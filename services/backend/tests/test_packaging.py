@@ -41,6 +41,23 @@ def test_release_wheel_loads_packaged_enrichment_schema(tmp_path: Path) -> None:
     )
     assert build.returncode == 0, build.stdout + build.stderr
     wheel = next(wheel_directory.glob("recall_backend-*.whl"))
+    installed_directory = tmp_path / "installed"
+    install = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--no-deps",
+            "--target",
+            str(installed_directory),
+            str(wheel),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert install.returncode == 0, install.stdout + install.stderr
 
     smoke_test = subprocess.run(
         [
@@ -49,11 +66,13 @@ def test_release_wheel_loads_packaged_enrichment_schema(tmp_path: Path) -> None:
             "-c",
             (
                 "import sys; "
-                f"sys.path.insert(0, {str(wheel)!r}); "
+                f"sys.path.insert(0, {str(installed_directory)!r}); "
                 "from app.enrichment import enrichment_schema; "
+                "from app.database import discover_migrations; "
                 "schema = enrichment_schema(); "
                 "assert schema['type'] == 'object'; "
-                "assert 'search_aliases' in schema['required']"
+                "assert 'search_aliases' in schema['required']; "
+                "assert [item.version for item in discover_migrations()] == [1, 2]"
             ),
         ],
         cwd=tmp_path,

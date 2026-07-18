@@ -65,12 +65,13 @@ It refreshes directly from the checked-in Markdown source every two seconds.
 
 ## Status
 
-Layers 0–3 and the shared CRUD-to-macOS vertical slice are complete. The app can
-capture clipboard text with a personal note, persist it through the real
-backend, poll the enrichment lifecycle, and render the live list and separated
-detail fields. Layer 4 backend enrichment is implemented and deterministically
-tested; its real OpenAI proof awaits a local API key. Backend search, Chrome
-capture, and hybrid retrieval remain pending. Live evidence and blockers are
+Layers 0–5 backend work and the shared CRUD-to-macOS vertical slice are
+complete. The app can capture clipboard text with a personal note, persist it
+through the real backend, poll the enrichment lifecycle, search through the
+Layer 5 API, and render the live list and separated detail fields. Layer 4 is
+deterministically tested, but its real OpenAI proof awaits a local API key.
+Layer 7 embeddings and hybrid retrieval will proceed before the deferred Layer
+6 Chrome extension at the user's direction. Live evidence and blockers are
 tracked in [`docs/developer-b-checklist.md`](docs/developer-b-checklist.md).
 
 macOS setup, limitations, build commands, and the manual test matrix are in

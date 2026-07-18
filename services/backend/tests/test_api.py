@@ -266,6 +266,93 @@ def test_provider_failure_is_persisted_without_private_trace(
     assert "private provider trace" not in loaded["error_message"]
 
 
+def test_search_returns_keyword_only_contract_shape(
+    api_client: tuple[TestClient, Path],
+) -> None:
+    client, _ = api_client
+    app.dependency_overrides[get_enrichment_provider] = SuccessfulProvider
+    created = client.post("/v1/captures", json=fixture_request()).json()
+
+    response = client.get("/v1/search", params={"q": "surprising VPS fix"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["query"] == "surprising VPS fix"
+    assert len(body["results"]) == 1
+    result = body["results"][0]
+    assert result["capture"]["id"] == created["id"]
+    assert result["score"] == result["keyword_score"] == 1.0
+    assert result["semantic_score"] is None
+    assert 0.0 <= result["score"] <= 1.0
+
+
+def test_search_without_openai_finds_failed_capture_raw_fields(
+    api_client: tuple[TestClient, Path],
+) -> None:
+    client, _ = api_client
+    created = client.post("/v1/captures", json=fixture_request()).json()
+
+    response = client.get(
+        "/v1/search",
+        params={"q": "WorkingDirectory"},
+    )
+
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert [result["capture"]["id"] for result in results] == [created["id"]]
+    assert results[0]["capture"]["status"] == "error"
+    assert results[0]["semantic_score"] is None
+
+
+def test_empty_and_missing_search_query_return_recent_captures(
+    api_client: tuple[TestClient, Path],
+) -> None:
+    client, _ = api_client
+    first = client.post("/v1/captures", json=fixture_request()).json()
+    second_payload = fixture_request()
+    second_payload["client_capture_id"] = str(uuid4())
+    second_payload["selected_text"] = "newer raw capture"
+    second = client.post("/v1/captures", json=second_payload).json()
+
+    missing_query = client.get("/v1/search?limit=2")
+    whitespace_query = client.get("/v1/search", params={"q": "   ", "limit": 1})
+
+    assert missing_query.status_code == 200
+    assert missing_query.json()["query"] == ""
+    assert [
+        result["capture"]["id"] for result in missing_query.json()["results"]
+    ] == [second["id"], first["id"]]
+    assert whitespace_query.status_code == 200
+    assert whitespace_query.json()["query"] == "   "
+    assert whitespace_query.json()["results"][0]["capture"]["id"] == second["id"]
+    assert whitespace_query.json()["results"][0]["keyword_score"] == 0.0
+
+
+def test_search_no_result_and_client_fts_syntax_are_safe(
+    api_client: tuple[TestClient, Path],
+) -> None:
+    client, _ = api_client
+    client.post("/v1/captures", json=fixture_request())
+
+    missing = client.get("/v1/search", params={"q": "absent-nebula"})
+    syntax = client.get("/v1/search", params={"q": '" OR * -'})
+
+    assert missing.status_code == 200
+    assert missing.json()["results"] == []
+    assert syntax.status_code == 200
+    assert syntax.json()["results"] == []
+
+
+@pytest.mark.parametrize("query", ["limit=0", "limit=101", "limit=word"])
+def test_search_limit_is_enforced(
+    api_client: tuple[TestClient, Path],
+    query: str,
+) -> None:
+    client, _ = api_client
+
+    assert_validation_error(client.get(f"/v1/search?{query}"))
+
+
 @pytest.mark.parametrize("user_note", ["", "长备注" * 20_000])
 def test_empty_and_long_user_notes_round_trip(
     api_client: tuple[TestClient, Path],

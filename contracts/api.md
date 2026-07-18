@@ -251,6 +251,8 @@ contract does not use WebSockets.
 - Empty or whitespace-only `q`: returns recent Captures.
 - Exact technical identifiers receive higher keyword weight.
 - If query embedding fails, results fall back to keyword scoring.
+- Through Layer 5, `score` equals `keyword_score` and `semantic_score` is
+  `null`; Layer 7 adds semantic and hybrid scoring without changing this shape.
 
 ```json
 {

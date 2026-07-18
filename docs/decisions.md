@@ -28,7 +28,8 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-012 | Local live build-checklist dashboard | Addition | Accepted |
 | D-013 | Proceed past Layer 3 with a documented macOS integration holder | Addition | Accepted; gate closed |
 | D-014 | In-process enrichment tasks with an explicit retry endpoint | Clarification | Accepted |
-| D-015 | Build Week macOS client runtime and temporary search fallback | Addition | Accepted |
+| D-015 | Trigger-synchronized FTS5 with normalized keyword-only scoring | Clarification | Accepted |
+| D-016 | Build Week macOS client runtime and temporary search fallback | Addition | Accepted |
 
 ## D-001 — Localhost monorepo architecture
 
@@ -263,7 +264,31 @@ An abrupt process exit can still leave an in-process task unfinished. Automatic
 stale-processing recovery remains a documented post-MVP safeguard unless it
 becomes necessary for demo reliability.
 
-## D-015 — Build Week macOS client runtime and temporary search fallback
+## D-015 — Trigger-synchronized FTS5 with normalized keyword-only scoring
+
+- Classification: Clarification / implementation choice
+- Status: Accepted
+- Product impact: Implements the baseline Layer 5 keyword-retrieval path
+- Schedule impact: Low
+
+Layer 5 creates the exact product-plan `captures_fts` columns. One set of SQLite
+`AFTER INSERT`, `AFTER UPDATE`, and `AFTER DELETE` triggers owns synchronization
+for raw creation, enrichment success or failure, retry clearing, future
+deletion, and any other repository write. Migration 002 also backfills every
+existing Capture, avoiding an application-only second indexing path.
+
+Non-empty queries are split on whitespace and each segment is escaped as an FTS
+phrase joined with `AND`, so FTS operators supplied by a client are data rather
+than query syntax. Weighted BM25 prioritizes titles, exact source content,
+user notes, tags, entities, and aliases. Scores are normalized relative to the
+candidate set with a small exact-phrase bonus and clamped to `0...1`.
+
+In Layer 5, `score` equals `keyword_score` and `semantic_score` is `null`. Empty
+queries return recent Captures with zero keyword scores. Layer 7 may combine
+these stable keyword results with embeddings and metadata bonuses without
+changing FTS synchronization.
+
+## D-016 — Build Week macOS client runtime and temporary search fallback
 
 - Classification: Addition
 - Status: Accepted
@@ -285,8 +310,10 @@ semantic scoring, is never presented as the final search implementation, and
 is bypassed automatically whenever the contracted backend route succeeds.
 
 The temporary filter keeps the search UI testable while the two workstreams run
-in parallel. The backend remains the only persistence boundary and the only
-owner of production keyword, semantic, and hybrid retrieval.
+in parallel. With Layer 5 available, the app now bypasses the fallback and uses
+backend-ranked keyword results. The backend remains the only persistence
+boundary and the only owner of production keyword, semantic, and hybrid
+retrieval.
 
 ## Pending decisions
 

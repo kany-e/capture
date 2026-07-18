@@ -1,6 +1,6 @@
 # Developer A backend handoff
 
-Status: Layer 3 macOS integration verified; Layer 4 polling contract available
+Status: Layer 3 macOS integration verified; Layer 4 polling and Layer 5 search contracts available
 
 Last verified: 2026-07-18
 
@@ -12,6 +12,7 @@ Last verified: 2026-07-18
 - List: `GET /v1/captures?limit=50&offset=0`
 - Detail: `GET /v1/captures/{id}`
 - Retry enrichment: `POST /v1/captures/{id}/enrich`
+- Search: `GET /v1/search?q={query}&limit=20`
 - Shared response contract: `contracts/api.md`
 
 Start the backend from `services/backend/`:
@@ -43,9 +44,22 @@ List the newest records:
 curl 'http://127.0.0.1:8765/v1/captures?limit=50&offset=0'
 ```
 
+Search raw and generated fields, or omit `q` for recent Captures:
+
+```bash
+curl --get --data-urlencode 'q=WorkingDirectory' \
+  'http://127.0.0.1:8765/v1/search?limit=20'
+curl 'http://127.0.0.1:8765/v1/search?limit=20'
+```
+
 The live proof created Capture `359d1c47-0190-40c4-8681-d994408860be` and
 verified the same record through POST, direct SQLite inspection, detail GET,
 and list GET.
+
+The Layer 5 provider-off proof created temporary Capture
+`9845ea10-da9a-4407-bd43-907f86d89557`, observed its safe `error` transition,
+retrieved it through `q=WorkingDirectory`, and retrieved it again after a clean
+backend restart. The disposable database was removed afterward.
 
 ## macOS behavior for this layer
 
@@ -59,6 +73,9 @@ and list GET.
   and offer retry through `POST /v1/captures/{id}/enrich`.
 - Display the stable error `message`, but branch behavior on the error `code`.
 - Preserve `context_truncated` in Swift request and response models.
+- Decode search from `results[*].capture`. In Layer 5, `score` equals
+  `keyword_score` and `semantic_score` is `null`; do not require embeddings to
+  display keyword results.
 
 ## Retired integration holder
 
@@ -87,4 +104,5 @@ This closes the shared Layer 3 vertical-slice gate. Layer 4 enrichment is now
 implemented by the backend: the app polls `processing` records to `ready` or
 `error` and preserves raw content in either case. A real OpenAI-backed `ready`
 proof still requires the untracked local API key recorded as blocker B-007;
-backend search remains later-layer work.
+Layer 5 backend keyword search is available and automatically replaces the
+client's visible `404`-only fallback.

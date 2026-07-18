@@ -57,8 +57,10 @@ appear without a service restart. The dashboard is read-only and local-only.
 ## SQLite persistence
 
 Numbered SQL files live in `app/migrations/` and run transactionally during
-backend startup and before repository access. The current migration creates the
-product-plan `captures` table; FTS5 remains deferred to Layer 5.
+backend startup and before repository access. Migrations create the product-plan
+`captures` and `captures_fts` tables. SQLite triggers synchronize every insert,
+update, retry, and future deletion in the same transaction; migration 002
+backfills records created by older builds.
 
 Application code accesses Capture records through `app.repository` rather than
 issuing SQL from HTTP handlers. Source fields and the user note are not accepted
@@ -75,8 +77,8 @@ curl --header 'Content-Type: application/json' \
   http://127.0.0.1:8765/v1/captures
 ```
 
-The response is HTTP `202` with status `processing`. Enrichment does not run
-until Layer 4, so Layer 3 records intentionally remain in that state.
+The response is HTTP `202` with status `processing`. The background enrichment
+task then moves the stored Capture to `ready` or a source-preserving `error`.
 
 Use the returned `id` in the detail route and list the newest Captures with:
 
@@ -117,6 +119,22 @@ Concurrent attempts return the stable `capture_already_processing` error.
 
 The P0 runner is deliberately in-process. It does not add Redis, Celery,
 WebSockets, or a durable queue; see decision D-014.
+
+## Keyword search
+
+Layer 5 exposes provider-independent FTS5 retrieval:
+
+```bash
+curl --get --data-urlencode 'q=WorkingDirectory' \
+  --data-urlencode 'limit=20' \
+  http://127.0.0.1:8765/v1/search
+```
+
+The response follows `contracts/api.md`. Through Layer 5, `score` equals the
+normalized `keyword_score` and `semantic_score` is `null`. Empty or omitted `q`
+returns recent Captures. Source text and user notes remain searchable when
+OpenAI is absent or enrichment fails. Client input is escaped as FTS data, so
+quotes and operators cannot become query syntax; see decision D-015.
 
 ## Test
 

@@ -20,6 +20,8 @@ from app.api_models import (
     CaptureListResponse,
     CaptureResponse,
     ErrorEnvelope,
+    SearchResponse,
+    SearchResult,
 )
 from app.checklist import build_checklist_snapshot
 from app.config import get_settings
@@ -77,7 +79,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Recall Backend", version="0.4.0", lifespan=lifespan)
+app = FastAPI(title="Recall Backend", version="0.5.0", lifespan=lifespan)
 
 
 def get_repository() -> CaptureRepository:
@@ -187,6 +189,27 @@ def list_captures(
         items=[CaptureResponse.from_record(record) for record in records],
         limit=limit,
         offset=offset,
+    )
+
+
+@app.get("/v1/search", response_model=SearchResponse)
+def search_captures(
+    repository: Annotated[CaptureRepository, Depends(get_repository)],
+    q: str = "",
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> SearchResponse:
+    matches = repository.search_captures(query=q, limit=limit)
+    return SearchResponse(
+        query=q,
+        results=[
+            SearchResult(
+                capture=CaptureResponse.from_record(match.capture),
+                score=match.keyword_score,
+                keyword_score=match.keyword_score,
+                semantic_score=None,
+            )
+            for match in matches
+        ],
     )
 
 

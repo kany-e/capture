@@ -17,9 +17,16 @@ from app.models import (
     EnrichmentUpdate,
     NewCapture,
 )
+from app.search import (
+    KeywordSearchMatch,
+    build_fts_match_query,
+    normalize_keyword_matches,
+)
 
 
 VALID_CAPTURE_STATUSES = frozenset(get_args(CaptureStatus))
+FTS_CANDIDATE_MULTIPLIER = 5
+FTS_MAX_CANDIDATES = 500
 
 
 class CaptureNotFoundError(LookupError):
@@ -187,6 +194,52 @@ class CaptureRepository:
                 (limit, offset),
             ).fetchall()
         return [_row_to_record(row) for row in rows]
+
+    def search_captures(
+        self,
+        *,
+        query: str,
+        limit: int,
+    ) -> list[KeywordSearchMatch]:
+        normalized_query = query.strip()
+        if not normalized_query:
+            return [
+                KeywordSearchMatch(capture=record, keyword_score=0.0)
+                for record in self.list_captures(limit=limit, offset=0)
+            ]
+
+        candidate_limit = min(
+            max(limit * FTS_CANDIDATE_MULTIPLIER, limit),
+            FTS_MAX_CANDIDATES,
+        )
+        match_query = build_fts_match_query(normalized_query)
+        with database_connection(self.database_path) as connection:
+            rows = connection.execute(
+                """
+                SELECT captures.*,
+                    bm25(
+                        captures_fts,
+                        0.0, 6.0, 5.0, 2.0, 4.0, 6.0, 3.0,
+                        4.0, 5.0, 3.0, 6.0, 6.0, 5.0
+                    ) AS fts_rank
+                FROM captures_fts
+                JOIN captures ON captures.id = captures_fts.capture_id
+                WHERE captures_fts MATCH ?
+                ORDER BY fts_rank ASC, captures.created_at DESC
+                LIMIT ?
+                """,
+                (match_query, candidate_limit),
+            ).fetchall()
+
+        candidates = [
+            (_row_to_record(row), max(0.0, -float(row["fts_rank"])))
+            for row in rows
+        ]
+        return normalize_keyword_matches(
+            candidates,
+            query=normalized_query,
+            limit=limit,
+        )
 
     def claim_enrichment(self, capture_id: str) -> CaptureRecord:
         """Atomically move a non-processing Capture into processing state."""
