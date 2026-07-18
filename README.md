@@ -5,8 +5,14 @@ Recall is a macOS personal-memory capture tool that preserves source material,
 the user's reason for saving it, and an AI-generated contextual interpretation
 as separate, searchable layers.
 
-The repository has completed **Layer 2**: product and API contracts, the local
-backend foundation, and durable SQLite Capture storage are available.
+The repository contains the Layer 0–5 backend foundation plus locally verified
+Layer 6 Chrome capture and Layer 7 hybrid-retrieval implementations. Their
+shared manual Chrome/macOS and live OpenAI gates remain explicitly open.
+
+The current `main` tree intentionally holds only shared documentation,
+contracts, examples, and root metadata. Implementation code is separated by
+layer; see [`docs/branch-layout.md`](docs/branch-layout.md) for the exact branch
+map and integration consequence.
 
 ## Product baseline
 
@@ -41,6 +47,8 @@ Capture source text and optional user note
   the product baseline.
 - [`docs/developer-b-checklist.md`](docs/developer-b-checklist.md): live build
   checklist, exit gates, validation evidence, and blocker log.
+- [`docs/branch-layout.md`](docs/branch-layout.md): implementation branch tips,
+  dependency relationships, and the definition of central files on `main`.
 
 ## Planned stack
 
@@ -55,8 +63,9 @@ Capture source text and optional user note
 
 The backend starts without `.env` or an API key. Copy `.env.example` to `.env`
 only for local overrides, and never commit `.env` or an API key. Installation,
-start, health-check, test, and configuration instructions are in
-[`services/backend/README.md`](services/backend/README.md).
+start, health-check, test, and configuration instructions live with the backend
+on the implementation branches listed in
+[`docs/branch-layout.md`](docs/branch-layout.md).
 
 While the backend is running, the live Developer B checklist is available at
 [`http://127.0.0.1:8765/dev/checklist`](http://127.0.0.1:8765/dev/checklist).
@@ -64,8 +73,11 @@ It refreshes directly from the checked-in Markdown source every two seconds.
 
 ## Status
 
-Layers 0–5 backend work is pushed. Layer 7 embeddings and hybrid retrieval will
-proceed before the deferred Layer 6 Chrome extension at the user's direction.
-The real OpenAI proof awaits a local API key, while Developer A's macOS display
-confirmation remains open. Live evidence and blockers are tracked in
+Layers 0–5 backend work is pushed. Layers 6 and 7 are implemented, verified,
+and committed on local branches but are not yet pushed. The documentation-only
+`main` change is also local. The unpacked-Chrome-to-macOS confirmation, real
+OpenAI provider proof, and complete team integration remain open; none is
+represented as complete. A validated local `integration/layers-6-7` branch
+combines Developer B's Chrome and retrieval deltas but not Developer A's macOS
+client. Live evidence and blockers are tracked in
 [`docs/developer-b-checklist.md`](docs/developer-b-checklist.md).

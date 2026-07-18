@@ -29,6 +29,10 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-013 | Proceed past Layer 3 with a documented macOS integration holder | Addition | Accepted with open gate |
 | D-014 | In-process enrichment tasks with an explicit retry endpoint | Clarification | Accepted |
 | D-015 | Trigger-synchronized FTS5 with normalized keyword-only scoring | Clarification | Accepted |
+| D-016 | Build Layer 7 before Layer 6 | Addition | Accepted by user direction |
+| D-017 | Default-dimension embeddings with per-result FTS fallback | Clarification | Accepted |
+| D-018 | Build-free Manifest V3 Chrome extension | Addition | Accepted |
+| D-019 | Documentation-only main with stacked layer branches | Addition | Accepted by user direction |
 
 ## D-001 — Localhost monorepo architecture
 
@@ -287,7 +291,99 @@ queries return recent Captures with zero keyword scores. Layer 7 may combine
 these stable keyword results with embeddings and metadata bonuses without
 changing FTS synchronization.
 
+## D-016 — Build Layer 7 before Layer 6
+
+- Classification: Addition / schedule change
+- Status: Accepted by explicit user direction
+- Product impact: None; both baseline layers remain required
+- Schedule impact: Layer 6 is deferred until Layer 7 is delivered
+
+The product plan orders Chrome capture before embeddings and hybrid retrieval.
+At the user's direction, Developer B will implement Layer 7 first and will not
+start or claim any Chrome-extension work as part of this slice. Layer 7 remains
+a backend-only change built against the existing Capture API and deterministic
+fixtures.
+
+This reordering does not change ownership, remove the Layer 6 browser workflow,
+or satisfy the final Chrome-to-search vertical-slice gate. The Apple on-device
+experiment in D-008 also remains gated until the baseline workflow is stable.
+
+The temporary deferral ended on 2026-07-18 when the user requested Layer 6
+after the Layer 7 backend implementation and deterministic verification were
+complete. Layer 7's live provider gate remains independently blocked by B-008.
+
+## D-017 — Default-dimension embeddings with per-result FTS fallback
+
+- Classification: Clarification / implementation choice
+- Status: Accepted
+- Product impact: Implements product-plan §12 without a storage migration
+- Schedule impact: Low
+
+Layer 7 calls the configured `OPENAI_EMBEDDING_MODEL` without a reduced
+`dimensions` argument for both Capture and query inputs. A Capture vector is
+generated only after enrichment output has passed validation; an embedding
+failure still stores that Capture as `ready` with `embedding_json` empty.
+
+Search reads every `ready` Capture and calculates cosine similarity in Python.
+Cosine values are clamped to the public `0...1` score range. Hybrid candidates
+are the union of keyword matches and ready Captures with compatible vectors.
+When the query vector is unavailable, the complete response preserves Layer 5
+FTS ordering and scores. When only one Capture vector is unavailable or
+incompatible, that result retains its keyword score and a null semantic score
+instead of failing the search.
+
+The implementation stores no second vector index and adds no embedding-model
+metadata column. A future model change still requires the regeneration policy
+from D-004; provider metadata remains a pending post-MVP decision.
+
+## D-018 — Build-free Manifest V3 Chrome extension
+
+- Classification: Addition / implementation choice
+- Status: Accepted
+- Product impact: Implements the baseline Chrome Capture workflow
+- Schedule impact: Low
+
+Layer 6 uses browser-native ES modules and a Manifest V3 action popup under
+`apps/chrome-extension/`. The unpacked extension requires no bundler or runtime
+framework: its package script runs deterministic tests with Node's built-in
+test runner, while Chrome executes the checked-in source directly.
+
+The popup injects a self-contained, testable extraction function only after an
+explicit toolbar action. It requests exactly `activeTab`, `scripting`, and
+`storage`, plus the fixed `http://127.0.0.1:8765/*` host permission. `storage`
+holds only a per-tab note draft plus its page-URL identity and removes the draft
+after a successful save; selected text and surrounding context are not cached
+by the extension.
+
+The backend CORS allowlist remains environment-configured. Wildcards, public
+web origins, malformed extension origins, credentials, and broad methods or
+headers are rejected; no unpacked extension ID is hard-coded into the shared
+repository.
+
+## D-019 — Documentation-only main with stacked layer branches
+
+- Classification: Addition / repository workflow change
+- Status: Accepted by explicit user direction
+- Product impact: `main` is no longer a runnable integrated product tree
+- Schedule impact: A runnable integration branch is required before Layer 8
+
+The user directed that AI, SQL, Chrome-extension, and related implementation
+work be retained on separate branches while `main` contains only description
+and central files. Existing commits are not rewritten. Branch refs preserve the
+verified Layer 1–5 boundaries, and Layers 6 and 7 are committed as separate
+sibling deltas from Layer 5. Their validated combined state is retained on
+`integration/layers-6-7` because a direct sibling merge requires resolution in
+the shared backend bootstrap and README. Developer A's existing macOS branch is
+unchanged.
+
+The exact branch tips and definition of central files are recorded in
+[`branch-layout.md`](branch-layout.md). This intentionally supersedes the
+product-plan workflow rule that `main` stay runnable. It does not waive the
+Layer 8 and final demo integration gates: the team must agree on a runnable
+integration location before those gates can close.
+
 ## Pending decisions
 
-Model snapshots, embedding dimensions, and the exact provider-metadata fields
-remain implementation-layer decisions and must not be silently fixed here.
+Model snapshots, future dimension migrations, and the exact provider-metadata
+fields remain implementation-layer decisions and must not be silently fixed
+here.

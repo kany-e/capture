@@ -6,11 +6,15 @@ Project: Recall
 
 Last updated: 2026-07-18
 
-Current phase: Layer 5 pushed; Layer 7 requested before Layer 6; design cross-check next
+Current phase: layer branches created locally; documentation-only main awaiting review/push
 
 Current branch: `main`
 
 Last verified Layer 5 implementation commit: `d34a567`, pushed to `origin/main`
+
+Branch map: `docs/branch-layout.md`; Layer 6 commit `d426ca8`; Layer 7 commit
+`faa45d7`; combined integration commit `3389bae`; none of the new branches is
+pushed yet
 
 Last baseline cross-check: 2026-07-18 against all sections of
 `docs/product-plan.md`
@@ -48,15 +52,18 @@ Update protocol:
 | 3 | Capture CRUD and first integration | Backend complete / integration deferred | Commit `17264fe` pushed; D-013 holder awaits Developer A |
 | 4 | OpenAI enrichment | Backend implemented / live proof blocked | 94 tests pass, including release-wheel proof; real Responses API call awaits B-007 |
 | 5 | FTS5 keyword retrieval | Complete | Commit `d34a567` pushed; 119 tests and provider-off live/restart proof pass |
-| 6 | Chrome capture | Pending | Not started |
-| 7 | Embeddings and hybrid retrieval | Pending | Not started |
+| 6 | Chrome capture | Implemented / manual gate open | Isolated branch `d426ca8`: 13 extension and 128 backend tests pass; B-009 remains |
+| 7 | Embeddings and hybrid retrieval | Backend implemented / live proof blocked | Isolated branch `faa45d7`: 156 backend tests pass; live embedding call awaits B-008 |
 | 8 | Reliability and demo readiness | Pending | Not started |
 | 9 | Optional Apple on-device path | Gated | Decision D-008 accepted; prerequisites unmet |
 | 10 | Final freeze and submission | Pending | Not started |
 
-No hard blocker prevents Layer 5 implementation or verification. B-007 blocks
-only the real Layer 4 provider proof, and B-006 remains Developer A's shared
-macOS gate; neither prevents provider-independent FTS5 retrieval.
+No hard blocker prevents the completed local Layer 6/7 implementation work.
+B-009 holds the real unpacked-Chrome/macOS gate, B-008 prevents live
+embedding-model proof, B-007 prevents the real Layer 4 provider proof, and
+B-006 remains Developer A's shared macOS gate. B-010 blocks claiming a complete
+Layer 8 integration while `main` is documentation-only and the local Developer
+B integration branch does not include Developer A's macOS client.
 
 ## Scope, schedule, and collaboration guardrails
 
@@ -69,8 +76,9 @@ These are baseline requirements, not optional process suggestions:
   of the submission entirely; the only approved exception is the separately
   gated Apple experiment in D-008, which still cannot begin before Layers 1–8
   pass.
-- `main` must remain runnable; merge small batches and require both developers
-  to agree before changing a shared contract.
+- The product plan requires `main` to remain runnable. D-019 records the user's
+  explicit documentation-only exception; B-010 remains open until the team
+  restores a runnable `main` or agrees on a separate integration branch.
 - Run at least two end-to-end integration checks each day.
 - Freeze major features for the final half-day. On July 21, add no new platform,
   technology stack, database rewrite, complex agent, Safari extension, OCR,
@@ -589,37 +597,75 @@ Status: `[x]` implementation and exit gate verified locally; delivery pending
 
 # Layer 6 — Chrome extension capture
 
-Status: `[ ]` pending
+Status: `[~]` implementation verified; real unpacked-Chrome/macOS gate open
+
+## Decisions and prerequisites
+
+- [x] End the D-016 deferral after the verified Layer 7 backend implementation.
+- [x] Record the build-free Manifest V3 structure and note-draft storage scope
+  in D-018 before implementation.
+- [x] Keep all browser Capture fields within the existing shared contract; no
+  schema change is required.
 
 ## Build tasks
 
-- [ ] Create a Manifest V3 extension under `apps/chrome-extension/`.
-- [ ] Request only `activeTab`, `scripting`, `storage`, and required localhost
+- [x] Create a Manifest V3 extension under `apps/chrome-extension/`.
+- [x] Request only `activeTab`, `scripting`, `storage`, and required localhost
   host permission.
-- [ ] Extract page title, URL, selected text, and nearby context.
-- [ ] Locate the selection's `commonAncestorContainer`, then prefer `article`,
+- [x] Extract page title, URL, selected text, and nearby context.
+- [x] Locate the selection's `commonAncestorContainer`, then prefer `article`,
   `[role="main"]`, `.answer`, `.post-text`, `main`, or the nearest `p`, `div`,
   or `section` without site-specific parsers.
-- [ ] If no useful container exists, fall back to a truncated portion of
+- [x] If no useful container exists, fall back to a truncated portion of
   `document.body.innerText`.
-- [ ] Enforce context limits and set `context_truncated`.
-- [ ] Support no-selection page-context capture with a clear warning.
-- [ ] Build popup page title, selection preview, optional note, Save, `Saved`,
+- [x] Enforce context limits and set `context_truncated`.
+- [x] Support no-selection page-context capture with a clear warning.
+- [x] Build popup page title, selection preview, optional note, Save, `Saved`,
   and `Processing with AI` states.
-- [ ] Send the exact Capture contract to the backend.
-- [ ] Show `Recall is not running` when localhost is unreachable.
-- [ ] Configure narrow CORS origins; never submit with `*`.
+- [x] Send the exact Capture contract to the backend.
+- [x] Show `Recall is not running` when localhost is unreachable.
+- [x] Configure narrow CORS origins; never submit with `*`.
 
 ## Required browser tests
 
-- [ ] Stack Overflow.
-- [ ] GitHub Issue.
-- [ ] Ordinary article/blog.
-- [ ] OpenAI documentation.
-- [ ] Code block selection.
-- [ ] No selection.
-- [ ] Long context.
-- [ ] Backend stopped.
+- [x] Stack Overflow: actual page returned 6,211 characters from the preferred
+  page container without truncation.
+- [x] GitHub Issue: actual issue returned 8,170 characters from the preferred
+  page container without truncation.
+- [x] Ordinary article/blog: Python.org returned 2,804 characters from the
+  preferred page container.
+- [x] OpenAI documentation: the embeddings guide returned 6,968 characters
+  from the preferred page container.
+- [x] Code block selection: a real DOM Range produced the exact two-line
+  systemd command and its surrounding article context.
+- [x] No selection: actual public pages and the popup harness returned page
+  context plus the visible warning.
+- [x] Long context: the browser fixture returned exactly 20,000 characters and
+  `context_truncated=true`.
+- [~] Backend stopped: deterministic Node and browser-harness connection
+  refusal tests show the exact recovery message. The existing user-owned
+  process on port 8765 was not stopped solely for this test; see B-009.
+
+## Validation evidence
+
+- [x] The dependency-free extension suite passes all 13 tests with the bundled
+  Node runtime and through the package script.
+- [x] Node syntax checks pass for extraction, API, and popup modules.
+- [x] The pre-split combined backend suite passed all 165 tests, including
+  strict CORS; `pip check` and bytecode compilation passed.
+- [x] The isolated `layer/6-chrome-capture` branch passes 128 backend tests,
+  all 13 extension tests, `pip check`, bytecode compilation, and JS syntax
+  checks without any embedding or hybrid-retrieval files.
+- [x] The real browser matrix covers Stack Overflow, GitHub, Python.org, OpenAI
+  docs, selected code, no selection, long context, saved state, processing
+  state, and connection-refusal state using the checked-in modules.
+- [x] Disposable backend 0.7.0 proof accepted the exact extension payload as
+  `202 processing`, preserved all source/note fields in SQLite, and transitioned
+  safely to `error` only because OpenAI was intentionally disabled.
+- [x] Exact extension-origin preflight returned `200`; an unconfigured public
+  origin returned `400`. Methods remained `GET, POST`, with no credentials.
+- [x] Temporary browser tabs, fixture server, backend process, and database
+  were removed; the pre-existing process on port 8765 was untouched.
 
 ## Exit gate
 
@@ -631,52 +677,75 @@ Chrome selection
 → card appears in macOS app
 ```
 
-- [ ] Complete workflow passes without developer database edits.
+- [D] Complete workflow passes without developer database edits. The checked-in
+  implementation has component and boundary proof, but the real unpacked
+  extension and Developer A macOS display confirmation remain B-009/B-006.
 
 ---
 
 # Layer 7 — Embeddings and hybrid retrieval
 
-Status: `[ ]` pending
+Status: `[~]` backend implementation verified; cross-layer exit gate deferred
 
 ## Decisions required before implementation
 
-- [ ] Confirm embedding model access.
-- [ ] Use the configured model's default dimensions for the MVP. Only introduce
+- [!] Confirm embedding model access. B-008 records the unavailable credential;
+  deterministic provider-boundary work continues without claiming a live call.
+- [x] Use the configured model's default dimensions for the MVP. Only introduce
   reduced dimensions or version migration if a tested constraint requires it,
   and document that change first.
+- [x] Cross-check the implementation call shape against the official OpenAI
+  embeddings guide and API reference: `client.embeddings.create`, one input,
+  configured model, float encoding, and `response.data[0].embedding`.
 
 ## Build tasks
 
-- [ ] Implement the exact §12.1 embedding-input builder.
-- [ ] Keep labels, order, LF normalization, joining, and final newline stable.
-- [ ] Test the builder against `contracts/examples/embedding-input.txt`.
-- [ ] Generate an embedding only after successful enrichment.
-- [ ] Store vectors as JSON arrays in SQLite.
-- [ ] Do not introduce Pinecone, Weaviate, Milvus, Redis Vector, or a complex
+- [x] Implement the exact §12.1 embedding-input builder.
+- [x] Keep labels, order, LF normalization, joining, and final newline stable.
+- [x] Test the builder against `contracts/examples/embedding-input.txt`.
+- [x] Generate an embedding only after successful enrichment.
+- [x] Store vectors as JSON arrays in SQLite.
+- [x] Do not introduce Pinecone, Weaviate, Milvus, Redis Vector, or a complex
   SQLite vector extension for the Build Week dataset.
-- [ ] Embed the search query using the same model and dimensions.
-- [ ] Calculate cosine similarity in Python.
-- [ ] Implement normal weights:
+- [x] Embed the search query using the same model and dimensions.
+- [x] Calculate cosine similarity in Python.
+- [x] Implement normal weights:
   `0.55 semantic + 0.35 keyword + 0.10 metadata`.
-- [ ] Implement technical-query weights:
+- [x] Implement technical-query weights:
   `0.45 semantic + 0.50 keyword + 0.05 metadata`.
-- [ ] Calculate metadata bonuses from URL-domain, source-app, exact-tag, and
+- [x] Calculate metadata bonuses from URL-domain, source-app, exact-tag, and
   exact error-code matches.
-- [ ] Detect technical identifiers using digits, paths, hyphens, underscores,
+- [x] Detect technical identifiers using digits, paths, hyphens, underscores,
   hexadecimal prefixes, URLs, and mixed-case identifiers.
-- [ ] Return final, keyword, and nullable semantic scores.
-- [ ] Fall back to FTS if Capture embedding or query embedding is unavailable.
+- [x] Return final, keyword, and nullable semantic scores.
+- [x] Fall back to FTS if Capture embedding or query embedding is unavailable.
 
 ## Required tests
 
-- [ ] Exact query still ranks correctly.
-- [ ] Vague personal description retrieves the intended Capture.
-- [ ] Technical identifier query favors exact text.
-- [ ] Chinese query retrieves relevant English source with Chinese note.
-- [ ] Missing Capture embedding does not crash search.
-- [ ] Query embedding failure returns FTS results.
-- [ ] Score ordering is deterministic for fixed fixtures.
+- [x] Exact query still ranks correctly.
+- [x] Vague personal description retrieves the intended Capture.
+- [x] Technical identifier query favors exact text.
+- [x] Chinese query retrieves relevant English source with Chinese note.
+- [x] Missing Capture embedding does not crash search.
+- [x] Query embedding failure returns FTS results.
+- [x] Score ordering is deterministic for fixed fixtures.
+
+## Validation evidence
+
+- [x] The Layer 7 focused suite passes 137 tests across embedding projection,
+  provider boundaries, enrichment, storage, hybrid ranking, and HTTP behavior.
+- [x] `.venv/bin/python -m pytest` passes all 156 tests.
+- [x] `pip check`, `git diff --check`, and bytecode compilation pass.
+- [x] Exact fixture comparison proves stable labels, order, list trimming, LF
+  normalization, preserved internal note/source whitespace, and final newline.
+- [x] Deterministic HTTP tests prove post-enrichment vector persistence and a
+  semantic-only API result with final/keyword/semantic score fields.
+- [x] A disposable backend 0.6.0 live run with OpenAI disabled preserved the
+  raw Capture, stored `embedding_json` as null, and returned
+  `WorkingDirectory` with `score=keyword_score=1.0` and
+  `semantic_score=null` before and after a clean restart.
+- [x] The disposable database and both live server processes were removed.
+- [!] A real OpenAI embedding request cannot be claimed; B-008 remains open.
 
 ## Vertical-slice exit gate
 
@@ -688,8 +757,12 @@ Chrome selection
 → intended Capture ranks near the top
 ```
 
-- [ ] Complete workflow passes three times with representative data.
-- [ ] Commit and push the working slice.
+- [D] Complete workflow passes three times with representative data. This
+  cross-layer gate requires the deferred Layer 6 Chrome path and resolution of
+  B-008; deterministic Layer 7 backend coverage is not presented as a substitute.
+- [x] Commit the working slice as `faa45d7` on
+  `layer/7-hybrid-retrieval`.
+- [ ] Push the working slice.
 
 ---
 
@@ -832,7 +905,8 @@ Status: `[ ]` pending
 - [ ] Stop feature work.
 - [ ] Merge only verified fixes.
 - [ ] Keep the last known working commit available for immediate rollback.
-- [ ] Confirm `main` is runnable.
+- [!] Confirm `main` is runnable. D-019 intentionally makes it documentation-
+  only; B-010 must be resolved before this gate can close.
 - [ ] Run backend tests and contract validation.
 - [ ] Run Chrome and macOS manual test matrices.
 - [ ] Confirm `.env` and API keys are absent from Git history and tracked files.
@@ -962,10 +1036,138 @@ Use IDs `B-###`. Never delete an entry; append resolution and date.
 - Does it block Layer 4 implementation? No. It blocks only the live provider
   exit-gate evidence and marking Layer 4 completely verified.
 
+## B-008 — OpenAI credential is unavailable for Layer 7 embedding proof
+
+- Opened: 2026-07-18
+- Severity: Integration / Layer 7 exit gate
+- Status: Open
+- Impact: The exact embedding projection, provider boundary, SQLite storage,
+  cosine/hybrid scoring, deterministic vector tests, and FTS fallback can be
+  implemented and verified, but a real embedding-model request cannot run.
+- Resolution needed: Configure `OPENAI_API_KEY` outside Git, restart the
+  backend, and run the Layer 7 live provider proof using the configured
+  `OPENAI_EMBEDDING_MODEL`.
+- Does it block Layer 7 implementation? No. It blocks live model-access proof
+  and the complete Chrome-to-OpenAI vertical-slice gate.
+
+## B-009 — Real unpacked-Chrome-to-macOS confirmation is pending
+
+- Opened: 2026-07-18
+- Severity: Coordination / Layer 6 exit gate
+- Status: Open
+- Impact: Manifest, extraction, popup behavior, exact API delivery, SQLite
+  persistence, CORS, and browser-page behavior are verified independently, but
+  the complete toolbar-action flow has not run in a user-loaded Chrome
+  extension and the resulting card has not been confirmed in Developer A's
+  macOS app.
+- Resolution needed: Load `apps/chrome-extension/` through
+  `chrome://extensions`, configure the generated exact origin in the untracked
+  `.env`, save one selected passage, and have Developer A confirm the card in
+  the macOS list without a database edit. Also repeat the popup check once with
+  the backend intentionally stopped.
+- Does it block Layer 6 implementation? No. It blocks marking the cross-client
+  exit gate complete.
+
+## B-010 — Documentation-only main is not a runnable integration tree
+
+- Opened: 2026-07-18
+- Severity: Architecture / Layer 8 integration gate
+- Status: Open by explicit user direction under D-019
+- Impact: Contracts and descriptions remain centralized, and every
+  implementation commit remains recoverable on a named branch, but checking
+  out `main` alone no longer starts or tests the Recall product.
+- Resolution needed: Before Layer 8, either restore a runnable integrated
+  `main` or have both developers agree to extend the local
+  `integration/layers-6-7` branch with the required macOS work.
+- Does it block the branch separation? No. It blocks claiming `main` is runnable
+  and therefore blocks the Layer 8/final integrated-demo gate.
+
 # Errors encountered
 
 Use IDs `E-###`. Record the original symptom and the resolution. Do not erase
 resolved errors.
+
+## E-025 — The first extension test command could not find `npm`
+
+- Date: 2026-07-18
+- Status: Resolved 2026-07-18
+- Symptom: The first `npm test` attempt exited immediately with
+  `zsh: command not found: npm`; the parallel backend CORS/API suite passed all
+  57 tests.
+- Resolution: Located the bundled Node and pnpm runtimes. The built-in test
+  suite passed all 13 tests directly and through the package script; the README
+  now documents npm, pnpm, and direct Node commands.
+- Recurrence during branch separation: the plain `npm test` command again
+  exited `127` because this shell still has no npm on `PATH`; the parallel
+  isolated Layer 6 backend suite passed all 128 tests. The extension suite was
+  immediately rerun with the bundled Node executable and all 13 tests plus
+  three syntax checks passed.
+- Project impact: Tool discovery only; no dependency or product change.
+
+## E-026 — First real-page browser check missed the dispatch deadline
+
+- Date: 2026-07-18
+- Status: Resolved 2026-07-18
+- Symptom: The initial read-only Stack Overflow extraction check exceeded the
+  browser dispatch deadline before navigation was sent.
+- Resolution: The navigation had completed despite the dispatch timeout. Reused
+  the existing tab and ran the checked-in extractor successfully, then
+  completed the remaining real-page matrix.
+- Project impact: One delayed observation only; no page write occurred.
+
+## E-027 — First code-block drag did not create a browser selection
+
+- Date: 2026-07-18
+- Status: Resolved 2026-07-18
+- Symptom: A bounded pointer drag inside the OpenAI documentation code block
+  left `window.getSelection()` empty. The extractor correctly returned page
+  context, but that does not prove the selected-code path.
+- Resolution: A second coordinate gesture also produced no selection, so the
+  test switched to a deterministic local browser fixture whose own page script
+  establishes a real DOM Range. The checked-in extractor returned the exact
+  two-line code selection and preferred article context.
+- Project impact: Browser-gesture limitation only; the real DOM selection path
+  is now verified.
+
+## E-028 — Local fixture server received an optional favicon request
+
+- Date: 2026-07-18
+- Status: Resolved / no action required
+- Symptom: The browser requested `/favicon.ico`; the disposable fixture server
+  returned `404` because the test pages intentionally define no icon.
+- Resolution: No product file was added for a test-only browser decoration.
+  Every requested fixture, module, stylesheet, and popup artifact returned
+  `200`, and the server was removed after verification.
+- Project impact: None.
+
+## E-029 — Package-script verification generated empty pnpm metadata
+
+- Date: 2026-07-18
+- Status: Resolved 2026-07-18
+- Symptom: Running the dependency-free package script through bundled pnpm
+  created an empty lockfile and two `node_modules` metadata files despite there
+  being no dependencies.
+- Resolution: Removed the generated files and added a local `.gitignore` for
+  `node_modules/` and the empty pnpm lock. The extension remains build-free and
+  the direct Node test command remains the canonical dependency-free proof.
+- Project impact: Workspace hygiene only; no runtime package was installed.
+
+## E-030 — Direct Layer 6 and Layer 7 merge has two content conflicts
+
+- Date: 2026-07-18
+- Status: Resolved for local Developer B integration; direct merge remains
+  intentionally unsupported
+- Symptom: `git merge-tree --write-tree layer/6-chrome-capture
+  layer/7-hybrid-retrieval` reported content conflicts in
+  `services/backend/app/main.py` and `services/backend/README.md`.
+- Cause: Both sibling deltas update the backend version/bootstrap and adjacent
+  runtime documentation from the same Layer 5 base.
+- Resolution: Promoted the already-resolved, previously validated combined
+  checkpoint `3389bae` to `integration/layers-6-7`. The focused siblings remain
+  review branches; integration should use the combined branch instead of a
+  blind direct merge.
+- Project impact: No code loss and no test regression. Final team integration
+  still requires Developer A's macOS branch under B-010.
 
 ## E-001 — Official OpenAI docs MCP could not initially install
 
