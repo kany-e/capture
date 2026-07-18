@@ -310,7 +310,9 @@ Initial error codes:
 
 Development may allow configured localhost and unpacked-extension origins.
 The submitted build must not use an unrestricted `*` origin. The final Chrome
-extension origin is configured through `RECALL_CORS_ORIGINS`.
+extension origin is configured through `RECALL_CORS_ORIGINS`. The backend
+rejects wildcards, public web origins, malformed extension IDs, credentials,
+paths, queries, and fragments; allowed methods are limited to `GET` and `POST`.
 
 ## Official OpenAI references
 

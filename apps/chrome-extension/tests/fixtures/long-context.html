@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Recall long-context fixture</title>
+  </head>
+  <body>
+    <article id="long-article"></article>
+    <script>
+      document.querySelector("#long-article").textContent = "context ".repeat(3000);
+    </script>
+  </body>
+</html>

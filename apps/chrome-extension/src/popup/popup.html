@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Save to Recall</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header class="brand-row">
+        <span class="brand-mark" aria-hidden="true">R</span>
+        <div>
+          <p class="eyebrow">Recall</p>
+          <h1>Save this context</h1>
+        </div>
+      </header>
+
+      <section class="source-card" aria-labelledby="source-title-label">
+        <p class="section-label" id="source-title-label">Page</p>
+        <h2 id="page-title">Reading the active page…</h2>
+        <p id="page-url" class="page-url"></p>
+      </section>
+
+      <section class="preview-section" aria-labelledby="preview-label">
+        <div class="section-heading">
+          <p class="section-label" id="preview-label">Selection preview</p>
+          <span id="preview-count" class="character-count"></span>
+        </div>
+        <p id="selection-warning" class="warning" hidden>
+          No text selected; saving page context.
+        </p>
+        <pre id="selection-preview" class="selection-preview">Loading…</pre>
+      </section>
+
+      <label class="note-label" for="user-note">Why are you saving this?</label>
+      <textarea
+        id="user-note"
+        rows="4"
+        placeholder="Optional note, situation, or caution"
+      ></textarea>
+
+      <div id="status" class="status" aria-live="polite" hidden>
+        <strong id="status-title"></strong>
+        <span id="status-detail"></span>
+      </div>
+
+      <button id="save-button" type="button" disabled>Save</button>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

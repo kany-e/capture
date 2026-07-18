@@ -25,6 +25,7 @@ from app.api_models import (
 )
 from app.checklist import build_checklist_snapshot
 from app.config import get_settings
+from app.cors import ConfiguredCORSMiddleware
 from app.database import (
     MigrationError,
     apply_migrations,
@@ -79,7 +80,14 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Recall Backend", version="0.5.0", lifespan=lifespan)
+app = FastAPI(title="Recall Backend", version="0.6.0", lifespan=lifespan)
+app.add_middleware(
+    ConfiguredCORSMiddleware,
+    allow_origins=[],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+    allow_credentials=False,
+)
 
 
 def get_repository() -> CaptureRepository:

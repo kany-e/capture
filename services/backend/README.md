@@ -115,6 +115,21 @@ Concurrent attempts return the stable `capture_already_processing` error.
 The P0 runner is deliberately in-process. It does not add Redis, Celery,
 WebSockets, or a durable queue; see decision D-014.
 
+## Chrome extension CORS
+
+Layer 6 accepts cross-origin requests only from exact origins listed in
+`RECALL_CORS_ORIGINS`. Wildcards and public web origins are rejected. After
+loading the unpacked extension, copy its ID and configure the untracked root
+`.env`, then restart the backend:
+
+```text
+RECALL_CORS_ORIGINS=chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+```
+
+For a local browser harness, loopback origins such as
+`http://127.0.0.1:3000` are also accepted. CORS permits only `GET`, `POST`, and
+the `Content-Type` header, without credentials.
+
 ## Keyword search
 
 Layer 5 exposes provider-independent FTS5 retrieval:
