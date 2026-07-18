@@ -5,8 +5,9 @@ Recall is a macOS personal-memory capture tool that preserves source material,
 the user's reason for saving it, and an AI-generated contextual interpretation
 as separate, searchable layers.
 
-The repository has completed **Layer 2**: product and API contracts, the local
-backend foundation, and durable SQLite Capture storage are available.
+The repository contains the Layer 0–5 backend foundation plus locally verified
+Layer 6 Chrome capture and Layer 7 hybrid-retrieval implementations. Their
+shared manual Chrome/macOS and live OpenAI gates remain explicitly open.
 
 ## Product baseline
 
@@ -64,8 +65,7 @@ It refreshes directly from the checked-in Markdown source every two seconds.
 
 ## Status
 
-Layers 0–5 backend work is pushed. Layer 7 embeddings and hybrid retrieval will
-proceed before the deferred Layer 6 Chrome extension at the user's direction.
-The real OpenAI proof awaits a local API key, while Developer A's macOS display
-confirmation remains open. Live evidence and blockers are tracked in
+Layers 0–5 backend work is pushed. Layers 6 and 7 are implemented and verified
+locally. The unpacked-Chrome-to-macOS confirmation and real OpenAI provider
+proof remain open; neither is represented as complete. Live evidence and blockers are tracked in
 [`docs/developer-b-checklist.md`](docs/developer-b-checklist.md).

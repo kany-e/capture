@@ -115,6 +115,10 @@ exactly and is documented as a byte-stable construction in
 
 ## Build order
 
+The baseline dependency order remains below. Delivery is currently executing
+Layer 7 before Layer 6 by explicit user direction under D-016; this does not
+remove the Chrome workflow or change ownership.
+
 1. Contracts and documentation (Layer 0).
 2. Backend configuration and health check.
 3. SQLite persistence and Capture CRUD.

@@ -1,8 +1,8 @@
 # Recall backend
 
-The backend is a local-only FastAPI service. Layers 1–2 provide validated
-configuration, `GET /health`, numbered SQLite migrations, and transactional
-Capture persistence. HTTP Capture CRUD routes begin in Layer 3.
+The backend is a local-only FastAPI service. It provides validated
+configuration, health, transactional SQLite persistence, Capture CRUD,
+Structured Output enrichment, FTS5, embeddings, and hybrid retrieval.
 
 Run all commands below from `services/backend/`.
 
@@ -115,9 +115,25 @@ Concurrent attempts return the stable `capture_already_processing` error.
 The P0 runner is deliberately in-process. It does not add Redis, Celery,
 WebSockets, or a durable queue; see decision D-014.
 
-## Keyword search
+## Chrome extension CORS
 
-Layer 5 exposes provider-independent FTS5 retrieval:
+Layer 6 accepts cross-origin requests only from exact origins listed in
+`RECALL_CORS_ORIGINS`. Wildcards and public web origins are rejected. After
+loading the unpacked extension, copy its ID and configure the untracked root
+`.env`, then restart the backend:
+
+```text
+RECALL_CORS_ORIGINS=chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+```
+
+For a local browser harness, loopback origins such as
+`http://127.0.0.1:3000` are also accepted. CORS permits only `GET`, `POST`, and
+the `Content-Type` header, without credentials.
+
+## Embeddings and hybrid search
+
+Layer 5 provides provider-independent FTS5 retrieval, and Layer 7 adds
+embeddings and in-memory hybrid ranking:
 
 ```bash
 curl --get --data-urlencode 'q=WorkingDirectory' \
@@ -125,11 +141,18 @@ curl --get --data-urlencode 'q=WorkingDirectory' \
   http://127.0.0.1:8765/v1/search
 ```
 
-The response follows `contracts/api.md`. Through Layer 5, `score` equals the
-normalized `keyword_score` and `semantic_score` is `null`. Empty or omitted `q`
-returns recent Captures. Source text and user notes remain searchable when
-OpenAI is absent or enrichment fails. Client input is escaped as FTS data, so
-quotes and operators cannot become query syntax; see decision D-015.
+After enrichment validates, the backend builds the exact §12.1 projection and
+stores one vector as an internal SQLite JSON array. Search embeds a non-empty
+query with the same configured model, calculates cosine similarity over all
+`ready` Captures in Python, and combines semantic, normalized keyword, and
+metadata scores. Normal queries use `0.55 / 0.35 / 0.10`; technical identifiers
+use `0.45 / 0.50 / 0.05`.
+
+The response follows `contracts/api.md`. Empty or omitted `q` returns recent
+Captures. If OpenAI, the query vector, or a Capture vector is unavailable,
+Layer 5 FTS behavior remains available and `semantic_score` is `null` for the
+affected result. Client input is escaped as FTS data, so quotes and operators
+cannot become query syntax; see decisions D-015 and D-017.
 
 ## Test
 
@@ -141,9 +164,9 @@ quotes and operators cannot become query syntax; see decision D-015.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | unset | Enables later OpenAI layers when non-empty |
-| `OPENAI_MODEL` | `gpt-5.6` | Later enrichment model |
-| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | Later embedding model |
+| `OPENAI_API_KEY` | unset | Enables OpenAI enrichment and embeddings when non-empty |
+| `OPENAI_MODEL` | `gpt-5.6` | Enrichment model |
+| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | Capture and query embedding model |
 | `RECALL_HOST` | `127.0.0.1` | Loopback-only bind host |
 | `RECALL_PORT` | `8765` | Backend port, from 1 through 65535 |
 | `RECALL_DATABASE_PATH` | `./data/recall.db` | SQLite file, relative to repository root |

@@ -251,8 +251,10 @@ contract does not use WebSockets.
 - Empty or whitespace-only `q`: returns recent Captures.
 - Exact technical identifiers receive higher keyword weight.
 - If query embedding fails, results fall back to keyword scoring.
-- Through Layer 5, `score` equals `keyword_score` and `semantic_score` is
-  `null`; Layer 7 adds semantic and hybrid scoring without changing this shape.
+- With a compatible Capture and query vector, `score` combines semantic,
+  keyword, and metadata signals. On provider or vector fallback, `score`
+  preserves the keyword score and `semantic_score` is `null` for the affected
+  result.
 
 ```json
 {
@@ -310,7 +312,9 @@ Initial error codes:
 
 Development may allow configured localhost and unpacked-extension origins.
 The submitted build must not use an unrestricted `*` origin. The final Chrome
-extension origin is configured through `RECALL_CORS_ORIGINS`.
+extension origin is configured through `RECALL_CORS_ORIGINS`. The backend
+rejects wildcards, public web origins, malformed extension IDs, credentials,
+paths, queries, and fragments; allowed methods are limited to `GET` and `POST`.
 
 ## Official OpenAI references
 

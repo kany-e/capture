@@ -1,6 +1,6 @@
 # Developer A backend handoff
 
-Status: Layer 3 holder pending; Layer 4 polling and Layer 5 search contracts available
+Status: Layer 3 holder pending; Layer 4 polling, Layer 6 Chrome, and Layer 7 search contracts available
 
 Last verified: 2026-07-18
 
@@ -73,9 +73,11 @@ backend restart. The disposable database was removed afterward.
   and offer retry through `POST /v1/captures/{id}/enrich`.
 - Display the stable error `message`, but branch behavior on the error `code`.
 - Preserve `context_truncated` in Swift request and response models.
-- Decode search from `results[*].capture`. In Layer 5, `score` equals
-  `keyword_score` and `semantic_score` is `null`; do not require embeddings to
-  display keyword results.
+- Chrome Captures use the same response model with `source_type=web` and
+  `source_app=Google Chrome`; no browser-only field was added.
+- Decode search from `results[*].capture`. `score` is the final ranking score,
+  `keyword_score` is always present, and `semantic_score` is nullable. Never
+  require an embedding to display a keyword-fallback result.
 
 ## Non-production integration holder
 
@@ -94,3 +96,7 @@ Developer A should confirm:
 3. Detail view preserves source and user-note separation.
 
 That confirmation closes the shared Layer 3 vertical-slice gate.
+
+The complete Layer 6 exit gate additionally requires Developer A to confirm
+that a Capture created from the unpacked Chrome extension appears in the macOS
+list without a manual database edit.

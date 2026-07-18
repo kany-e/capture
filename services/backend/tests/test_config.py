@@ -36,10 +36,28 @@ def test_directory_is_rejected_as_database_path(tmp_path: Path) -> None:
 def test_cors_origins_are_parsed_from_comma_separated_setting() -> None:
     settings = Settings(
         _env_file=None,
-        recall_cors_origins="http://127.0.0.1:3000, chrome-extension://example",
+        recall_cors_origins=(
+            "http://127.0.0.1:3000, "
+            "chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ),
     )
 
     assert settings.cors_origins == [
         "http://127.0.0.1:3000",
-        "chrome-extension://example",
+        "chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     ]
+
+
+@pytest.mark.parametrize(
+    "origins",
+    [
+        "*",
+        "https://example.com",
+        "chrome-extension://example",
+        "chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/path",
+        "http://127.0.0.1:3000/path",
+    ],
+)
+def test_broad_or_malformed_cors_origin_is_rejected(origins: str) -> None:
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, recall_cors_origins=origins)

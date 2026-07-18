@@ -11,6 +11,10 @@ from typing import Any, Protocol
 from openai import OpenAI
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from app.embeddings import (
+    EmbeddingProvider,
+    build_embedding_input,
+)
 from app.models import CaptureRecord, EnrichmentUpdate
 from app.repository import CaptureNotFoundError, CaptureRepository
 
@@ -216,9 +220,11 @@ class EnrichmentService:
         self,
         repository: CaptureRepository,
         provider: EnrichmentProvider,
+        embedding_provider: EmbeddingProvider | None = None,
     ) -> None:
         self.repository = repository
         self.provider = provider
+        self.embedding_provider = embedding_provider
 
     def run(self, capture_id: str) -> None:
         capture = self.repository.get(capture_id)
@@ -249,23 +255,55 @@ class EnrichmentService:
             )
             return
 
-        self.repository.update_enrichment(
-            capture_id,
-            EnrichmentUpdate(
-                status="ready",
-                ai_title=result.title,
-                ai_summary=result.summary,
-                problem=result.problem,
-                key_insight=result.key_insight,
-                why_saved=result.why_saved,
-                caveats=result.caveats,
-                tags=result.tags,
-                entities=result.entities,
-                search_aliases=result.search_aliases,
-                error_message=None,
-                enrichment_version=capture.enrichment_version,
-            ),
+        update = EnrichmentUpdate(
+            status="ready",
+            ai_title=result.title,
+            ai_summary=result.summary,
+            problem=result.problem,
+            key_insight=result.key_insight,
+            why_saved=result.why_saved,
+            caveats=result.caveats,
+            tags=result.tags,
+            entities=result.entities,
+            search_aliases=result.search_aliases,
+            embedding=self._generate_embedding(capture, result),
+            error_message=None,
+            enrichment_version=capture.enrichment_version,
         )
+        self.repository.update_enrichment(capture_id, update)
+
+    def _generate_embedding(
+        self,
+        capture: CaptureRecord,
+        result: EnrichmentPayload,
+    ) -> list[float] | None:
+        if self.embedding_provider is None:
+            return None
+
+        enriched_capture = capture.model_copy(
+            update={
+                "status": "ready",
+                "ai_title": result.title,
+                "ai_summary": result.summary,
+                "problem": result.problem,
+                "key_insight": result.key_insight,
+                "why_saved": result.why_saved,
+                "caveats": result.caveats,
+                "tags": result.tags,
+                "entities": result.entities,
+                "search_aliases": result.search_aliases,
+            }
+        )
+        try:
+            return self.embedding_provider.embed(
+                build_embedding_input(enriched_capture)
+            )
+        except Exception:
+            logger.warning(
+                "Embedding failed for Capture %s; keyword fallback remains available",
+                capture.id,
+            )
+            return None
 
     def _store_error(
         self,

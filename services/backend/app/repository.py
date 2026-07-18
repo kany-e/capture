@@ -195,6 +195,19 @@ class CaptureRepository:
             ).fetchall()
         return [_row_to_record(row) for row in rows]
 
+    def list_ready_captures(self) -> list[CaptureRecord]:
+        """Return the small MVP semantic candidate set without a vector index."""
+
+        with database_connection(self.database_path) as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM captures
+                WHERE status = 'ready'
+                ORDER BY created_at DESC
+                """
+            ).fetchall()
+        return [_row_to_record(row) for row in rows]
+
     def search_captures(
         self,
         *,

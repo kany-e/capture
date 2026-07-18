@@ -15,7 +15,12 @@ from app.enrichment import (
     EnrichmentPayload,
     EnrichmentProviderError,
 )
-from app.main import app, get_enrichment_provider, get_repository
+from app.main import (
+    app,
+    get_embedding_provider,
+    get_enrichment_provider,
+    get_repository,
+)
 from app.models import NewCapture
 from app.repository import CaptureRepository
 
@@ -32,6 +37,7 @@ def api_client(
     with TestClient(app) as client:
         yield client, database_path
     app.dependency_overrides.pop(get_enrichment_provider, None)
+    app.dependency_overrides.pop(get_embedding_provider, None)
     get_settings.cache_clear()
 
 
@@ -53,6 +59,16 @@ class SuccessfulProvider:
 class FailedProvider:
     def enrich(self, _capture) -> EnrichmentPayload:
         raise EnrichmentProviderError from RuntimeError("private provider trace")
+
+
+class SuccessfulEmbeddingProvider:
+    def embed(self, _text: str) -> list[float]:
+        return [1.0, 0.0]
+
+
+class FailedEmbeddingProvider:
+    def embed(self, _text: str) -> list[float]:
+        raise TimeoutError("private embedding trace")
 
 
 def test_api_models_match_checked_in_contract_fields() -> None:
@@ -284,6 +300,48 @@ def test_search_returns_keyword_only_contract_shape(
     assert result["score"] == result["keyword_score"] == 1.0
     assert result["semantic_score"] is None
     assert 0.0 <= result["score"] <= 1.0
+
+
+def test_search_returns_semantic_result_after_embedding_pipeline(
+    api_client: tuple[TestClient, Path],
+) -> None:
+    client, database_path = api_client
+    app.dependency_overrides[get_enrichment_provider] = SuccessfulProvider
+    app.dependency_overrides[get_embedding_provider] = SuccessfulEmbeddingProvider
+    created = client.post("/v1/captures", json=fixture_request()).json()
+
+    stored = CaptureRepository(database_path, initialize=False).get(created["id"])
+    response = client.get(
+        "/v1/search",
+        params={"q": "thing that finally solved my server problem"},
+    )
+
+    assert stored is not None
+    assert stored.embedding == [1.0, 0.0]
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["capture"]["id"] == created["id"]
+    assert result["keyword_score"] == 0.0
+    assert result["semantic_score"] == 1.0
+    assert result["score"] == 0.55
+
+
+def test_search_query_embedding_failure_returns_keyword_fallback(
+    api_client: tuple[TestClient, Path],
+) -> None:
+    client, _ = api_client
+    app.dependency_overrides[get_enrichment_provider] = SuccessfulProvider
+    app.dependency_overrides[get_embedding_provider] = SuccessfulEmbeddingProvider
+    created = client.post("/v1/captures", json=fixture_request()).json()
+    app.dependency_overrides[get_embedding_provider] = FailedEmbeddingProvider
+
+    response = client.get("/v1/search", params={"q": "surprising VPS fix"})
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["capture"]["id"] == created["id"]
+    assert result["score"] == result["keyword_score"] == 1.0
+    assert result["semantic_score"] is None
 
 
 def test_search_without_openai_finds_failed_capture_raw_fields(
