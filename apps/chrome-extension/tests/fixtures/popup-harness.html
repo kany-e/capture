@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Recall popup harness</title>
+    <link rel="stylesheet" href="../../src/popup/popup.css" />
+  </head>
+  <body>
+    <script type="module">
+      const popupResponse = await fetch("../../src/popup/popup.html");
+      const popupSource = await popupResponse.text();
+      const popupDocument = new DOMParser().parseFromString(popupSource, "text/html");
+      document.body.replaceChildren(popupDocument.querySelector("main"));
+
+      const hasSelection = new URLSearchParams(location.search).get("selection") !== "0";
+      const storage = {};
+      globalThis.chrome = {
+        tabs: {
+          query: async () => [{
+            id: 7,
+            url: "https://fixture.example/systemd-repair",
+          }],
+        },
+        scripting: {
+          executeScript: async () => [{
+            result: {
+              sourceTitle: "FastAPI systemd repair",
+              sourceUrl: "https://fixture.example/systemd-repair",
+              selectedText: hasSelection ? "Set WorkingDirectory before restart." : "",
+              surroundingContext: "The service worked manually but failed under systemd.",
+              contextTruncated: false,
+              hasSelection,
+              extractionMode: hasSelection
+                ? "preferred-container"
+                : "page-container",
+            },
+          }],
+        },
+        storage: {
+          local: {
+            get: async (key) => ({ [key]: storage[key] }),
+            set: async (values) => Object.assign(storage, values),
+            remove: async (key) => delete storage[key],
+          },
+        },
+      };
+
+      if (new URLSearchParams(location.search).get("offline") === "1") {
+        globalThis.fetch = async () => {
+          throw new TypeError("simulated connection refusal");
+        };
+      } else if (new URLSearchParams(location.search).get("success") === "1") {
+        globalThis.fetch = async () => new Response(
+          JSON.stringify({ id: "fixture-capture", status: "processing" }),
+          {
+            status: 202,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      await import("../../src/popup/popup.js");
+    </script>
+  </body>
+</html>
