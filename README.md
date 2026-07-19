@@ -1,92 +1,109 @@
-# capture
 # Recall
 
-Recall is a macOS personal-memory capture tool that preserves source material,
-the user's reason for saving it, and an AI-generated contextual interpretation
-as separate, searchable layers.
+Recall is a local-first macOS personal-memory tool. It preserves source
+material, the user's reason for saving it, and an AI-generated contextual
+interpretation as separate, searchable layers.
 
-The repository contains the Layer 0–5 backend foundation plus locally verified
-Layer 6 Chrome capture and Layer 7 hybrid-retrieval implementations. Their
-shared manual Chrome/macOS and live OpenAI gates remain explicitly open.
+This repository now contains the complete integrated product tree:
 
-The current `main` tree intentionally holds only shared documentation,
-contracts, examples, and root metadata. Implementation code is separated by
-layer; see [`docs/branch-layout.md`](docs/branch-layout.md) for the exact branch
-map and integration consequence.
+- `apps/macos/` — SwiftUI/AppKit clipboard capture, library, detail, lifecycle,
+  and search client;
+- `apps/chrome-extension/` — build-free Manifest V3 web capture extension;
+- `services/backend/` — loopback FastAPI API, SQLite/FTS5 storage, OpenAI
+  enrichment, embeddings, and hybrid retrieval;
+- `contracts/` — shared request, response, and schema contracts; and
+- `docs/` — product plan, architecture, decisions, handoffs, and validation
+  records.
+
+The earlier documentation-only `main` arrangement is retired by D-023.
+`main` is again the canonical runnable integration target. Historical layer
+branches remain useful as development checkpoints, but they are not separate
+runtime dependencies.
 
 ## Product baseline
 
 The authoritative Build Week scope and execution plan is
-[`docs/product-plan.md`](docs/product-plan.md). Any requirement or technical
-choice introduced beyond that baseline must be highlighted in
-[`docs/decisions.md`](docs/decisions.md) before implementation.
+[`docs/product-plan.md`](docs/product-plan.md). Additions and implementation
+clarifications are recorded in [`docs/decisions.md`](docs/decisions.md).
 
 ## Core workflow
 
 ```text
-Capture source text and optional user note
+Capture source text and an optional user note
 → persist the original Capture immediately
 → enrich it asynchronously with Structured Outputs
 → generate an embedding from the stable §12.1 text projection
 → retrieve it through keyword and semantic search
 ```
 
-## Layer 0 contracts
+## Start the backend
 
-- [`contracts/capture.schema.json`](contracts/capture.schema.json): client
-  Capture creation payload.
-- [`contracts/enriched_capture.schema.json`](contracts/enriched_capture.schema.json):
-  model-generated enrichment payload.
-- [`contracts/api.md`](contracts/api.md): localhost API, lifecycle, response,
-  error, and search contracts.
-- [`contracts/examples/`](contracts/examples/): handoff fixtures shared by the
-  backend, macOS, and Chrome-extension owners.
-- [`docs/architecture.md`](docs/architecture.md): system boundaries, ownership,
-  and dependency direction.
-- [`docs/decisions.md`](docs/decisions.md): accepted decisions and additions to
-  the product baseline.
-- [`docs/developer-b-checklist.md`](docs/developer-b-checklist.md): live build
-  checklist, exit gates, validation evidence, and blocker log.
-- [`docs/branch-layout.md`](docs/branch-layout.md): implementation branch tips,
-  dependency relationships, and the definition of central files on `main`.
-- [`docs/backend-stress-report-2026-07-18.md`](docs/backend-stress-report-2026-07-18.md):
-  weird-card, bulk, provider, SQLite, and retrieval stress results with every
-  confirmed breakpoint recorded.
+The backend starts safely without an OpenAI key. From the repository root:
 
-## Planned stack
+```bash
+cd services/backend
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m app
+```
 
-- SwiftUI and AppKit macOS application
-- Manifest V3 Chrome extension
-- Python and FastAPI localhost backend
-- SQLite with FTS5
-- OpenAI Responses API with Structured Outputs
-- OpenAI embeddings with local cosine-similarity search
+Confirm it from another terminal:
 
-## Environment
+```bash
+curl --fail http://127.0.0.1:8765/health
+```
 
-The backend starts without `.env` or an API key. Copy `.env.example` to `.env`
-only for local overrides, and never commit `.env` or an API key. Installation,
-start, health-check, test, and configuration instructions live with the backend
-on the implementation branches listed in
-[`docs/branch-layout.md`](docs/branch-layout.md).
+Copy `.env.example` to the untracked root `.env` only when local overrides or
+an OpenAI key are needed. Never commit or transmit `.env` or an API key.
+Complete backend setup and test commands are in
+[`services/backend/README.md`](services/backend/README.md).
 
-While the backend is running, the live Developer B checklist is available at
+While the backend is running, the live engineering checklist is available at
 [`http://127.0.0.1:8765/dev/checklist`](http://127.0.0.1:8765/dev/checklist).
-It refreshes directly from the checked-in Markdown source every two seconds.
 
-## Status
+## Run the macOS app
 
-Layers 0–7, the combined Developer B integration checkpoint, the stress and
-hardening branches, and documentation-only `main` are pushed. The unpacked-
-Chrome-to-macOS confirmation, real OpenAI provider proof, and complete team
-integration remain open; none is represented as complete. The published
-`integration/layers-6-7` branch combines Developer B's Chrome and retrieval
-deltas but not Developer A's macOS client. Live evidence and blockers are
-tracked in
+Open [`apps/macos/Recall.xcodeproj`](apps/macos/Recall.xcodeproj) in Xcode,
+select the shared **Recall** scheme and **My Mac**, then run the app. Keep the
+backend running at `127.0.0.1:8765`. Detailed build commands and the manual test
+matrix are in [`apps/macos/README.md`](apps/macos/README.md).
+
+## Load the Chrome extension
+
+Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**,
+and select `apps/chrome-extension/`. The backend accepts only explicitly
+configured Chrome-extension origins; follow
+[`apps/chrome-extension/README.md`](apps/chrome-extension/README.md) to add the
+generated origin to the untracked root `.env` and restart the backend.
+
+## Contracts and architecture
+
+- [`contracts/api.md`](contracts/api.md) defines HTTP paths, lifecycle,
+  envelopes, error codes, limits, and search results.
+- [`contracts/capture.schema.json`](contracts/capture.schema.json) defines
+  client Capture creation input.
+- [`contracts/enriched_capture.schema.json`](contracts/enriched_capture.schema.json)
+  defines provider-generated enrichment output.
+- [`docs/architecture.md`](docs/architecture.md) defines system boundaries and
+  ownership.
+- [`docs/branch-layout.md`](docs/branch-layout.md) records how the historical
+  implementation branches were integrated.
+- [`docs/backend-stress-report-2026-07-18.md`](docs/backend-stress-report-2026-07-18.md)
+  records the first full backend stress audit and remediation evidence.
+
+## Current status
+
+The hardened backend, Chrome extension, and macOS client have been assembled and
+verified in one integration tree. The current tree passes 186 backend tests,
+all 44 deterministic stress scenarios, 13 extension tests, and 27 macOS tests.
+Live verification covers provider-off keyword fallback, real OpenAI enrichment
+and embeddings, semantic retrieval with a non-null score, and both selected-text
+and no-selection Chrome Captures appearing as ready cards in the macOS app.
+
+The shared P0 integration gates B-007, B-008, and B-009 are resolved. Layer 10
+submission work such as screenshots, licensing, final tagging, and release
+packaging remains intentionally separate from the runnable product integration.
+
+Detailed current evidence and blockers are tracked in
 [`docs/developer-b-checklist.md`](docs/developer-b-checklist.md).
-
-The first full backend stress audit is retained on branch
-`test/backend-stress`: its 44 escalated scenarios originally exposed 13 grouped
-repair items. Branch `fix/backend-stress-hardening` at `5ea3d2a` resolves all
-groups; 181 backend tests and all 44 stress scenarios now pass. Both branches
-are published on `origin`.

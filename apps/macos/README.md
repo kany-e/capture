@@ -1,0 +1,168 @@
+# Recall for macOS
+
+This directory contains Recall's SwiftUI/AppKit client. It talks to the
+loopback backend at `http://127.0.0.1:8765`; normal runs do not use an in-process
+database or mock API client.
+
+The macOS client, hardened backend, and Chrome extension now live in the same
+integration tree. The current target builds and passes all 22 contract,
+networking, lifecycle, validation, idempotency, and store tests.
+
+## Requirements
+
+- Xcode 26.x. The project was previously built with Xcode 26.2.
+- macOS 14.0 or later.
+- Python 3.10 or later and backend dependencies installed as described in
+  [`services/backend/README.md`](../../services/backend/README.md).
+- XcodeGen 2.45 or later only when regenerating the project. The checked-in
+  `Recall.xcodeproj` opens without XcodeGen.
+
+## Run the app
+
+Install the backend once from the repository root:
+
+```bash
+cd services/backend
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+Check `python3 --version` first. On Apple Silicon with Homebrew,
+`/opt/homebrew/bin/python3` is a typical compatible interpreter when Apple's
+system Python is too old.
+
+Keep the backend running in its own terminal:
+
+```bash
+cd services/backend
+.venv/bin/python -m app
+```
+
+Confirm the local service is ready:
+
+```bash
+curl --fail http://127.0.0.1:8765/health
+```
+
+No OpenAI key is required for storage and keyword retrieval. A healthy
+provider-off response reports `"openai_configured": false`. Real enrichment,
+embedding, and semantic-search integration has also been verified with a key
+stored only in the untracked root `.env`.
+
+Open `apps/macos/Recall.xcodeproj` in Xcode, select the shared **Recall** scheme
+and **My Mac**, then run with **Product > Run** (`Command-R`). The app shows a
+green **Connected** indicator after it reaches a healthy local service.
+
+## Build and test from the command line
+
+Run from the repository root. The explicit Derived Data path keeps generated
+output outside the source tree.
+
+```bash
+xcodebuild \
+  -project apps/macos/Recall.xcodeproj \
+  -scheme Recall \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  -derivedDataPath /tmp/recall-derived-data \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+```
+
+```bash
+xcodebuild \
+  -project apps/macos/Recall.xcodeproj \
+  -scheme Recall \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  -derivedDataPath /tmp/recall-derived-data \
+  CODE_SIGNING_ALLOWED=NO \
+  test
+```
+
+The same actions are available in Xcode with `Command-B` and `Command-U`.
+
+## Regenerate the Xcode project
+
+`project.yml` is the source of truth for targets, build settings, sources, and
+the shared scheme. Regeneration overwrites project-file-only edits, so change
+the YAML first and commit it with the generated project.
+
+```bash
+cd apps/macos
+xcodegen generate
+git diff -- project.yml Recall.xcodeproj
+```
+
+Run the build and tests again after regeneration.
+
+## Current client behavior
+
+- Check backend and database health and distinguish connected, degraded, and
+  disconnected states.
+- Load the newest durable Captures and show list and detail views from live API
+  responses.
+- Capture non-empty clipboard text, optional notes, and best-effort source-app
+  metadata through `POST /v1/captures`.
+- Keep source, surrounding context, user note, and generated interpretation
+  visually separate.
+- Show `processing`, `ready`, `error`, and captured lifecycle states; poll
+  processing records about every two seconds for approximately 60 seconds.
+- Retry enrichment without losing the raw Capture.
+- Search through the backend's keyword/hybrid endpoint and display results with
+  nullable semantic scores.
+- Use a visible local substring fallback only when the exact search route
+  returns `404`; other API and connection errors remain visible.
+- Validate the 12,000-character clipboard, 4,000-character note, and
+  512-character search-query limits before sending a request.
+- Reuse one `client_capture_id` when the same quick-capture draft is retried, so
+  backend idempotency can return the original record instead of creating a
+  duplicate. After an ambiguous network failure, freeze that request and require
+  a new draft before edited content can be submitted, preventing silent note
+  loss on an idempotent replay.
+- Render valid web source URLs and Chrome-created Captures through the same
+  shared model used for clipboard Captures.
+
+## Remaining integration boundaries
+
+- Real OpenAI enrichment, embeddings, semantic retrieval, and unpacked-Chrome
+  selected-text/no-selection Captures have been verified end to end against the
+  macOS client. Keep the credential and machine-specific extension origin only
+  in the untracked root `.env`.
+- Clipboard source-application detection is best effort. The app does not read
+  active window titles or Accessibility selections and has no global shortcut.
+- Persistence belongs to the backend SQLite database. The app has no offline
+  write queue.
+- An abrupt backend exit can leave in-process enrichment unfinished; automatic
+  stale-processing recovery remains reliability work.
+- App sandboxing, notarization, and bundling the Python service are outside the
+  current P0 Build Week scope.
+
+The current command-line suite executes 27 contract, networking, lifecycle,
+validation, retry, polling, and store tests.
+
+## Manual test matrix
+
+Run the integrated backend and a Debug build against `127.0.0.1:8765`. These
+rows describe expected behavior; check them off in the shared checklist only
+after rerunning them on the current integrated tree.
+
+| Area | Action | Expected result |
+| --- | --- | --- |
+| Healthy launch | Start the backend, then launch Recall. | Connection shows **Connected** and live records load. `AI not configured` is acceptable without a key. |
+| Offline recovery | Stop the backend, launch Recall, restart the backend, then choose **Try Again** or **Refresh**. | Recall shows an offline state, reconnects, and reloads the library without losing persisted records. |
+| Clipboard capture | Copy non-empty text in TextEdit, open **Capture Clipboard**, add a note, and save. | The exact text and note are saved separately; the record appears immediately and progresses to a safe terminal state. |
+| Empty clipboard | Clear the clipboard or copy non-text-only content, then open capture. | Recall warns locally and sends no create request. |
+| Capture limits | Try clipboard text at 12,000/12,001 characters and notes at 4,000/4,001. | Values at the caps can be submitted; oversized drafts stay visible and show validation without submission. |
+| Idempotent retry | Make one create attempt fail after preparing a draft, restore service, and retry the same draft. | The retry uses the same client ID and cannot create two records for that one draft. |
+| Durable reload | Save a unique record, quit Recall, and relaunch against the same backend database. | The same record reloads with unchanged source, note, and lifecycle data. |
+| Lifecycle polling | Save or retry a processing record and leave it visible. | Polling stops on `ready` or `error`, does not duplicate records, and visibly stops after its time cap. |
+| Keyword fallback | Run without a key and search for indexed source/note text. | Backend FTS results display even when `semantic_score` is `null`. |
+| Search limits and failure | Try 512/513-character queries, a control character, a backend error, and a genuine search-route `404`. | Valid input reaches the backend; invalid input is blocked locally; only `404` enables the visible local fallback. |
+| API-provided web record | POST `contracts/examples/capture-request.json`, refresh, and open the record. | URL, title, selection, context, note, and truncation state appear in separate sections. |
+| Real Chrome flow | Load the extension unpacked, configure its exact origin, save a web selection, and refresh Recall. | The Chrome-created card appears without a database edit; repeat once with the backend stopped to verify the popup error. |
+| Menu-bar entry | Exercise **Open Recall**, **Capture Clipboard**, **Search**, **Check Connection**, and **Quit Recall**. | Each item performs its intended action without unexpected duplicate windows. |
+
+For the short walkthrough, use
+[`docs/demo-script.md`](../../docs/demo-script.md).

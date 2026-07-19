@@ -1,68 +1,77 @@
-# Repository branch layout
+# Repository integration history
 
-Last updated: 2026-07-18
+Last updated: 2026-07-19
 
-This file defines the user-directed branch separation introduced after Layers
-1–7 were developed. It is the central map for locating implementation code.
+This file records how Recall's implementation branches were combined. It is a
+history and audit aid, not a list of branches required to run the product.
 
-## Main branch scope
+## Canonical branch scope
 
-The current `main` tree contains only shared project material:
+`main` is again the canonical runnable integration target. Its tree contains:
 
-- root metadata: `.env.example`, `.gitignore`, `Project_Outline (GPT).md`, and
-  `README.md`;
-- shared request, response, schema, and example files under `contracts/`; and
-- product descriptions, architecture, decisions, handoffs, and checklists under
-  `docs/`.
+- the macOS client under `apps/macos/`;
+- the Chrome extension under `apps/chrome-extension/`;
+- the complete backend under `services/backend/`;
+- shared contracts under `contracts/`; and
+- current project documentation under `docs/`.
 
-`apps/` and `services/` are intentionally absent from the current `main` tree.
-Their earlier commits remain in Git history and are retained by the branches
-below. No existing commit was rewritten or force-updated.
+D-019 records the temporary documentation-only `main` arrangement. D-023
+supersedes that exception and restores the product-plan rule that the main
+branch contain the integrated product.
 
-## Implementation branches
+## Historical implementation checkpoints
 
 | Branch | Tip | Purpose |
 | --- | --- | --- |
 | `layer/1-backend-foundation` | `fb7be35` | FastAPI configuration and health foundation |
 | `layer/2-sqlite-storage` | `0622ad0` | SQLite migrations, repository, and live checklist dashboard |
 | `layer/3-capture-api` | `17264fe` | Capture create, list, and detail API |
-| `layer/4-ai-enrichment` | `e24fe4d` | OpenAI enrichment boundary and delivery-status documentation |
-| `layer/5-keyword-retrieval` | `8754c9d` | FTS5 keyword retrieval and its delivery-status documentation |
+| `layer/4-ai-enrichment` | `e24fe4d` | OpenAI enrichment boundary |
+| `layer/5-keyword-retrieval` | `8754c9d` | FTS5 keyword retrieval |
 | `layer/6-chrome-capture` | `d426ca8` | Manifest V3 extension and strict local CORS |
 | `layer/7-hybrid-retrieval` | `faa45d7` | Embeddings and hybrid retrieval |
-| `integration/layers-6-7` | `3389bae` | Validated combined Developer B runtime at backend 0.7.0 |
-| `test/backend-stress` | `0c9a52f` | Reproducible backend stress harness and dated break report |
-| `fix/backend-stress-hardening` | `5ea3d2a` | Concise fixes for all 13 stress finding groups plus regression coverage |
-| `codex/macos-client` | `12862d3` on `origin` | Developer A's macOS client; left untouched |
+| `integration/layers-6-7` | `3389bae` | Combined Developer B runtime |
+| `test/backend-stress` | `0c9a52f` | Reproducible backend stress harness and report |
+| `fix/backend-stress-hardening` | `5ea3d2a` | Fixes for all 13 stress-finding groups |
+| `codex/macos-client` | `12862d3` | SwiftUI/AppKit macOS client |
 
-The branches are dependency checkpoints, not unrelated orphan trees. Layers
-1–5 are stacked in order. Layers 6 and 7 are siblings based on Layer 5 so the
-Chrome/CORS delta and embeddings/search delta remain independently reviewable.
-Consequently, a later branch includes its prerequisite commits in its history.
+Layers 1–5 are stacked in order. The isolated Layer 6 and Layer 7 branches are
+siblings based on Layer 5. `integration/layers-6-7` contains their already
+resolved combined runtime; `test/backend-stress` and
+`fix/backend-stress-hardening` continue from that combined checkpoint.
 
-A merge-tree audit found expected content conflicts when the Layer 6 and Layer
-7 siblings are merged directly: both update `services/backend/app/main.py` and
-`services/backend/README.md`. `integration/layers-6-7` preserves the exact
-already-resolved combined state that passed 165 backend and 13 extension tests.
-Use the sibling branches for focused review and the integration branch for the
-combined Developer B runtime.
+## Final tree composition
 
-## Integration consequence
+The final integration deliberately combines trees instead of relying on a
+plain merge with the former documentation-only `main`:
 
-The product plan originally required `main` to remain runnable. A documentation-
-only `main` cannot satisfy that requirement; D-019 records this explicit
-user-directed exception. Before Layer 8 or the final demo can be called
-integrated, the team must either restore a runnable `main` or create and agree
-on a separate integration branch that combines all required implementation.
-The published `integration/layers-6-7` branch combines Developer B's work, but
-it does not yet include Developer A's macOS client and has not been accepted as
-the final team integration branch.
+- `services/` and `apps/chrome-extension/` come from
+  `fix/backend-stress-hardening`;
+- `apps/macos/` comes from `codex/macos-client`;
+- the hardened contracts shared by the backend and current documentation are
+  retained; and
+- merge commits preserve the main, hardening, and macOS histories.
 
-`test/backend-stress` is based on the Developer B integration branch. It adds
-no production behavior; it contains the destructive-in-temp harness and the
-exact findings summarized on documentation-only `main`. It is published on
-`origin`.
+This explicit composition was necessary because the historical D-019 commit
+deleted `apps/` and `services/` from `main`. A normal three-way merge would have
+kept some of those deletions for files unchanged on the hardening branch.
 
-`fix/backend-stress-hardening` continues from the stress branch. It retains the
-reproduction harness, applies the remediations documented in D-021, and passes
-181 backend tests plus all 44 stress scenarios. It is published on `origin`.
+## Verification state
+
+The assembled tree passes 186 backend tests, all 44 deterministic stress
+scenarios, 13 extension tests, and 27 macOS tests. Provider-off keyword search,
+real OpenAI enrichment and embeddings, semantic retrieval, unpacked Chrome
+selected-text and no-selection capture, and macOS display all pass against the
+integrated tree. Earlier branch-level results remain historical evidence, while
+these counts describe the current integration.
+
+The shared live gates B-007, B-008, and B-009 are resolved. Final submission
+artifacts and release packaging remain Layer 10 work.
+
+## Retiring old branch names
+
+After integrated `main` is independently smoke-tested, historical remote branch
+names may be deleted without removing commits that are ancestors of `main`.
+The isolated Layer 6 commit `d426ca8` and Layer 7 commit `faa45d7` are not
+ancestors of the combined checkpoint, so create archival tags first if their
+exact sibling commit identities must remain permanently addressable.

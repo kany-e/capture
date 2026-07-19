@@ -26,15 +26,18 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-010 | Standard-library virtual environment for the backend | Addition | Accepted |
 | D-011 | Numbered SQL migrations with the Python standard library | Addition | Accepted |
 | D-012 | Local live build-checklist dashboard | Addition | Accepted |
-| D-013 | Proceed past Layer 3 with a documented macOS integration holder | Addition | Accepted with open gate |
+| D-013 | Proceed past Layer 3 with a documented macOS integration holder | Addition | Accepted; gate closed |
 | D-014 | In-process enrichment tasks with an explicit retry endpoint | Clarification | Accepted |
 | D-015 | Trigger-synchronized FTS5 with normalized keyword-only scoring | Clarification | Accepted |
 | D-016 | Build Layer 7 before Layer 6 | Addition | Accepted by user direction |
 | D-017 | Default-dimension embeddings with per-result FTS fallback | Clarification | Accepted |
 | D-018 | Build-free Manifest V3 Chrome extension | Addition | Accepted |
-| D-019 | Documentation-only main with stacked layer branches | Addition | Accepted by user direction |
+| D-019 | Documentation-only main with stacked layer branches | Addition | Superseded by D-023 |
 | D-020 | Deterministic destructive-in-temp backend stress harness | Addition | Accepted by user direction |
 | D-021 | Bounded provider-neutral stress hardening | Addition | Accepted by user direction |
+| D-022 | Build Week macOS runtime and narrow search fallback | Addition | Accepted |
+| D-023 | Restore runnable integrated main | Addition | Accepted; deterministic verification complete |
+| D-024 | Bounded literal-substring retrieval fallback | Clarification | Accepted |
 
 ## D-001 — Localhost monorepo architecture
 
@@ -231,20 +234,23 @@ Recall product behavior.
 ## D-013 — Proceed past Layer 3 with a documented macOS integration holder
 
 - Classification: Addition / workflow exception
-- Status: Accepted with open gate
-- Product impact: None; no macOS behavior is claimed as implemented
+- Status: Accepted; gate closed 2026-07-18
+- Product impact: None; the temporary holder was retired after the macOS gate
+  passed
 - Schedule impact: Layer 4 backend work proceeds in parallel with Developer A
 
 The product-plan build order places the first macOS list integration before AI
-enrichment. At the user's direction, Developer B may begin Layer 4 after the
-Layer 3 backend is verified and pushed, while Developer A's display confirmation
-remains open. A non-production Swift example under `docs/examples/` documents
-the expected decoding and list request without modifying Developer A's Xcode
-project or pretending the shared vertical slice is complete.
+enrichment. At the user's direction, Developer B began Layer 4 after the Layer
+3 backend was verified while Developer A completed the display gate in
+parallel. A non-production Swift example under `docs/examples/` temporarily
+documented the expected decoding and list request without modifying Developer
+A's Xcode project or claiming the shared vertical slice was complete.
 
-The placeholder is not an exit-gate substitute. Developer A must still display
-the live Capture, preserve source/user-note separation, and remove or supersede
-the holder before the shared Layer 3 gate can be marked complete.
+Developer A subsequently displayed live backend Captures, preserved source and
+user-note separation, and replaced the holder with the maintained client under
+`apps/macos/`. The placeholder was removed when the shared Layer 3 gate closed.
+The current post-integration test sweep is tracked separately and does not
+reopen this historical coordination gate.
 
 ## D-014 — In-process enrichment tasks with an explicit retry endpoint
 
@@ -312,7 +318,7 @@ experiment in D-008 also remains gated until the baseline workflow is stable.
 
 The temporary deferral ended on 2026-07-18 when the user requested Layer 6
 after the Layer 7 backend implementation and deterministic verification were
-complete. Layer 7's live provider gate remains independently blocked by B-008.
+complete. The later real embedding and semantic-search proof resolved B-008.
 
 ## D-017 — Default-dimension embeddings with per-result FTS fallback
 
@@ -365,9 +371,10 @@ repository.
 ## D-019 — Documentation-only main with stacked layer branches
 
 - Classification: Addition / repository workflow change
-- Status: Accepted by explicit user direction
-- Product impact: `main` is no longer a runnable integrated product tree
-- Schedule impact: A runnable integration branch is required before Layer 8
+- Status: Superseded by D-023 on 2026-07-19
+- Product impact: Historical exception; no longer the active repository layout
+- Schedule impact: The exception ended when the complete integration tree was
+  assembled
 
 The user directed that AI, SQL, Chrome-extension, and related implementation
 work be retained on separate branches while `main` contains only description
@@ -378,11 +385,14 @@ sibling deltas from Layer 5. Their validated combined state is retained on
 the shared backend bootstrap and README. Developer A's existing macOS branch is
 unchanged.
 
-The exact branch tips and definition of central files are recorded in
-[`branch-layout.md`](branch-layout.md). This intentionally supersedes the
-product-plan workflow rule that `main` stay runnable. It does not waive the
-Layer 8 and final demo integration gates: the team must agree on a runnable
-integration location before those gates can close.
+The exact branch tips and definition of central files were recorded in
+[`branch-layout.md`](branch-layout.md). During this temporary exception, that
+layout superseded the product-plan workflow rule that `main` stay runnable. It
+did not waive the Layer 8 or final demo integration gates.
+
+D-023 ends this exception. The branch checkpoints remain in history, while
+`main` again carries the backend, Chrome extension, macOS application,
+contracts, and documentation together.
 
 ## D-020 — Deterministic destructive-in-temp backend stress harness
 
@@ -408,7 +418,7 @@ recorded in [`backend-stress-report-2026-07-18.md`](backend-stress-report-2026-0
 - Classification: Addition / reliability hardening
 - Status: Accepted by explicit user direction
 - Product impact: No new user-facing feature; malformed work now fails safely
-- Schedule impact: Closes B-011 while live-provider and team-integration gates remain
+- Schedule impact: Closed B-011; later integration work closed the independent live gates
 
 The stress findings are repaired on `fix/backend-stress-hardening` without a
 new external service, queue, or vector dependency. This decision supersedes the
@@ -431,10 +441,82 @@ Overflow-safe normalization, stored-JSON health checks, and the stable malformed
 body envelope complete the concise remediation. These choices amend the strict
 AND behavior in D-015 and the per-request full decode described in D-017.
 
-The same deterministic harness must remain green after changes. The acceptance
-evidence is 181 passing backend tests and 44/44 passing stress scenarios; real
-OpenAI calls, real-socket behavior, power loss, disk-full behavior, and final
-team integration remain separate gates.
+The same deterministic harness must remain green after changes. The original
+branch acceptance evidence is 181 passing backend tests and 44/44 passing
+stress scenarios. The full integration tree now passes 186 backend tests and
+the unchanged 44/44 scenario set. Real OpenAI enrichment and embeddings have
+also passed; power-loss and disk-full behavior remain separate system evidence.
+
+## D-022 — Build Week macOS runtime and narrow search fallback
+
+- Classification: Addition / implementation choice
+- Status: Accepted
+- Product impact: Implements the product-plan macOS client without moving
+  persistence or retrieval ownership out of the backend
+- Schedule impact: Low
+
+The Build Week macOS target supports macOS 14 and later, remains a normal Dock
+application, and also provides a `MenuBarExtra`. It uses single-instance main
+and quick-capture windows. The prototype target does not enable App Sandbox or
+bundle the Python service; it permits localhost HTTP through
+`NSAllowsLocalNetworking`. Production sandboxing, notarization, and backend
+packaging remain outside the P0 Build Week scope.
+
+The backend remains the only persistence and production search boundary. A
+case-insensitive local filter is allowed only when the exact search route
+returns HTTP `404`, so a genuinely unavailable older backend can still exercise
+the search UI. Other transport and API errors remain visible and must not be
+silently converted into local results. The client enforces the current Capture
+and search limits before submission, and a quick-capture draft retains one
+stable `client_capture_id` across retries for backend idempotency.
+
+The macOS implementation has been included in the full integration tree and
+passes all 27 current contract, networking, lifecycle, validation, idempotency,
+polling-deadline, and store tests. An ambiguous create retry freezes its original
+request, and foreground refreshes cannot replace an active server search with
+local results.
+
+## D-023 — Restore runnable integrated main
+
+- Classification: Addition / repository workflow restoration
+- Status: Accepted 2026-07-19; deterministic and live verification complete
+- Product impact: `main` again contains the complete runnable Recall product
+- Schedule impact: Removes the repository-layout blocker before final demo work
+
+The temporary D-019 documentation-only arrangement is retired. The canonical
+integration tree combines the stress-hardened backend and Chrome extension from
+`fix/backend-stress-hardening`, the macOS client from `codex/macos-client`, and
+the current shared contracts and documentation. Merge commits preserve the
+relevant development histories; no published commit is rewritten.
+
+This tree is the source for future feature branches and the final demo. Prior
+branch test results remain useful component evidence, but they do not replace
+the backend, extension, Xcode, and manual checks being run against the assembled
+tree. The assembled tree passes 186 backend tests, 44/44 stress scenarios, 13
+extension tests, and 27 macOS tests. Real OpenAI enrichment and embeddings,
+semantic search, unpacked-Chrome capture, and macOS display resolve B-007,
+B-008, and B-009.
+
+## D-024 — Bounded literal-substring retrieval fallback
+
+- Classification: Clarification / retrieval robustness
+- Status: Accepted
+- Product impact: Partial identifiers and short CJK fragments remain findable
+  when FTS5 tokenization cannot represent the user's literal query
+- Schedule impact: Low
+
+FTS5 remains the primary keyword retrieval and ranking path. Search first runs
+the strict all-term expression and then the D-021 any-term expression when
+needed. A bounded, parameterized literal-substring scan across the same indexed
+Capture fields is merged with tokenized candidates so a valid FTS hit cannot
+hide a partial identifier elsewhere. Rows are deduped under the existing
+candidate cap; FTS-ranked rows retain priority. The pass never interprets
+punctuation as SQL or FTS syntax.
+
+This closes the observed cases where `RecallSearchSmokeTest` could not be found
+with `Recall`, or a Chinese memory could not be found with a literal character
+fragment. Semantic retrieval remains independent and may add candidates when a
+real embedding provider is configured.
 
 ## Pending decisions
 

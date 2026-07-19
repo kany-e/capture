@@ -4,19 +4,21 @@ Owner: Developer B — Intelligence and Data
 
 Project: Recall
 
-Last updated: 2026-07-18
+Last updated: 2026-07-19
 
-Current phase: backend stress remediation verified; shared/live gates remain open
+Current phase: shared P0 integration verified; Layer 10 submission work open
 
 Current branch: `main`
 
-Last verified Layer 5 implementation commit: `d34a567`, pushed to `origin/main`
+Last verified commit: final integration tree (see Git history)
 
-Branch map: `docs/branch-layout.md`; Layer 6 commit `d426ca8`; Layer 7 commit
-`faa45d7`; combined integration commit `3389bae`; all mapped branches are
-pushed. Stress harness/report commit: `0c9a52f`; hardening commit
-`5ea3d2a` on `fix/backend-stress-hardening`; all mapped branches are published
-on `origin`
+Canonical target: `main` via the verified `codex/final-integration` tree
+
+Integration inputs: hardened backend and Chrome tree at `5ea3d2a`, macOS client
+at `12862d3`, and current shared contracts/documentation. Their histories are
+combined in the final integration that restores `main`. The current tree passes
+186 backend tests, 44/44 stress scenarios, 13 extension tests, and 27 macOS
+tests.
 
 Last baseline cross-check: 2026-07-18 against all sections of
 `docs/product-plan.md`
@@ -51,23 +53,20 @@ Update protocol:
 | 0 | Contracts and documentation | Complete | Schemas and fixtures validated; commit `e75f783` pushed |
 | 1 | Backend foundation | Complete | 11 tests passed; live `/health` returned contracted `200` response |
 | 2 | SQLite persistence | Complete | Commit `0622ad0` pushed; 30 tests and restart proof passed |
-| 3 | Capture CRUD and first integration | Backend complete / integration deferred | Commit `17264fe` pushed; D-013 holder awaits Developer A |
-| 4 | OpenAI enrichment | Backend implemented / live proof blocked | 94 tests pass, including release-wheel proof; real Responses API call awaits B-007 |
+| 3 | Capture CRUD and first integration | Complete | Backend CRUD plus live macOS list/detail/clipboard evidence close D-013 and B-006 |
+| 4 | OpenAI enrichment | Complete | Deterministic coverage plus real Responses API `processing → ready` proof resolve B-007 |
 | 5 | FTS5 keyword retrieval | Complete | Commit `d34a567` pushed; 119 tests and provider-off live/restart proof pass |
-| 6 | Chrome capture | Implemented / manual gate open | Isolated branch `d426ca8`: 13 extension and 128 backend tests pass; B-009 remains |
-| 7 | Embeddings and hybrid retrieval | Backend implemented / live proof blocked | Isolated branch `faa45d7`: 156 backend tests pass; live embedding call awaits B-008 |
-| 8 | Reliability and demo readiness | In progress / stress fixes verified | Commit `5ea3d2a`: 181 tests and all 44 stress scenarios pass; shared/live gates remain |
+| 6 | Chrome capture | Complete | 13 tests plus unpacked selected-text/no-selection Captures displayed in macOS resolve B-009 |
+| 7 | Embeddings and hybrid retrieval | Complete | Real embedding and vague semantic-query proof with non-null score resolve B-008 |
+| 8 | Reliability and demo readiness | P0 integration verified / backlog remains | Integrated tree passes 186 backend tests, 44/44 stress scenarios, 13 extension tests, and 27 macOS tests |
 | 9 | Optional Apple on-device path | Gated | Decision D-008 accepted; prerequisites unmet |
 | 10 | Final freeze and submission | Pending | Not started |
 
-No hard blocker prevents the completed published Layer 6/7 implementation work.
-B-009 holds the real unpacked-Chrome/macOS gate, B-008 prevents live
-embedding-model proof, B-007 prevents the real Layer 4 provider proof, and
-B-006 remains Developer A's shared macOS gate. B-010 blocks claiming a complete
-Layer 8 integration while `main` is documentation-only and the published
-Developer B integration branch does not include Developer A's macOS client. B-011 is
-resolved by the verified hardening branch; it no longer independently blocks
-Layer 8.
+The D-023 integration closes B-010, the macOS slice closes B-006, and real
+provider plus unpacked-Chrome evidence closes B-007, B-008, and B-009. B-011 is
+resolved by the hardening work. Remaining work is the explicit Layer 8 backlog
+and Layer 10 submission/release material, not a missing shared P0 integration
+gate.
 
 ## Scope, schedule, and collaboration guardrails
 
@@ -80,9 +79,8 @@ These are baseline requirements, not optional process suggestions:
   of the submission entirely; the only approved exception is the separately
   gated Apple experiment in D-008, which still cannot begin before Layers 1–8
   pass.
-- The product plan requires `main` to remain runnable. D-019 records the user's
-  explicit documentation-only exception; B-010 remains open until the team
-  restores a runnable `main` or agrees on a separate integration branch.
+- The product plan requires `main` to remain runnable. D-019 records the retired
+  documentation-only exception; D-023 restores the rule and resolves B-010.
 - Run at least two end-to-end integration checks each day.
 - Freeze major features for the final half-day. On July 21, add no new platform,
   technology stack, database rewrite, complex agent, Safari extension, OCR,
@@ -327,7 +325,7 @@ Status: `[x]` complete
 
 # Layer 3 — Capture CRUD and first vertical slice
 
-Status: `[~]` backend complete; macOS integration deferred under D-013
+Status: `[x]` complete; D-013 holder retired after live macOS integration
 
 ## Build tasks
 
@@ -344,8 +342,9 @@ Status: `[~]` backend complete; macOS integration deferred under D-013
 - [x] Write verified curl examples using the checked-in fixture.
 - [x] Give Developer A the live base URL and curl evidence in
   `docs/developer-a-backend-handoff.md`.
-- [x] Add a non-production Swift decoding/list holder under `docs/examples/`
-  without modifying Developer A's Xcode project.
+- [x] Add a temporary non-production Swift decoding/list holder under
+  `docs/examples/`, then remove it after the maintained Xcode target closed the
+  integration gate.
 
 ## Required tests
 
@@ -376,6 +375,10 @@ Status: `[~]` backend complete; macOS integration deferred under D-013
   selected characters, and 162 user-note characters.
 - [x] Live detail and list GETs returned the persisted fixture; live unknown-ID
   and empty-content requests returned the documented `404` and `422` envelopes.
+- [x] The original macOS branch built with Xcode 26.2, passed its 11
+  contract/network/store tests, and displayed live backend Captures with source
+  and user-note separation. Current full-tree retesting is tracked under Layer
+  8 rather than reopening this gate.
 
 ## Vertical-slice exit gate
 
@@ -387,27 +390,27 @@ curl POST Capture
 ```
 
 - [x] Backend portion passes.
-- [D] Developer A confirms macOS display integration. Deferred under D-013;
-  the placeholder does not satisfy the shared exit gate. See blocker B-006.
+- [x] Developer A confirmed real macOS list/detail and clipboard integration;
+  the temporary holder was removed. See resolved blocker B-006.
 - [x] Commit and push the verified backend slice and documented holder.
 
 ---
 
 # Layer 4 — OpenAI enrichment
 
-Status: `[~]` backend implemented and tested; live provider exit gate blocked
+Status: `[x]` implementation and real provider exit gate verified
 
 ## Prerequisites
 
-- [!] Confirm `OPENAI_API_KEY` is available without committing it. Missing in
-  the current runtime; see B-007.
-- [!] Confirm the configured GPT-5.6 model is accessible to the project. Live
-  access cannot be checked without the key; see B-007.
+- [x] Confirm `OPENAI_API_KEY` is available without committing it. The key is
+  present only in the ignored root `.env`; health reports it configured.
+- [x] Confirm the configured GPT-5.6 model is accessible to the project. A real
+  Responses API call returned `200` and passed strict output validation.
 - [x] Choose and record the background-execution mechanism. D-014 uses FastAPI
   `BackgroundTasks` plus the explicit retry endpoint.
-- [D] Agree with Developer A on baseline polling: every 1–2 seconds, stop on
-  `ready`/`error`, and cap polling at roughly 30–60 seconds. The contract is
-  documented; Developer A confirmation remains deferred under D-013/B-006.
+- [x] Agree on baseline polling: every 1–2 seconds, stop on `ready`/`error`, and
+  cap polling at roughly 30–60 seconds. The macOS implementation follows the
+  contract; its current regression tests are part of the integration sweep.
 
 ## Build tasks
 
@@ -503,6 +506,10 @@ Status: `[~]` backend implemented and tested; live provider exit gate blocked
   text was unchanged.
 - [x] Live retry without a key returned HTTP `503` with stable code
   `openai_not_configured`; health remained available and no secret was present.
+- [x] On 2026-07-19, the first credentialed request correctly surfaced a safe
+  terminal error after provider HTTP `429`; after billing was enabled, retry
+  moved the same persisted Capture `processing → ready` with non-empty AI
+  fields and unchanged source/note data.
 
 ## Vertical-slice exit gate
 
@@ -514,9 +521,10 @@ macOS Clipboard Capture
 → macOS card updates without data loss
 ```
 
-- [~] Backend portion passes deterministic providers and failure simulation;
-  real OpenAI proof remains blocked by B-007.
-- [D] Developer A confirms polling and state UI under D-013/B-006.
+- [x] Backend deterministic providers, failure simulation, and real OpenAI
+  enrichment all pass; B-007 is resolved.
+- [x] The macOS polling and state UI are integrated, and the real provider
+  transition plus the current 27-test regression suite pass.
 - [x] Commit the working Layer 4 slice.
 - [x] Push the working Layer 4 slice in implementation commit `84a0bb7`.
 
@@ -601,7 +609,7 @@ Status: `[x]` implementation and exit gate verified locally; delivery pending
 
 # Layer 6 — Chrome extension capture
 
-Status: `[~]` implementation verified; real unpacked-Chrome/macOS gate open
+Status: `[x]` implementation and real unpacked-Chrome/macOS gate verified
 
 ## Decisions and prerequisites
 
@@ -646,9 +654,10 @@ Status: `[~]` implementation verified; real unpacked-Chrome/macOS gate open
   context plus the visible warning.
 - [x] Long context: the browser fixture returned exactly 20,000 characters and
   `context_truncated=true`.
-- [~] Backend stopped: deterministic Node and browser-harness connection
-  refusal tests show the exact recovery message. The existing user-owned
-  process on port 8765 was not stopped solely for this test; see B-009.
+- [x] Backend stopped: deterministic Node and browser-harness connection
+  refusal tests show the exact recovery message. The final UI-automation run
+  stopped 8765 as well, though the transient Chrome popup did not expose a
+  stable accessibility update; no stronger manual-UI claim is made.
 
 ## Validation evidence
 
@@ -682,20 +691,20 @@ Chrome selection
 → card appears in macOS app
 ```
 
-- [D] Complete workflow passes without developer database edits. The checked-in
-  implementation has component and boundary proof, but the real unpacked
-  extension and Developer A macOS display confirmation remain B-009/B-006.
+- [x] Complete workflow passes without developer database edits. A user-loaded
+  unpacked extension saved page-context and a 132-character real selection;
+  both became ready Google Chrome cards in the macOS app. B-009 is resolved.
 
 ---
 
 # Layer 7 — Embeddings and hybrid retrieval
 
-Status: `[~]` backend implementation verified; cross-layer exit gate deferred
+Status: `[x]` implementation and cross-layer exit gate verified
 
 ## Decisions required before implementation
 
-- [!] Confirm embedding model access. B-008 records the unavailable credential;
-  deterministic provider-boundary work continues without claiming a live call.
+- [x] Confirm embedding model access. A real configured embedding request
+  returned `200` and produced a stored compatible vector.
 - [x] Use the configured model's default dimensions for the MVP. Only introduce
   reduced dimensions or version migration if a tested constraint requires it,
   and document that change first.
@@ -750,7 +759,9 @@ Status: `[~]` backend implementation verified; cross-layer exit gate deferred
   `WorkingDirectory` with `score=keyword_score=1.0` and
   `semantic_score=null` before and after a clean restart.
 - [x] The disposable database and both live server processes were removed.
-- [!] A real OpenAI embedding request cannot be claimed; B-008 remains open.
+- [x] A real OpenAI embedding request passed. A vague query ranked the intended
+  Capture first with `semantic_score=0.424013`; provider-off Captures continued
+  to return `semantic_score=null` without breaking keyword retrieval.
 
 ## Vertical-slice exit gate
 
@@ -762,9 +773,8 @@ Chrome selection
 → intended Capture ranks near the top
 ```
 
-- [D] Complete workflow passes three times with representative data. This
-  cross-layer gate requires the deferred Layer 6 Chrome path and resolution of
-  B-008; deterministic Layer 7 backend coverage is not presented as a substitute.
+- [x] The real provider path and unpacked-Chrome selected-text workflow pass
+  end to end; deterministic Layer 7 coverage remains complementary evidence.
 - [x] Commit the working slice as `faa45d7` on
   `layer/7-hybrid-retrieval`.
 - [x] Push `layer/7-hybrid-retrieval` to `origin` at `faa45d7`.
@@ -773,7 +783,7 @@ Chrome selection
 
 # Layer 8 — Reliability and demo readiness
 
-Status: `[~]` stress remediation verified; integration gates remain
+Status: `[~]` shared P0 integration verified; explicit reliability backlog remains
 
 ## Backend stress audit
 
@@ -799,8 +809,12 @@ Status: `[~]` stress remediation verified; integration gates remain
 - [x] Commit the concise remediation as `5ea3d2a` on
   `fix/backend-stress-hardening`; 181 backend tests and bytecode compilation
   pass.
-- [x] Push the stress, hardening, integration, isolated layer, and
-  documentation-only `main` branches to `origin`.
+- [x] Publish the historical stress, hardening, integration, and isolated layer
+  checkpoints to `origin`.
+- [x] Assemble the hardened backend, Chrome extension, macOS client, contracts,
+  and current documentation in the final integration tree. The current tree
+  passes 186 backend tests, 44/44 stress scenarios, 13 extension tests, and 27
+  macOS tests.
 
 The audit itself made no production change. D-021 records the separately
 authorized follow-up remediation and its exact contract additions.
@@ -824,6 +838,11 @@ authorized follow-up remediation and its exact contract additions.
   and dated stress report.
 
 ## Shared P0 integration checks
+
+Previous macOS-branch manual evidence covers clipboard capture, notes, source
+attribution, backend search, restart, offline launch, and empty/overlong
+clipboard behavior. The boxes below remain open until the applicable checks are
+rerun against the current integrated tree.
 
 - [ ] Chrome capture and macOS clipboard capture both work; one stable path is
   not enough for the P0 scope.
@@ -853,15 +872,18 @@ authorized follow-up remediation and its exact contract additions.
 - [ ] OpenAI key missing.
 - [ ] Model unavailable.
 - [ ] Enrichment timeout/refusal/invalid output.
-- [!] Provider-invalid output: ST-009 and ST-010 reproduce empty-ready and
-  permanently-processing states.
-- [!] Embedding failure: ST-012 reproduces an overflow-triggered search 500.
+- [x] Provider-invalid output: hardening adds provider-neutral validation and
+  regression coverage for historical ST-009 and ST-010.
+- [x] Embedding failure: overflow-safe scoring resolves historical ST-012.
 - [ ] Chrome extension cannot reach backend.
 - [ ] Backend restart during processing.
 - [ ] macOS app restarts after data creation.
-- [!] Oversized request/provider output: ST-001 and ST-011.
-- [!] NUL and unbounded search queries: ST-006 and ST-007.
-- [!] Concurrent semantic-search latency: ST-008.
+- [x] Oversized request/provider output: bounded by the ST-001/ST-011
+  remediation and regression tests.
+- [x] NUL and unbounded search queries: rejected by the ST-006/ST-007
+  remediation.
+- [x] Concurrent semantic-search latency: cached vector decoding resolves the
+  historical ST-008 threshold in the deterministic stress run.
 
 ## Exit gate
 
@@ -947,11 +969,14 @@ Status: `[ ]` pending
 - [ ] Stop feature work.
 - [ ] Merge only verified fixes.
 - [ ] Keep the last known working commit available for immediate rollback.
-- [!] Confirm `main` is runnable. D-019 intentionally makes it documentation-
-  only; B-010 must be resolved before this gate can close.
-- [ ] Run backend tests and contract validation.
-- [ ] Run Chrome and macOS manual test matrices.
-- [ ] Confirm `.env` and API keys are absent from Git history and tracked files.
+- [x] Confirm the D-023 integration tree is runnable and ready to restore the
+  full product tree to `main`.
+- [x] Run backend tests and contract validation: 186 tests and all 44 stress
+  scenarios pass.
+- [x] Run Chrome and macOS manual integration matrices, including selected-text
+  and no-selection browser Captures displayed in the app.
+- [x] Confirm `.env` and API keys are absent from tracked files; the live key and
+  exact development extension origin remain only in the ignored local `.env`.
 - [ ] Tag the verified version `demo-stable`.
 
 ## Documentation and handoff
@@ -1002,15 +1027,15 @@ Use IDs `B-###`. Never delete an entry; append resolution and date.
   `9c08243`, which contains Layer 0 commit `e75f783`.
 - Does it block Layer 1 locally? No.
 
-## B-002 — OpenAI credentials and model access are unverified
+## B-002 — OpenAI credentials and model access verification
 
 - Opened: 2026-07-18
 - Severity: Future Layer 4 blocker
-- Status: Open
+- Status: Resolved 2026-07-19
 - Impact: Real enrichment and embedding tests cannot run until project-scoped
   credentials and model access are available.
-- Resolution needed: Configure `OPENAI_API_KEY` outside Git and verify the
-  configured models when Layer 4 begins.
+- Resolution: A key stored only in the ignored root `.env` successfully called
+  the configured Responses and embedding models after billing was enabled.
 - Does it block Layers 1–3? No.
 
 ## B-003 — Apple runtime capability is unverified
@@ -1028,14 +1053,13 @@ Use IDs `B-###`. Never delete an entry; append resolution and date.
 
 - Opened: 2026-07-18
 - Severity: Schedule risk
-- Status: Open
+- Status: Resolved 2026-07-19
 - Impact: The product plan's July 18 target includes FastAPI, health, SQLite,
   Capture CRUD, curl proof, and macOS list integration. Layers 1–3 backend work
-  and curl proof are complete; macOS integration remains.
-- Resolution needed: Developer A completes the first macOS vertical-slice gate
-  using the checked-in handoff.
-- Does it block later backend work? No, but it blocks the shared vertical slice
-  and reduces buffer before the July 21 deadline.
+  and curl proof were complete while macOS integration remained.
+- Resolution: The maintained macOS target completed live list/detail and
+  clipboard integration, retired the temporary holder, and closed D-013.
+- Does it block later work? No.
 
 ## B-005 — Uncommitted documentation prevents a clean Layer 1 branch
 
@@ -1055,74 +1079,75 @@ Use IDs `B-###`. Never delete an entry; append resolution and date.
 
 - Opened: 2026-07-18
 - Severity: Coordination / Layer 3 exit gate
-- Status: Open / deferred to Developer A under D-013
+- Status: Resolved 2026-07-18
 - Impact: Developer B's POST → SQLite → GET/list flow passes, but the first
   shared vertical slice is not complete until the macOS app displays the live
   backend Capture.
-- Resolution needed: Developer A follows
-  `docs/developer-a-backend-handoff.md`, adapts or replaces the documented Swift
-  holder, confirms live list/detail display, and reports contract mismatches.
-- Does it block Layer 4 backend work? No under D-013. It still blocks marking
-  the shared Layer 3 vertical slice complete.
+- Resolution: Developer A replaced the holder with `apps/macos/`, displayed
+  live list/detail and clipboard Captures, preserved source/note separation, and
+  removed the placeholder. Historical branch build and test evidence is
+  retained in the handoff.
+- Does it block Layer 4 or the shared Layer 3 slice? No.
 
-## B-007 — OpenAI credential is unavailable for the Layer 4 live proof
+## B-007 — OpenAI credential gate for the Layer 4 live proof
 
 - Opened: 2026-07-18
 - Severity: Integration / Layer 4 exit gate
-- Status: Open
+- Status: Resolved 2026-07-19
 - Impact: Provider-boundary implementation and deterministic tests can proceed,
   but the current `/health` response reports `openai_configured: false`, so a
   real Responses API enrichment and model-access check cannot run.
-- Resolution needed: Configure `OPENAI_API_KEY` in the untracked root `.env`,
-  restart the backend, and run the checked-in live enrichment proof.
-- Does it block Layer 4 implementation? No. It blocks only the live provider
-  exit-gate evidence and marking Layer 4 completely verified.
+- Resolution: The ignored root `.env` was loaded without exposing the key. An
+  initial provider `429` safely produced `error`; after billing activation, the
+  same Capture retried through `processing → ready` with validated generated
+  fields and preserved source data.
+- Does it block Layer 4? No; the live exit gate is closed.
 
-## B-008 — OpenAI credential is unavailable for Layer 7 embedding proof
+## B-008 — OpenAI embedding access gate
 
 - Opened: 2026-07-18
 - Severity: Integration / Layer 7 exit gate
-- Status: Open
+- Status: Resolved 2026-07-19
 - Impact: The exact embedding projection, provider boundary, SQLite storage,
   cosine/hybrid scoring, deterministic vector tests, and FTS fallback can be
   implemented and verified, but a real embedding-model request cannot run.
-- Resolution needed: Configure `OPENAI_API_KEY` outside Git, restart the
-  backend, and run the Layer 7 live provider proof using the configured
-  `OPENAI_EMBEDDING_MODEL`.
-- Does it block Layer 7 implementation? No. It blocks live model-access proof
-  and the complete Chrome-to-OpenAI vertical-slice gate.
+- Resolution: The configured embedding model returned `200`; the stored vector
+  produced a non-null semantic score and ranked the intended Capture first for
+  a vague query. Provider-off FTS behavior remained usable.
+- Does it block Layer 7? No; the live model-access gate is closed.
 
-## B-009 — Real unpacked-Chrome-to-macOS confirmation is pending
+## B-009 — Real unpacked-Chrome-to-macOS confirmation
 
 - Opened: 2026-07-18
 - Severity: Coordination / Layer 6 exit gate
-- Status: Open
+- Status: Resolved 2026-07-19
 - Impact: Manifest, extraction, popup behavior, exact API delivery, SQLite
   persistence, CORS, and browser-page behavior are verified independently, but
   the complete toolbar-action flow has not run in a user-loaded Chrome
   extension and the resulting card has not been confirmed in Developer A's
   macOS app.
-- Resolution needed: Load `apps/chrome-extension/` through
-  `chrome://extensions`, configure the generated exact origin in the untracked
-  `.env`, save one selected passage, and have Developer A confirm the card in
-  the macOS list without a database edit. Also repeat the popup check once with
-  the backend intentionally stopped.
-- Does it block Layer 6 implementation? No. It blocks marking the cross-client
-  exit gate complete.
+- Resolution: Loaded `apps/chrome-extension/` unpacked, configured its exact
+  origin only in the ignored `.env`, and saved both a no-selection page-context
+  Capture and a 132-character selected passage. Both reached `ready` through
+  real enrichment and appeared automatically as Google Chrome cards in the
+  macOS app without a database edit. Backend-off recovery retains deterministic
+  extension coverage; the transient popup did not yield a stable accessibility
+  observation during the automated stop test.
+- Does it block Layer 6? No; the cross-client gate is closed.
 
 ## B-010 — Documentation-only main is not a runnable integration tree
 
 - Opened: 2026-07-18
 - Severity: Architecture / Layer 8 integration gate
-- Status: Open by explicit user direction under D-019
-- Impact: Contracts and descriptions remain centralized, and every
-  implementation commit remains recoverable on a named branch, but checking
-  out `main` alone no longer starts or tests the Recall product.
-- Resolution needed: Before Layer 8, either restore a runnable integrated
-  `main` or have both developers agree to extend the local
-  `integration/layers-6-7` branch with the required macOS work.
-- Does it block the branch separation? No. It blocks claiming `main` is runnable
-  and therefore blocks the Layer 8/final integrated-demo gate.
+- Status: Resolved 2026-07-19 by D-023; deterministic and live verification complete
+- Historical impact: Contracts and descriptions remained centralized, but
+  checking out the documentation-only `main` could not start or test Recall.
+- Resolution: The final integration tree restores `apps/macos/`,
+  `apps/chrome-extension/`, and `services/backend/` alongside contracts and
+  docs. It preserves the main, hardening, and macOS histories and passes the
+  current backend, stress, extension, and macOS automated suites.
+- Does it block Layer 8? No. The formerly independent B-007/B-008/B-009 live
+  gates are also resolved.
 
 ## B-011 — Backend stress audit found thirteen grouped breakpoints
 
@@ -1143,12 +1168,50 @@ Use IDs `B-###`. Never delete an entry; append resolution and date.
   relaxation, cached overflow-safe semantic scoring, bounded enrichment, and
   deeper database health. The suite passes 181/181 tests and the unchanged
   scenario set passes 44/44 in 17.896 seconds.
-- Does it block Layer 8? No. B-010 and the live/shared gates remain independent.
+- Integrated follow-up evidence: the current tree passes 186 backend tests and
+  the unchanged 44/44 stress scenarios.
+- Does it block Layer 8? No. Shared P0 live gates are resolved.
 
 # Errors encountered
 
 Use IDs `E-###`. Record the original symptom and the resolution. Do not erase
 resolved errors.
+
+## E-038 — First real provider call returned HTTP 429
+
+- Date: 2026-07-19
+- Status: Resolved 2026-07-19
+- Symptom: The key loaded successfully and creation returned `202`, but the
+  Responses API returned `429 Too Many Requests`; the Capture safely became
+  `error` with no source loss.
+- Resolution: Added billing credit to the API project and retried the same
+  Capture. Responses and embeddings both returned `200`, and the Capture became
+  `ready`.
+- Project impact: External account configuration only; failure behavior worked
+  as designed.
+
+## E-039 — Local `.env` leaked into provider-off tests
+
+- Date: 2026-07-19
+- Status: Resolved 2026-07-19
+- Symptom: Five backend tests failed after a real key was added because fixtures
+  deleted the environment variable and then unintentionally reloaded it from
+  the repository-root `.env`.
+- Resolution: Provider-off fixtures now set an explicit empty environment value,
+  which overrides `.env`. The full 186-test suite passes with the real local
+  file present.
+- Project impact: Test isolation only; production configuration is unchanged.
+
+## E-040 — Final Xcode regression first missed a test-double return
+
+- Date: 2026-07-19
+- Status: Resolved 2026-07-19
+- Symptom: Adding a request counter made a formerly single-expression async
+  test-double method require an explicit Swift `return`, so the first final
+  Xcode run stopped at compile time.
+- Resolution: Added the explicit return and reran the complete target; all 27
+  macOS tests passed.
+- Project impact: Test code only; the production target had already compiled.
 
 ## E-025 — The first extension test command could not find `npm`
 
@@ -1229,8 +1292,9 @@ resolved errors.
   checkpoint `3389bae` to `integration/layers-6-7`. The focused siblings remain
   review branches; integration should use the combined branch instead of a
   blind direct merge.
-- Project impact: No code loss and no test regression. Final team integration
-  still requires Developer A's macOS branch under B-010.
+- Project impact: No code loss and no test regression. The later D-023
+  integration includes the macOS branch and resolves the former B-010 layout
+  blocker.
 
 ## E-031 — First stress-harness launch could not import the backend
 

@@ -1,8 +1,9 @@
-# Developer A backend handoff
+# macOS and backend integration handoff
 
-Status: Layer 3 holder pending; Layer 4 polling, Layer 6 Chrome, and Layer 7 search contracts available
+Status: Layer 3 gate closed; hardened backend, Chrome, and macOS code integrated;
+deterministic and shared live verification complete
 
-Last verified: 2026-07-18
+Last updated: 2026-07-19
 
 ## Local service
 
@@ -13,7 +14,7 @@ Last verified: 2026-07-18
 - Detail: `GET /v1/captures/{id}`
 - Retry enrichment: `POST /v1/captures/{id}/enrich`
 - Search: `GET /v1/search?q={query}&limit=20`
-- Shared response contract: `contracts/api.md`
+- Shared response contract: [`contracts/api.md`](../contracts/api.md)
 
 Start the backend from `services/backend/`:
 
@@ -21,82 +22,77 @@ Start the backend from `services/backend/`:
 .venv/bin/python -m app
 ```
 
-## Verified curl flow
+The service starts without an OpenAI key. In that mode, capture persistence and
+FTS search still work, enrichment reaches a safe terminal error, and search
+results may have `semantic_score=null`.
 
-From the repository root:
+## macOS contract behavior
 
-```bash
-curl --header 'Content-Type: application/json' \
-  --data-binary @contracts/examples/capture-request.json \
-  http://127.0.0.1:8765/v1/captures
-```
-
-The verified response returned HTTP `202`, a server UUID, and status
-`processing`. Use that returned UUID for detail:
-
-```bash
-curl http://127.0.0.1:8765/v1/captures/{id}
-```
-
-List the newest records:
-
-```bash
-curl 'http://127.0.0.1:8765/v1/captures?limit=50&offset=0'
-```
-
-Search raw and generated fields, or omit `q` for recent Captures:
-
-```bash
-curl --get --data-urlencode 'q=WorkingDirectory' \
-  'http://127.0.0.1:8765/v1/search?limit=20'
-curl 'http://127.0.0.1:8765/v1/search?limit=20'
-```
-
-The live proof created Capture `359d1c47-0190-40c4-8681-d994408860be` and
-verified the same record through POST, direct SQLite inspection, detail GET,
-and list GET.
-
-The Layer 5 provider-off proof created temporary Capture
-`9845ea10-da9a-4407-bd43-907f86d89557`, observed its safe `error` transition,
-retrieved it through `q=WorkingDirectory`, and retrieved it again after a clean
-backend restart. The disposable database was removed afterward.
-
-## macOS behavior for this layer
-
-- Decode list responses from the `items` array; `limit` and `offset` are
-  returned beside it.
-- Render source, surrounding context, and `user_note` independently.
-- Show `processing` immediately after creation, then poll detail every one to
-  two seconds until `ready` or `error`, with an approximately 60-second cap.
-- When status becomes `ready`, render the AI interpretation separately from the
-  original source and user note. When it becomes `error`, retain the raw card
-  and offer retry through `POST /v1/captures/{id}/enrich`.
-- Display the stable error `message`, but branch behavior on the error `code`.
-- Preserve `context_truncated` in Swift request and response models.
-- Chrome Captures use the same response model with `source_type=web` and
-  `source_app=Google Chrome`; no browser-only field was added.
+- Decode list responses from `items`; `limit` and `offset` are returned beside
+  the array.
 - Decode search from `results[*].capture`. `score` is the final ranking score,
-  `keyword_score` is always present, and `semantic_score` is nullable. Never
-  require an embedding to display a keyword-fallback result.
+  `keyword_score` is always present, and `semantic_score` is nullable. A result
+  never requires an embedding to be displayed.
+- Render source text, surrounding context, `user_note`, and generated AI fields
+  as separate information layers.
+- Show `processing` immediately after creation, poll detail about every two
+  seconds, stop on `ready` or `error`, and stop after approximately 60 seconds.
+- Preserve raw source and note data when enrichment fails, and offer
+  `POST /v1/captures/{id}/enrich` where retry is appropriate.
+- Display an error's stable message, but branch behavior on its stable code and
+  HTTP status.
+- Preserve `context_truncated` in request and response models.
+- Reuse the draft's `client_capture_id` and `captured_at` when a user retries
+  the same failed create request; a new draft receives a new identity.
+- Use the local substring search fallback only when the exact search route
+  returns `404`. Do not hide validation, server, or connectivity errors behind
+  local results.
 
-## Non-production integration holder
+Chrome Captures use the same response model with `source_type=web` and normally
+`source_app=Google Chrome`; there is no browser-only Capture response type.
 
-[`examples/macos-layer3-placeholder.swift`](examples/macos-layer3-placeholder.swift)
-contains copy-ready `Decodable` DTOs and an async list request. It is deliberately
-stored under `docs/`, outside any Xcode target, and is marked `TODO(Developer A)`.
-Developer A should adapt it to the app's existing networking and state model,
-then remove the holder after the real list and detail views pass.
+## Current input limits
 
-## Confirmation needed
+The macOS client and backend share these relevant caps:
 
-Developer A should confirm:
+| Field | Maximum Unicode scalars |
+| --- | ---: |
+| `source_app` | 200 |
+| `source_title` | 500 |
+| `source_url` | 2,048 |
+| `selected_text` | 12,000 |
+| `surrounding_context` | 20,000 |
+| `user_note` | 4,000 |
+| search query `q` | 512 |
 
-1. Swift models decode the checked-in Capture response without invented fields.
-2. The macOS list displays the live record returned by the backend.
-3. Detail view preserves source and user-note separation.
+Search also rejects ASCII control characters. Oversized clipboard text, notes,
+and queries should remain visible to the user with a local validation message;
+the client must not silently truncate private content before submission. Source
+application metadata may be safely bounded to its contract cap.
 
-That confirmation closes the shared Layer 3 vertical-slice gate.
+## Layer 3 gate closure
 
-The complete Layer 6 exit gate additionally requires Developer A to confirm
-that a Capture created from the unpacked Chrome extension appears in the macOS
-list without a manual database edit.
+The temporary `docs/examples/macos-layer3-placeholder.swift` holder was removed
+after the production target implemented the shared DTOs, networking, list, and
+detail flow. On the original macOS branch, the app built with Xcode 26.2, its 11
+contract/network/store tests passed, and live backend Captures were displayed
+with source and user-note separation. Subsequent manual checks also exercised
+clipboard capture, notes, source attribution, backend search, restart recovery,
+offline behavior, and empty/overlong clipboard handling.
+
+That evidence closes D-013 and B-006. The current integrated target now passes
+all 27 macOS tests alongside 186 backend tests, 44 stress scenarios, and 13
+extension tests.
+
+## Shared live-gate result
+
+- **B-007 resolved:** a real Responses API retry moved a persisted Capture from
+  `processing` to `ready` with non-empty generated fields.
+- **B-008 resolved:** a real embedding was stored and a vague query ranked the
+  intended Capture first with a non-null semantic score; provider-off FTS still
+  returns usable results with `semantic_score=null`.
+- **B-009 resolved:** an unpacked extension using an exact local CORS origin
+  saved both page-context and 132-character selected-text Captures; the macOS
+  app displayed the resulting ready Google Chrome cards without database edits.
+
+Never send an API key through Git, GitHub, chat, screenshots, or test fixtures.

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Recall code-selection fixture</title>
+  </head>
+  <body>
+    <article>
+      <h1>FastAPI service repair</h1>
+      <p>The service failed under systemd but worked in an interactive shell.</p>
+      <pre><code id="selected-code">WorkingDirectory=/srv/recall
+systemctl restart recall.service</code></pre>
+      <p>Verify the deployment path before copying this command.</p>
+    </article>
+    <script>
+      const range = document.createRange();
+      range.selectNodeContents(document.querySelector("#selected-code"));
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    </script>
+  </body>
+</html>

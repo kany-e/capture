@@ -1,0 +1,72 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "title": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "A concise, specific title grounded in the source and user context."
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "A contextual personal-memory summary, not merely an article summary."
+    },
+    "problem": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "key_insight": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "why_saved": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Grounded primarily in user_note; explicitly acknowledge when no personal reason was provided."
+    },
+    "caveats": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "tags": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "entities": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "search_aliases": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    }
+  },
+  "required": [
+    "title",
+    "summary",
+    "problem",
+    "key_insight",
+    "why_saved",
+    "caveats",
+    "tags",
+    "entities",
+    "search_aliases"
+  ]
+}

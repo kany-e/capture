@@ -271,6 +271,10 @@ contract does not use WebSockets.
 - Empty or whitespace-only `q`: returns recent Captures.
 - Keyword retrieval first requires all terms, then retries with any term only
   when the strict pass returns no rows.
+- A bounded literal-substring pass is merged with tokenized candidates to
+  recover partial identifiers and CJK fragments that FTS may omit. Candidates
+  are deduped under the existing cap, and FTS-ranked rows retain priority.
+  Query punctuation is never interpreted as search syntax.
 - Exact technical identifiers receive higher keyword weight.
 - If query embedding fails, results fall back to keyword scoring.
 - With a compatible Capture and query vector, `score` combines semantic,
