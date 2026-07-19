@@ -8,6 +8,11 @@ Run all commands below from `services/backend/`.
 
 ## Install
 
+Use Python 3.10 or later. Check `python3 --version` before creating the virtual
+environment; Apple's system Python may be older than this project's declared
+minimum. On Apple Silicon with Homebrew, `/opt/homebrew/bin/python3` is a
+typical compatible interpreter path.
+
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
