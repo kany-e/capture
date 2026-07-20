@@ -1276,6 +1276,20 @@ Use IDs `B-###`. Never delete an entry; append resolution and date.
 Use IDs `E-###`. Record the original symptom and the resolution. Do not erase
 resolved errors.
 
+## E-054 — First cloud CI parse rejected a hyphenated job reference
+
+- Date: 2026-07-20
+- Status: Resolved 2026-07-20
+- Evidence: GitHub Actions run `29787636411`
+- Symptom: GitHub created a failed run with no jobs because the aggregate
+  expression referenced `needs.backend-stress.result`; the hyphen was parsed as
+  an operator. Generic YAML validation could not detect GitHub expression
+  semantics.
+- Resolution: Renamed the internal job ID to `backend_stress` while preserving
+  the user-facing **Backend stress** check name, then republished the workflow.
+- Project impact: Workflow-only correction; no application or test behavior
+  changed.
+
 ## E-053 — Sandboxed macOS verification could not access Vision services
 
 - Date: 2026-07-20
