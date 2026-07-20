@@ -80,9 +80,8 @@ with source and user-note separation. Subsequent manual checks also exercised
 clipboard capture, notes, source attribution, backend search, restart recovery,
 offline behavior, and empty/overlong clipboard handling.
 
-That evidence closes D-013 and B-006. The current integrated target now passes
-all 27 macOS tests alongside 186 backend tests, 44 stress scenarios, and 13
-extension tests.
+That evidence closes D-013 and B-006. Current `main` passes all 27 macOS tests
+alongside 190 backend tests, 44 stress scenarios, and 16 extension tests.
 
 ## Shared live-gate result
 

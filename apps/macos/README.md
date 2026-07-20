@@ -57,7 +57,16 @@ green **Connected** indicator after it reaches a healthy local service.
 ## Build and test from the command line
 
 Run from the repository root. The explicit Derived Data path keeps generated
-output outside the source tree.
+output outside the source tree. The repository test command builds the app and
+test bundle, then invokes the bundle directly so Xcode 26.6 cannot leave the
+host application waiting indefinitely before test completion:
+
+```bash
+./scripts/test-macos.sh
+```
+
+Use the commands below when testing interactively through Xcode's normal host
+runner rather than the deterministic command-line safeguard.
 
 ```bash
 xcodebuild \
@@ -81,7 +90,10 @@ xcodebuild \
   test
 ```
 
-The same actions are available in Xcode with `Command-B` and `Command-U`.
+The same actions are available in Xcode with `Command-B` and `Command-U`. If
+`xcodebuild test` launches Recall but never finishes, stop that run and use
+`./scripts/test-macos.sh`; D-026 and E-045 record the verified Xcode 26.6
+workaround.
 
 ## Regenerate the Xcode project
 

@@ -812,8 +812,8 @@ Status: `[~]` shared P0 integration verified; explicit reliability backlog remai
 - [x] Publish the historical stress, hardening, integration, and isolated layer
   checkpoints to `origin`.
 - [x] Assemble the hardened backend, Chrome extension, macOS client, contracts,
-  and current documentation in the final integration tree. The current tree
-  passes 186 backend tests, 44/44 stress scenarios, 13 extension tests, and 27
+  and current documentation in the final integration tree. Current `main`
+  passes 190 backend tests, 44/44 stress scenarios, 16 extension tests, and 27
   macOS tests.
 
 The audit itself made no production change. D-021 records the separately
@@ -845,6 +845,9 @@ authorized follow-up remediation and its exact contract additions.
   Bash validation, automated safeguards, a live provider-off start, health wait,
   duplicate-process detection, URL output, and clean `Control-C` shutdown pass;
   the complete 190-test suite and 44/44 stress scenarios also pass.
+- [x] Add `scripts/test-macos.sh` as a deterministic Xcode 26.6 command-line
+  fallback. A clean build-for-testing followed by direct `xctest` execution
+  passes all 27 tests without changing production code or project settings.
 - [ ] Document backend-connected/disconnected behavior for Developer A.
 - [x] Record stress limitations and remaining live/system gates in the README
   and dated stress report.
@@ -1180,8 +1183,8 @@ Use IDs `B-###`. Never delete an entry; append resolution and date.
   relaxation, cached overflow-safe semantic scoring, bounded enrichment, and
   deeper database health. The suite passes 181/181 tests and the unchanged
   scenario set passes 44/44 in 17.896 seconds.
-- Integrated follow-up evidence: the current tree passes 186 backend tests and
-  the unchanged 44/44 stress scenarios.
+- Integrated follow-up evidence: current `main` passes 190 backend tests and the
+  unchanged 44/44 stress scenarios.
 - Does it block Layer 8? No. Shared P0 live gates are resolved.
 
 # Errors encountered
@@ -1413,6 +1416,60 @@ resolved errors.
   explicitly to retain both improvements.
 - Project impact: No code or uncommitted work was lost; the failure occurred
   before the first feature merge changed `main`.
+
+## E-044 — First merged-main backend command used a duplicated path
+
+- Date: 2026-07-20
+- Status: Resolved 2026-07-20
+- Symptom: The first parallel quality-gate command exited `127` before backend
+  collection because it invoked `services/backend/.venv/bin/python` while its
+  working directory was already `services/backend`.
+- Resolution: Reran with `.venv/bin/python` from the backend directory. All 190
+  tests, bytecode compilation, and `pip check` passed; the independent 44-case
+  stress harness also passed.
+- Project impact: Verification path only; no backend test or app code executed
+  during the failed command.
+
+## E-045 — Xcode 26.6 hosted macOS tests waited indefinitely
+
+- Date: 2026-07-20
+- Status: Resolved with deterministic repository fallback 2026-07-20
+- Symptom: `xcodebuild test` built and launched Recall but stalled in the hosted
+  test process. A targeted live-client test and a contract-only target both
+  reproduced the hang; interrupted runs returned exit `75`.
+- Investigation: A private-URL-scheme experiment did not change the behavior
+  and was reverted. Invoking the exact compiled test bundle directly with
+  Apple's `xctest` completed all 27 tests with zero failures, proving the test
+  and production code were healthy.
+- Resolution: Added `scripts/test-macos.sh` to run `build-for-testing` followed
+  by direct `xctest` with the app debug-library path configured. A clean derived
+  data run passes all 27 tests. D-026 documents the safeguard.
+- Project impact: Xcode 26.6 command-line host-runner reliability only; no
+  production source or Xcode project setting changed.
+
+## E-046 — Direct macOS test run first left a coverage profile in the repository
+
+- Date: 2026-07-20
+- Status: Resolved 2026-07-20
+- Symptom: The first successful direct `xctest` run created the untracked file
+  `default.profraw` in the repository root.
+- Resolution: Updated `scripts/test-macos.sh` to route `LLVM_PROFILE_FILE` into
+  its Derived Data directory, removed only the generated profile, and reran all
+  27 tests. Coverage output now stays outside the worktree.
+- Project impact: Workspace hygiene only; test and production behavior did not
+  change.
+
+## E-047 — Live checklist smoke test assumed the wrong representation
+
+- Date: 2026-07-20
+- Status: Resolved 2026-07-20
+- Symptom: The first live smoke assertion tried to parse `/dev/checklist` as
+  JSON, then a corrected HTML check used a stale title string. The route itself
+  returned HTTP `200` both times.
+- Resolution: Verified the HTML contract and current `Recall build pulse` title
+  at `/dev/checklist`, then verified structured metadata separately through
+  `/dev/checklist.json`; it reported branch `main` and a complete dashboard.
+- Project impact: Verification assumptions only; no endpoint change was needed.
 
 ## E-001 — Official OpenAI docs MCP could not initially install
 
@@ -1715,7 +1772,7 @@ resolved errors.
 - Project impact: None; live verification had completed and no repository file
   was targeted.
 
-## E-025 — Review worktree lacked npm and backend test dependencies
+## E-043 — Review worktree lacked npm and backend test dependencies
 
 - Date: 2026-07-19
 - Status: Resolved for the changed extension scope

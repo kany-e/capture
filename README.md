@@ -76,7 +76,9 @@ While the backend is running, the live engineering checklist is available at
 Open [`apps/macos/Recall.xcodeproj`](apps/macos/Recall.xcodeproj) in Xcode,
 select the shared **Recall** scheme and **My Mac**, then run the app. Keep the
 backend running at `127.0.0.1:8765`. Detailed build commands and the manual test
-matrix are in [`apps/macos/README.md`](apps/macos/README.md).
+matrix are in [`apps/macos/README.md`](apps/macos/README.md). Run the complete
+macOS test bundle reliably from the repository root with
+`./scripts/test-macos.sh`.
 
 ## Load the Chrome extension
 

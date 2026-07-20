@@ -447,9 +447,10 @@ AND behavior in D-015 and the per-request full decode described in D-017.
 
 The same deterministic harness must remain green after changes. The original
 branch acceptance evidence is 181 passing backend tests and 44/44 passing
-stress scenarios. The full integration tree now passes 186 backend tests and
-the unchanged 44/44 scenario set. Real OpenAI enrichment and embeddings have
-also passed; power-loss and disk-full behavior remain separate system evidence.
+stress scenarios; the first integrated tree passed 186 backend tests. Current
+`main` passes 190 backend tests and the unchanged 44/44 scenario set. Real
+OpenAI enrichment and embeddings have also passed; power-loss and disk-full
+behavior remain separate system evidence.
 
 ## D-022 — Build Week macOS runtime and narrow search fallback
 
@@ -496,10 +497,12 @@ relevant development histories; no published commit is rewritten.
 This tree is the source for future feature branches and the final demo. Prior
 branch test results remain useful component evidence, but they do not replace
 the backend, extension, Xcode, and manual checks being run against the assembled
-tree. The assembled tree passes 186 backend tests, 44/44 stress scenarios, 13
-extension tests, and 27 macOS tests. Real OpenAI enrichment and embeddings,
-semantic search, unpacked-Chrome capture, and macOS display resolve B-007,
-B-008, and B-009.
+tree. The first assembled tree passed 186 backend tests, 44/44 stress scenarios,
+13 extension tests, and 27 macOS tests. After the reliability and keyboard-first
+improvements, current `main` passes 190 backend tests, the same 44/44 stress
+scenarios, 16 extension tests, and 27 macOS tests. Real OpenAI enrichment and
+embeddings, semantic search, unpacked-Chrome capture, and macOS display resolve
+B-007, B-008, and B-009.
 
 ## D-024 — Bounded literal-substring retrieval fallback
 
@@ -542,6 +545,25 @@ submitted as invalid or misleading truncated links. Once a valid request begins,
 the open popup freezes and reuses that exact payload and `client_capture_id` for
 all retries. This complements backend idempotency without caching selected
 private source content in extension storage.
+
+## D-026 — Deterministic macOS command-line test runner
+
+- Classification: Reliability safeguard
+- Status: Accepted during final `main` reconciliation
+- Product impact: None; production code and the Xcode project remain unchanged
+- Schedule impact: Low
+
+Xcode 26.6 can build and launch the hosted macOS unit-test target but leave the
+host process waiting indefinitely. The compiled test bundle itself remains
+healthy and passes all 27 tests when invoked with Apple's `xctest` executable.
+The repository therefore provides `scripts/test-macos.sh`, which runs
+`xcodebuild build-for-testing` and then invokes that exact bundle with the app's
+debug-library directory available to the dynamic loader.
+
+This is a test-infrastructure fallback, not a substitute for manual app checks
+or a change to the product runtime. The conventional Xcode `Command-U` and
+`xcodebuild test` paths remain documented for environments where the hosted
+runner completes normally.
 
 ## Pending decisions
 

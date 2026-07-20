@@ -58,12 +58,14 @@ kept some of those deletions for files unchanged on the hardening branch.
 
 ## Verification state
 
-The assembled tree passes 186 backend tests, all 44 deterministic stress
-scenarios, 13 extension tests, and 27 macOS tests. Provider-off keyword search,
-real OpenAI enrichment and embeddings, semantic retrieval, unpacked Chrome
-selected-text and no-selection capture, and macOS display all pass against the
-integrated tree. Earlier branch-level results remain historical evidence, while
-these counts describe the current integration.
+The first assembled tree passed 186 backend tests, all 44 deterministic stress
+scenarios, 13 extension tests, and 27 macOS tests. Current `main`, after merging
+the backend reliability and keyboard-first Chrome branches, passes 190 backend
+tests, the same 44/44 stress scenarios, 16 extension tests, and 27 macOS tests.
+Provider-off keyword search, real OpenAI enrichment and embeddings, semantic
+retrieval, unpacked Chrome selected-text and no-selection capture, and macOS
+display all pass against the integrated tree. Earlier branch-level results
+remain historical evidence.
 
 The shared live gates B-007, B-008, and B-009 are resolved. Final submission
 artifacts and release packaging remain Layer 10 work.
