@@ -64,9 +64,8 @@ not approval from a particular historical developer role.
    app, and source review are complete. PR #9 passed all required checks and
    merged at `0c1083e`. Deterministic suites pass 68/68 for Chrome and 48/48 for
    the D-030 macOS checkpoint.
-3. **Native global capture and stable Screen Recording identity — current;
-   implementation and TCC identity verification complete; final interaction
-   pending.** D-031 registers
+3. **Native global capture and stable Screen Recording identity — complete and
+   live-verified.** D-031 registers
    configurable global screenshot and clipboard shortcuts through Carbon
    without Accessibility or Input Monitoring permission. A normal Dock app and
    its existing menu-bar extra share one application-level coordinator, so
@@ -78,10 +77,11 @@ not approval from a particular historical developer role.
    override, verification of a signer-based designated requirement, and a clear
    diagnostic for temporary signatures. The app-specific reset,
    reauthorization, same-signer rebuild, system overlay, and cancellation now
-   pass, as do all 70 macOS tests. The app must be running; launch at login
-   remains a separate opt-in improvement. Final acceptance only needs the
-   physical shortcut with Recall's main window closed and one completed
-   non-empty region; reconfirming the clipboard shortcut is desirable.
+   pass, as do all 70 macOS tests. The real-device interaction gate also passes:
+   with Recall's main window closed and another app focused, the physical
+   screenshot shortcut completed a non-empty region, and the clipboard shortcut
+   opened Capture after text was copied. The app must be running; launch at
+   login remains a separate opt-in improvement.
 4. **Native Accessibility selection — next.** Read the focused app's selected text and
    bounds only after a user shortcut, then open capture UI near that selection.
    Keep clipboard capture as the compatibility fallback and avoid passive
@@ -153,7 +153,7 @@ The verification backend intentionally had no AI provider configured. Its later
 enrichment `error` did not invalidate the successful Capture: the persist-first
 pipeline retained the original source and note.
 
-### Native global capture — implemented; physical-input gate pending
+### Native global capture — complete and live-verified
 
 - Recall remains a normal Dock app with its existing `MenuBarExtra`; it must be
   running, but the main window may be closed.
@@ -202,9 +202,9 @@ pipeline retained the original source and note.
   the Team ID and signer-based requirement. The rebuilt process launched
   `/usr/sbin/screencapture`, displayed the system overlay, and cancelled with
   Escape without a permission error.
-- Remaining B-014 gate: from another app with Recall's main window closed,
-  physically press `Option+Shift+Command+4` and complete one non-empty region.
-  Reconfirm `Option+Shift+Command+C` if practical.
+- B-014 is closed. From another app with Recall's main window closed, the
+  physical `Option+Shift+Command+4` shortcut completed a non-empty region.
+  After copying text, `Option+Shift+Command+C` opened Capture as expected.
 
 ## Deliberately deferred
 

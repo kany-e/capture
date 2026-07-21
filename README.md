@@ -153,7 +153,8 @@ call. Real GPT, Screen Recording permission, and interactive screenshot flows
 remain explicit manual release gates. The physical global hotkeys and the
 global screenshot path also require a final run from the stably signed app.
 CI may intentionally disable code signing for deterministic tests, so a green
-macOS job is not TCC acceptance evidence.
+macOS job is not TCC acceptance evidence. The current stable build has passed
+that real-device gate; future release candidates must repeat it.
 
 ## Current status
 
@@ -206,8 +207,10 @@ make that state explicit. The app-specific TCC reset and reauthorization now
 pass on the integration Mac. A same-signer rebuild changed CDHash from
 `143035…` to `5a1b00…` while retaining the Team ID and signer-based requirement;
 the rebuilt app opened the system region overlay and cancelled cleanly without
-a permission error. The macOS suite passes 70/70. B-014 now contains only the
-remaining physical-hotkey and completed non-empty-region acceptance.
+a permission error. The macOS suite passes 70/70. B-014 is closed: with Recall's
+main window closed and another app focused, the physical screenshot shortcut
+completed a non-empty region, and the clipboard shortcut opened Capture after
+text was copied.
 Final regression also passes 215 backend tests, 44/44 stress scenarios, and
 68/68 Chrome-extension tests.
 

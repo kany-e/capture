@@ -44,7 +44,7 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-028 | Layered GitHub Actions pull-request checks | Reliability safeguard | Accepted by user direction |
 | D-029 | Opt-in inline browser selected-text capture | Addition | Implemented, real-Chrome verified, and merged in PR #8 |
 | D-030 | Omit unsafe browser context and bound native display | Reliability/privacy safeguard | Implemented, UI-verified, and merged through PR #9 at `0c1083e` |
-| D-031 | Native global capture through Carbon and one app-level coordinator | Addition | Implemented and merged through PR #10 at `0ab687b`; final physical-input gate pending |
+| D-031 | Native global capture through Carbon and one app-level coordinator | Addition | Implemented and merged through PR #10 at `0ab687b`; real-device acceptance passed |
 | D-032 | Stable development code identity for TCC-protected screenshot capture | Reliability/privacy safeguard | Implemented; 70/70 tests and live TCC rebuild-persistence proof pass |
 
 ## D-001 — Localhost monorepo architecture
@@ -760,11 +760,11 @@ aggregate Required checks job before merging into `main` at `0c1083e`.
 ## D-031 — Native global capture through Carbon and one app-level coordinator
 
 - Classification: Addition approved by user direction
-- Status: Implemented and merged; stable TCC behavior is verified under D-032,
-  while physical hotkey delivery and one completed non-empty region remain open
+- Status: Implemented, merged, and real-device verified; stable TCC behavior is
+  verified under D-032 and B-014 is closed
 - Product impact: Makes screenshot and clipboard Quick Capture available while
   Recall is running even if its main window is closed
-- Schedule impact: Current native priority; Accessibility selection remains next
+- Schedule impact: Completed native priority; Accessibility selection remains next
 
 Recall remains a normal Dock application and keeps its existing
 `MenuBarExtra`. It does not become an agent-only or hidden menu-bar process. The
@@ -821,14 +821,15 @@ The temporary ad-hoc test build did not match the Screen Recording permission
 record. It showed the explicit permission error and the verification
 deliberately did not change that permission. D-032 later verified the stable TCC
 identity, authorization, same-signer rebuild persistence, and selector
-cancellation. Physical global-key delivery and completing a non-empty region
-remain the narrower B-014 interaction gate.
+cancellation. B-014 later passed the physical screenshot shortcut with Recall's
+main window closed and another app focused, completed a non-empty region, and
+confirmed that the clipboard shortcut opened Capture after text was copied.
 
 ## D-032 — Stable development code identity for TCC-protected screenshot capture
 
 - Classification: Reliability and privacy safeguard approved by user direction
 - Status: Implemented and live-verified; the independent B-014 physical-input
-  gate remains open
+  gate also passed and is closed
 - Product impact: Makes Screen Recording authorization reliably refer to the
   current development build and explains temporary-signature failures
 - Schedule impact: Bounded correction to the D-031 manual acceptance gate
@@ -876,8 +877,8 @@ build, authorize it once, quit, relaunch, and then exercise completed plus
 cancelled region selections. Rebuild persistence is accepted only when the new
 executable CDHash changes while its signer-based designated requirement and
 authorization remain effective. D-032 now satisfies that identity and
-cancelled-selector proof. B-014 separately retains physical hotkey delivery and
-one completed non-empty region.
+cancelled-selector proof. B-014 separately passed physical screenshot delivery,
+one completed non-empty region, and clipboard Quick Capture after copying text.
 
 This follows Apple's explanation that privacy controls use code-signing
 requirements to identify an app and Apple's documented Screen & System Audio

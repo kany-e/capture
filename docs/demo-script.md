@@ -23,10 +23,10 @@ presented as stored memories: only reviewed text enters Recall.
 
 6. Prepare a second region with `Recall Local Vision 2026` for the locality
    comparison.
-7. Complete one private rehearsal with the physical screenshot shortcut from
-   another app and drag a non-empty region. D-032 already verifies that the
-   permission survives a same-signer rebuild; this rehearsal closes the separate
-   B-014 interaction gate.
+7. Repeat the physical screenshot shortcut from another app and drag a non-empty
+   region as a private pre-demo rehearsal. D-032 verifies that permission
+   survives a same-signer rebuild, and B-014 already records a successful
+   real-device interaction.
 
 ## Timed walkthrough
 
@@ -43,13 +43,13 @@ presented as stored memories: only reviewed text enters Recall.
 
 ## Optional D-031 global-capture pickup
 
-Use this only after B-014 is closed in the stably signed build. Before the
-recording, close Recall's main window without quitting, focus another app, and
-physically verify both default shortcuts: `Option+Shift+Command+4` for the
-screenshot selector and `Option+Shift+Command+C` for clipboard Quick Capture.
-Confirm Screen Recording permission and complete one real region selection.
+The current stable build has closed B-014: with Recall's main window closed and
+another app focused, `Option+Shift+Command+4` completed a non-empty screenshot
+region, and `Option+Shift+Command+C` opened clipboard Quick Capture after text
+was copied. Before recording, repeat both checks as a private rehearsal and
+confirm Screen Recording permission remains effective.
 
-After that gate passes, the 10–24 second step may begin with the screenshot
+With that gate passed, the 10–24 second step may begin with the screenshot
 shortcut instead of the menu command. Briefly show **Shortcut Settings…** only
 if there is time: the defaults, enable switches, and restore-defaults action are
 more useful than describing Carbon. If either physical shortcut or the system

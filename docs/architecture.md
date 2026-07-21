@@ -131,9 +131,10 @@ The integration Mac verifies this boundary end to end: after app-specific reset
 and authorization, a same-signer version-2 rebuild changed executable CDHash
 from `143035…` to `5a1b00…` without changing its Team ID or signer-based
 requirement. That rebuilt process launched the system selector, displayed its
-overlay, and cancelled without a permission error. Physical global-key delivery
-and completing a non-empty region remain a separate interaction gate, not a TCC
-identity uncertainty.
+overlay, and cancelled without a permission error. The separate interaction
+gate also passes: physical screenshot delivery completed a non-empty region,
+and the clipboard shortcut opened Capture after copying text. This remains
+distinct evidence from the TCC identity proof even though both are now closed.
 
 ## Browser inline capture boundary
 

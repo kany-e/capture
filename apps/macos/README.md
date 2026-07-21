@@ -264,9 +264,10 @@ Run the build and tests again after regeneration.
   does not read active window titles or Accessibility selections.
 - Global shortcuts work only while Recall is running. Launch at login is a
   separate future opt-in. Stable Screen Recording authorization now survives a
-  rebuild. Final manual acceptance still needs a physical screenshot shortcut
-  from another app with Recall's main window closed and one completed non-empty
-  region; the clipboard shortcut should also be reconfirmed.
+  rebuild. Real-device acceptance also passes: with Recall's main window closed
+  and another app focused, the physical screenshot shortcut completed a
+  non-empty region, and the clipboard shortcut opened Capture after copying
+  text.
 - Persistence belongs to the backend SQLite database. The app has no offline
   write queue.
 - An abrupt backend exit can interrupt in-process enrichment. On the next

@@ -6,7 +6,7 @@ Project: Recall
 
 Last updated: 2026-07-21
 
-Current phase: B-014 physical global-capture acceptance
+Current phase: B-014 closed; native Accessibility selection next
 
 Implementation branch: `codex/stable-screen-recording-permission`
 
@@ -24,8 +24,10 @@ asynchronous screenshot tests. Its final regression passes 215 backend tests,
 44/44 stress scenarios, 68/68 Chrome-extension tests, and 68/68 macOS tests on
 the host. D-032 corrects the ad-hoc signing identity failure, passes 70/70 macOS
 tests, and is live-verified across app-specific TCC reset, authorization,
-same-signer rebuild, selector launch, and cancellation. B-014 now retains only
-physical global-key delivery and one completed non-empty screenshot region.
+same-signer rebuild, selector launch, and cancellation. B-014 is also closed:
+the physical screenshot shortcut completed a non-empty region from another app
+with Recall's main window closed, and the clipboard shortcut opened Capture
+after copied text.
 
 Last baseline cross-check: 2026-07-18 against all sections of
 `docs/product-plan.md`
@@ -74,7 +76,7 @@ Update protocol:
 | Addition | Screenshot-to-notes OCR | Complete and verified | PR #5 supersedes draft PR #4; 214 backend, 44/44 stress, 16 extension, and 43 macOS tests pass; live GPT, Apple Vision, permission, cancellation, and dismissal flows pass |
 | Addition | Opt-in inline browser capture | Complete, real-Chrome verified, and merged | PR #8 merged D-029 at `71ec387`; 68/68 extension tests and enable/save/retry/revoke/BFCache/toolbar-fallback evidence passed before merge |
 | Addition | Browser context and detail-view hardening | Complete, UI-reviewed, and merged | D-030 disables unsafe Chrome context, bounds native display, fixes inline count/scroll, and compacts the popup; PR #9 merged at `0c1083e` after all required checks passed |
-| Addition | Native global capture | Merged and bounded UI-verified / physical-input gate pending | D-031 adds transactional Carbon shortcuts and one app-level capture coordinator; PR #10 merged at `0ab687b`; see B-014 |
+| Addition | Native global capture | Complete and real-device verified | D-031 adds transactional Carbon shortcuts and one app-level capture coordinator; PR #10 merged at `0ab687b`; B-014 is closed |
 | Safeguard | Stable Screen Recording identity | Complete and live-verified | D-032 passes 70/70 macOS tests; app-specific reset, authorization, rebuild persistence, selector launch, and cancellation pass |
 
 The D-023 integration closes B-010, the macOS slice closes B-006, and real
@@ -222,9 +224,9 @@ verification, source review, and CI complete; PR #9 merged into `main` at
 
 ## Active addition — native global capture
 
-Status: `[~]` D-031 implementation, automated verification, bounded real-UI
-verification, review, and merge are complete at `0ab687b`; the physical-input
-gate in B-014 remains open
+Status: `[x]` D-031 implementation, automated verification, bounded real-UI
+verification, review, merge at `0ab687b`, and B-014 real-device acceptance are
+complete
 
 - [x] Keep Recall as a normal Dock application with the existing
   `MenuBarExtra`. Global capture requires the app to be running but is owned by
@@ -273,10 +275,10 @@ gate in B-014 remains open
 - [x] Reset and authorize the stably signed build, relaunch after a same-signer
   rebuild, show the real system selector, and cancel it without a permission
   error or draft.
-- [ ] Focus another app, close Recall's main window without quitting, physically
-  press `Option+Shift+Command+4`, and complete one non-empty region. Automation
-  cannot synthesize this global-key evidence. Reconfirm
-  `Option+Shift+Command+C` if practical.
+- [x] Focus another app, close Recall's main window without quitting, physically
+  press `Option+Shift+Command+4`, and complete one non-empty region. After
+  copying text, physically press `Option+Shift+Command+C` and confirm that
+  Capture opens. The user completed both real-device checks on 2026-07-21.
 
 ## Active reliability correction — stable Screen Recording identity
 
@@ -1496,7 +1498,7 @@ Use IDs `B-###`. Never delete an entry; append resolution and date.
 
 - Opened: 2026-07-21
 - Severity: Manual UI/demo evidence / non-blocking for implementation
-- Status: Open
+- Status: Resolved 2026-07-21
 - Impact: Carbon registration, Settings persistence, rollback behavior,
   coordinator routing, exact clipboard Quick Capture, repeated-trigger draft
   preservation, and asynchronous screenshot cancellation are covered by 70/70
@@ -1515,13 +1517,13 @@ Use IDs `B-###`. Never delete an entry; append resolution and date.
   `/usr/sbin/screencapture`, displayed the overlay, and returned without a
   permission error after Escape. The 19,144-character context record also
   remained collapsed and responsive.
-- Resolution needed: On the current branch, close Recall's main window without
-  quitting, focus another app, physically press `Option+Shift+Command+4`, and
-  drag one non-empty region through the existing disclosure UI. Reconfirm the
-  clipboard hotkey if practical.
-- Does it block build, deterministic regression, or documentation? No. It blocks
-  claiming complete real-device global capture acceptance and should be closed
-  before using the hotkeys as live demo proof.
+- Resolution: With Recall's main window closed and another app focused, the user
+  physically pressed `Option+Shift+Command+4` and completed a non-empty region
+  through the existing capture flow. After copying text, the user physically
+  pressed `Option+Shift+Command+C` and Capture opened as expected.
+- Does it block build, deterministic regression, documentation, or live demo
+  proof? No. The real-device global capture acceptance gate is closed; future
+  release candidates should repeat the interaction check.
 
 # Errors encountered
 
@@ -1549,8 +1551,9 @@ resolved errors.
   CDHash, while the verifier rejects the old ad-hoc app. App-specific reset,
   authorization, **Quit & Reopen**, a same-signer version-2 rebuild, selector
   launch, and Escape cancellation all pass without the permission error. The
-  complete macOS suite passes 70/70. B-014 now tracks only the separate physical
-  hotkey and completed non-empty-region interaction.
+  complete macOS suite passes 70/70. B-014 subsequently passed the physical
+  screenshot shortcut with a completed non-empty region and the clipboard
+  shortcut after copying text, so it is closed.
 - Project impact: No API, storage, Chrome, OCR, image-persistence, or entitlement
   change. `CODE_SIGNING_ALLOWED=NO` remains valid for deterministic automation
   but is explicitly excluded from Screen Recording acceptance.
