@@ -273,7 +273,7 @@ OCR plus visual indexing into the existing search fields. Provider errors keep
 the original safe and support **Retry AI**. The user verified real-app image
 notes with AI both disabled and enabled.
 
-The integrated D-036/D-037 tree passes 234 backend tests, 44/44 stress
+The integrated D-036/D-037 tree passes 235 backend tests, 44/44 stress
 scenarios, 184/184 macOS tests, and
 68/68 Chrome-extension tests.
 

@@ -9,8 +9,9 @@ Last updated: 2026-07-21
 Current phase: Structured-text fidelity and persisted image notes implemented;
 primary real-app acceptance complete and release regression work remains
 
-Recorded implementation branches: `codex/text-capture-fidelity` and
-`codex/image-notes`
+Implementation branch: `codex/image-notes`
+
+Merged prerequisite branch: `codex/text-capture-fidelity`
 
 Integration base: `667b045` (PR #14 merge commit)
 
@@ -44,7 +45,7 @@ real-device acceptance on 2026-07-21.
 D-037 now adds one persisted screenshot image per Capture, an independent note,
 an off-by-default visual-analysis master switch, background OCR/visual enrichment
 through the existing searchable fields, library/detail rendering, and deletion
-of both metadata and the local file. The feature branch passes 234 backend and
+of both metadata and the local file. The feature branch passes 235 backend and
 the integrated macOS suite passes 184 tests. The user verified real-app image
 notes with AI both disabled and enabled; visual-concept retrieval, restart,
 retry, and physical deletion remain explicit release-regression checks.
@@ -109,7 +110,7 @@ Update protocol:
 | Addition | Native Accessibility selection | Implemented; primary path accepted | D-034 adds explicit `Option+Shift+Command+S`, fail-closed AX reading, anchored review, safe v1 shortcut migration, and 108/108 macOS tests; user acceptance passed on 2026-07-21 |
 | Addition | Clipboard selection compatibility | Complete and real-device accepted | D-035 adds an off-by-default transactional synthetic-Copy fallback with exact-control and application-scoped tickets; 149/149 host tests and B-016 user acceptance pass |
 | Addition | Structured-text capture fidelity | Implemented; live payload verified | D-036 adds a bounded plain/HTML/RTF resolver to explicit Clipboard Capture; the real Gemini payload restores verified boundaries from flattened plain text while retaining TeX |
-| Addition | Persisted image notes and visual indexing | Implemented; primary real-app flow accepted | D-037 adds one bounded local image, separate note, off-by-default AI master switch, existing-search reuse, rendering, retry, and deletion; 234 backend and 184 integrated macOS tests pass |
+| Addition | Persisted image notes and visual indexing | Implemented; primary real-app flow accepted | D-037 adds one bounded local image, separate note, off-by-default AI master switch, existing-search reuse, rendering, retry, and deletion; 235 backend and 184 integrated macOS tests pass |
 
 The D-023 integration closes B-010, the macOS slice closes B-006, and real
 provider plus unpacked-Chrome evidence closes B-007, B-008, and B-009. B-011 is
@@ -142,7 +143,7 @@ image-note acceptance verified
 - [x] Verify invalid images, idempotent retries, provider-off preservation,
   provider-on OCR/visual search, attachment reads, deletion, migration, health,
   networking, preference persistence, upload retry, image loading, and old-
-  backend decoding. Evidence: 234/234 backend and 184/184 integrated macOS tests.
+  backend decoding. Evidence: 235/235 backend and 184/184 integrated macOS tests.
 - [x] In the real app, verify image notes save successfully with AI disabled and
   enabled, and that the enabled path produces visible AI interpretation.
 - [ ] During release regression, verify visual-concept retrieval absent from OCR,
@@ -2534,7 +2535,7 @@ resolved errors.
   execution.
 - Resolution: Used the backend-local `.venv/bin/python`, loaded the bundled Node
   runtime and ran the extension suite directly, then assigned both async Swift
-  results before asserting them. Final evidence is 234/234 backend, 44/44
+  results before asserting them. Final evidence is 235/235 backend, 44/44
   stress, 68/68 Chrome, and 157/157 macOS tests.
 - Project impact: Verification harness only; no production-code assertion or
   product behavior failed.
@@ -2555,3 +2556,25 @@ resolved errors.
   verifying image metadata remains present.
 - Project impact: No result or attachment was lost, but this removed a real
   performance regression instead of weakening the existing stress threshold.
+
+## E-061 — Merge CI exceeded the bounded SQLite write-lock wait
+
+- Date: 2026-07-21
+- Status: Resolved
+- Symptom: The PR #14 merge run returned HTTP 500 for 19 of 700 concurrent
+  writes, and the integrated PR #15 run returned 500 for 14 of 500 writes. The
+  databases remained internally consistent but contained only the accepted
+  rows. A separate dashboard test read `current_branch` as `unknown`.
+- Cause: SQLite permits one writer at a time. On the slower shared runner, some
+  requests waited longer than the configured five seconds for the write lock.
+  The dashboard failure came from renaming its recognized `Implementation
+  branch` metadata field while resolving documentation conflicts.
+- Resolution: Increased the bounded SQLite busy wait to 30 seconds, added a
+  regression assertion for the effective 30,000 ms connection setting, and
+  restored the recognized checklist field. The complete backend suite passes
+  235/235 and all 44 stress scenarios pass, including 1,000 synchronized
+  Capture/FTS rows under the same 64- and 32-worker bursts.
+- Project impact: A write that previously lost a short lock race and returned a
+  safe 500 can now remain queued during an exceptional local burst. Normal
+  requests proceed as soon as the lock is released; a genuinely stuck lock is
+  still bounded and fails after 30 seconds rather than waiting indefinitely.

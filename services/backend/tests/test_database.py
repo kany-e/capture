@@ -2,7 +2,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.database import MIGRATIONS_DIRECTORY, apply_migrations, database_connection
+from app.database import (
+    DATABASE_BUSY_TIMEOUT_SECONDS,
+    MIGRATIONS_DIRECTORY,
+    apply_migrations,
+    database_connection,
+)
+
+
+def test_database_connection_allows_bounded_write_lock_queueing(
+    tmp_path: Path,
+) -> None:
+    with database_connection(tmp_path / "recall.db") as connection:
+        busy_timeout_ms = connection.execute("PRAGMA busy_timeout").fetchone()[0]
+
+    assert busy_timeout_ms == DATABASE_BUSY_TIMEOUT_SECONDS * 1_000
 
 
 def test_migrations_are_idempotent_and_complete(tmp_path: Path) -> None:

@@ -13,6 +13,7 @@ from typing import Iterator
 
 MIGRATIONS_DIRECTORY = Path(__file__).resolve().parent / "migrations"
 MIGRATION_FILENAME = re.compile(r"^(?P<version>[0-9]{3})_(?P<name>[a-z0-9_]+)\.sql$")
+DATABASE_BUSY_TIMEOUT_SECONDS = 30
 
 
 class MigrationError(RuntimeError):
@@ -52,7 +53,10 @@ def discover_migrations() -> list[Migration]:
 @contextmanager
 def database_connection(database_path: Path) -> Iterator[sqlite3.Connection]:
     database_path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(database_path, timeout=5)
+    connection = sqlite3.connect(
+        database_path,
+        timeout=DATABASE_BUSY_TIMEOUT_SECONDS,
+    )
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     try:
