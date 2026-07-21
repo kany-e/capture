@@ -6,7 +6,8 @@ Project: Recall
 
 Last updated: 2026-07-20
 
-Current phase: browser inline-capture Phase 1 specified; runtime not started; screenshot manual gates B-012/B-013 remain pending
+Current phase: browser inline-capture Phase 2 implemented; real Chrome gate
+B-014 and screenshot gates B-012/B-013 remain pending
 
 Current branch: `agent/browser-inline-capture`
 
@@ -62,7 +63,7 @@ Update protocol:
 | 9 | Optional Apple on-device path | Gated | Decision D-008 accepted; prerequisites unmet |
 | 10 | Final freeze and submission | Pending | Not started |
 | Addition | Screenshot-to-notes OCR | Published / manual proof pending | Commit `fc23cdf`, draft PR #4, 210 backend, 16 extension, and 37 macOS tests pass; B-012/B-013 track live demo proof |
-| Addition | Inline browser capture | Phase 1 complete / runtime not started | D-028 and `docs/browser-inline-capture-spec.md` define interaction, permissions, ownership, and independent Phase 2/3 gates |
+| Addition | Inline browser capture | Implemented / real Chrome proof pending | 30 extension tests and the complete browser-fixture flow pass; B-014 tracks unpacked-Chrome proof |
 
 The D-023 integration closes B-010, the macOS slice closes B-006, and real
 provider plus unpacked-Chrome evidence closes B-007, B-008, and B-009. B-011 is
@@ -102,8 +103,8 @@ manual demo-proof gates rather than unfinished code
 
 ## Active addition — inline browser capture and browser region screenshot
 
-Status: `[x]` Phase 1 interaction contract complete; Phase 2 and Phase 3 runtime
-implementation have not started
+Status: `[~]` Phase 1 and the Phase 2 selected-text runtime are implemented;
+B-014 remains open, and Phase 3 has not started
 
 - [x] Scale the addition into an independently shippable selected-text slice
   and a separately gated browser-region screenshot slice.
@@ -119,10 +120,25 @@ implementation have not started
 - [x] Assign Chrome content script, service worker, permission UI, browser crop,
   and automated extension testing to Developer B. Native screenshot UI remains
   Developer A's owned path.
-- [ ] Phase 2: implement and verify opt-in inline selected-text capture.
+- [x] Phase 2 permission boundary: request optional HTTP/HTTPS access only from
+  the explicit popup toggle; dynamically register, update, revoke, and remove
+  inline controls from open tabs without disabling toolbar capture.
+- [x] Phase 2 interaction: use an isolated fixed overlay with transient pill,
+  adjacent composer placement, no pre-click focus, documented dismissal rules,
+  keyboard controls, and visible success/error/retry states.
+- [x] Phase 2 delivery: route toolbar, shortcut, and inline entry points through
+  one service-worker coordinator and freeze source, comment, timestamp, and
+  `client_capture_id` across retry.
+- [x] Phase 2 automated verification: 30 Node tests pass; every JavaScript file
+  passes `node --check`; manifest/package JSON and `git diff --check` pass.
+- [x] Phase 2 browser fixture: complete selection → **Add to REcall** → comment
+  → save → 700 ms dismissal passes; exact article bounds are unchanged before
+  and after the overlay.
+- [!] Phase 2 real unpacked-extension gate B-014 is pending because the
+  available in-app browser cannot install an unpacked Chrome extension.
 - [ ] Phase 3: implement and verify explicit browser-region screenshot capture.
-- [ ] Run a real unpacked-extension interaction matrix and record demo evidence
-  before either runtime phase is marked complete.
+- [!] Run the B-014 unpacked-extension interaction matrix before claiming
+  Phase 2 is demo-verified.
 
 ## Scope, schedule, and collaboration guardrails
 
@@ -1276,6 +1292,25 @@ Use IDs `B-###`. Never delete an entry; append resolution and date.
 - Does it block build, automated verification, commit, or push? No. It must be
   closed before claiming the permission/selection interaction is demo-verified.
 
+## B-014 — Real unpacked Chrome inline-capture proof is pending
+
+- Opened: 2026-07-20
+- Severity: Manual browser/backend integration evidence / non-blocking
+- Status: Open
+- Impact: Optional-permission registration, revocation, transient UI, shared
+  delivery, retry identity, and the complete interaction are automated and
+  fixture-verified, but the available in-app browser cannot install an unpacked
+  Chrome extension. An extension-origin request to the live localhost backend
+  has therefore not been demonstrated for this Phase 2 path.
+- Resolution procedure: Load `apps/chrome-extension/` unpacked in Chrome; enable
+  the inline toggle and approve access; highlight ordinary page text; add a
+  comment; save against the live backend; confirm the macOS card preserves the
+  source and note; disable the toggle and confirm controls disappear from an
+  already-open tab.
+- Does it block implementation, deterministic verification, commit, or push?
+  No. It blocks only the claim that Phase 2 is fully demo-verified or ready to
+  merge under the D-028 runtime gate.
+
 # Errors encountered
 
 Use IDs `E-###`. Record the original symptom and the resolution. Do not erase
@@ -1358,6 +1393,33 @@ resolved errors.
   runtime phase is merged.
 - Project impact: No runtime file changed. This remains visible verification
   debt rather than evidence of an application failure.
+
+## E-055 — Inline-capture browser fixture initially served from the wrong root
+
+- Date: 2026-07-20
+- Status: Resolved 2026-07-20
+- Symptom: The first local fixture server started in `tests/fixtures`, so the
+  page's `/src/...` content-script requests returned 404 and no inline action
+  could initialize.
+- Resolution: Restarted the temporary server from the extension root. Both
+  scripts returned 200, and the complete action, comment, save confirmation,
+  automatic dismissal, and no-layout-shift checks passed. The temporary server
+  was stopped cleanly afterward.
+- Project impact: Test harness configuration only; production paths were not
+  affected.
+
+## E-056 — Final JSON validation used extension-relative paths from repo root
+
+- Date: 2026-07-20
+- Status: Resolved 2026-07-20
+- Symptom: `jq empty manifest.json package.json` ran from the repository root,
+  so both extension files were reported missing and no JSON was checked in that
+  attempt.
+- Resolution: Reran `jq` with the full `apps/chrome-extension/` paths; both
+  files passed, including the shared `0.3.0` version assertion in the Node
+  suite.
+- Project impact: Verification command path only; no product behavior or file
+  content was affected.
 
 ## E-038 — First real provider call returned HTTP 429
 

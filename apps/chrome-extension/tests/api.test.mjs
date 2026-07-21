@@ -12,6 +12,9 @@ import {
   buildCaptureRequest,
   createCapture,
 } from "../src/api/recall.js";
+import {
+  buildCaptureAttempt,
+} from "../src/api/messages.js";
 import { createCaptureAttempt } from "../src/popup/capture-attempt.js";
 
 
@@ -119,6 +122,19 @@ test("one popup attempt reuses its exact payload across retries", () => {
 });
 
 
+test("capture attempt preserves one client identity and timestamp", () => {
+  const attempt = buildCaptureAttempt(extracted(), "remember this", {
+    createId: () => "149f51e1-8c18-42d4-9778-3f3b062527a2",
+    now: () => new Date("2026-07-20T20:00:00.000Z"),
+  });
+
+  assert.equal(attempt.clientCaptureId, "149f51e1-8c18-42d4-9778-3f3b062527a2");
+  assert.equal(attempt.capturedAt, "2026-07-20T20:00:00.000Z");
+  assert.equal(attempt.extractedCapture.selectedText, "Set WorkingDirectory before restart.");
+  assert.equal(attempt.userNote, "remember this");
+});
+
+
 test("API client posts one JSON request and accepts processing response", async () => {
   const payload = buildCaptureRequest(extracted(), "note", {
     createId: () => "id",
@@ -180,17 +196,27 @@ test("backend error envelope remains visible without leaking transport details",
 
 
 test("manifest has only the approved permissions and fixed backend access", async () => {
-  const manifest = JSON.parse(
-    await readFile(`${extensionRoot}/manifest.json`, "utf8"),
-  );
+  const [manifest, packageMetadata] = await Promise.all([
+    readFile(`${extensionRoot}/manifest.json`, "utf8").then(JSON.parse),
+    readFile(`${extensionRoot}/package.json`, "utf8").then(JSON.parse),
+  ]);
 
   assert.equal(manifest.manifest_version, 3);
+  assert.equal(manifest.version, packageMetadata.version);
   assert.deepEqual(manifest.permissions.sort(), [
     "activeTab",
     "scripting",
     "storage",
   ]);
   assert.deepEqual(manifest.host_permissions, ["http://127.0.0.1:8765/*"]);
+  assert.deepEqual(manifest.optional_host_permissions, [
+    "http://*/*",
+    "https://*/*",
+  ]);
+  assert.deepEqual(manifest.background, {
+    service_worker: "src/background/service-worker.js",
+    type: "module",
+  });
   assert.equal(manifest.action.default_popup, "src/popup/popup.html");
   assert.equal(
     manifest.commands._execute_action.suggested_key.mac,
@@ -200,7 +226,7 @@ test("manifest has only the approved permissions and fixed backend access", asyn
 });
 
 
-test("popup includes no-selection, saved, processing, and offline states", async () => {
+test("popup preserves toolbar capture and exposes the opt-in inline setting", async () => {
   const [html, popupSource] = await Promise.all([
     readFile(`${extensionRoot}/src/popup/popup.html`, "utf8"),
     readFile(`${extensionRoot}/src/popup/popup.js`, "utf8"),
@@ -209,9 +235,13 @@ test("popup includes no-selection, saved, processing, and offline states", async
   assert.match(html, /No text selected; saving page context\./);
   assert.match(html, /⌘/);
   assert.match(html, /Retry uses the original source and note\./);
+  assert.match(html, /Show Add to REcall when I select text/);
+  assert.match(html, /nothing is sent until you save/);
   assert.match(popupSource, /"Saved\."/);
-  assert.match(popupSource, /"Processing with AI…"/);
-  assert.match(popupSource, /RECALL_UNAVAILABLE_TITLE/);
+  assert.match(popupSource, /"Your source and note are safely stored\."/);
+  assert.match(popupSource, /sendCaptureAttempt/);
+  assert.match(popupSource, /chrome\.permissions\.request/);
+  assert.match(popupSource, /SYNC_INLINE_CAPTURE_MESSAGE/);
   assert.match(popupSource, /chrome\.storage\.local\.remove/);
   assert.match(popupSource, /event\.metaKey \|\| event\.ctrlKey/);
   assert.match(popupSource, /window\.close\(\)/);

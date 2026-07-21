@@ -1,10 +1,14 @@
 # Browser inline capture interaction contract
 
-Status: Phase 1 accepted; runtime implementation has not started
+Status: Phase 2 implemented and fixture-verified; real unpacked-Chrome gate
+B-014 pending
 
 Owner: Developer B — Chrome extension, localhost delivery, and automated tests
 
 Related decisions: D-018, D-025, D-027, and D-028
+
+Development record:
+[`browser-inline-capture-development-record.md`](browser-inline-capture-development-record.md)
 
 ## Objective
 
@@ -229,6 +233,12 @@ without an explicit shared decision.
 Phase 2 cannot merge until the action produces no layout shift, does not steal
 focus, transmits nothing before Save, preserves exact retry identity, passes the
 extension regression suite, and completes a real unpacked-extension capture.
+
+The implementation passes 30 automated extension tests. The browser fixture
+completed selection action → comment → save confirmation → automatic dismissal
+and reported identical article bounds before and after the overlay. B-014 still
+tracks the real unpacked-Chrome permission, localhost delivery, macOS display,
+and permission-revocation proof; the fixture is not a substitute for that gate.
 
 Phase 3 cannot merge until high-DPI cropping, all cancellation paths, transient
 image cleanup, visible GPT disclosure, OCR failure, oversized output, and a real

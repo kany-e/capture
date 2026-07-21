@@ -41,7 +41,7 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-025 | Keyboard-first Chrome capture polish | Addition | Accepted by user direction |
 | D-026 | Deterministic macOS command-line test runner | Reliability safeguard | Accepted |
 | D-027 | Transient screenshot OCR into the existing Capture pipeline | Addition | Implemented; B-012 tracks live GPT proof |
-| D-028 | Opt-in inline browser capture and explicit browser-region screenshots | Addition | Phase 1 accepted; runtime not started |
+| D-028 | Opt-in inline browser capture and explicit browser-region screenshots | Addition | Phase 2 implemented; B-014 pending |
 
 ## D-001 — Localhost monorepo architecture
 
@@ -602,7 +602,8 @@ navigation system. Those remain deferred.
 ## D-028 — Opt-in inline browser capture and explicit browser-region screenshots
 
 - Classification: Addition approved by explicit user direction
-- Status: Phase 1 interaction and privacy contract accepted; runtime not started
+- Status: Phase 2 selected-text runtime implemented; B-014 pending; Phase 3
+  not started
 - Product impact: Adds a transient capture action beside completed webpage
   selections and scopes a matching REcall-initiated browser screenshot flow
 - Schedule impact: Phase 2 text selection is medium; Phase 3 screenshot capture
@@ -635,6 +636,15 @@ Phase 2 selected-text capture may ship independently. Phase 3 browser screenshot
 capture cannot block it and does not authorize passive screenshot monitoring,
 full-page snapshots, persistent image memories, image embeddings, or general
 image understanding.
+
+Phase 2 implementation evidence: optional website permission controls dynamic
+content-script registration and revocation; the isolated action/composer sends
+one explicitly saved, identity-frozen request through the shared service-worker
+coordinator. Toolbar and keyboard capture now use the same coordinator. No API,
+database, enrichment, or search schema changed. Thirty extension tests and the
+complete browser-fixture interaction pass. B-014 remains open because a real
+unpacked Chrome permission/backend/macOS/revocation run was not available in
+the browser fixture environment.
 
 ## Pending decisions
 

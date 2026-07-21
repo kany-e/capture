@@ -23,19 +23,29 @@
           }],
         },
         scripting: {
-          executeScript: async () => [{
-            result: {
-              sourceTitle: "FastAPI systemd repair",
-              sourceUrl: "https://fixture.example/systemd-repair",
-              selectedText: hasSelection ? "Set WorkingDirectory before restart." : "",
-              surroundingContext: "The service worked manually but failed under systemd.",
-              contextTruncated: false,
-              hasSelection,
-              extractionMode: hasSelection
-                ? "preferred-container"
-                : "page-container",
-            },
-          }],
+          executeScript: async (details) => details.files ? [] : [{
+              result: {
+                sourceTitle: "FastAPI systemd repair",
+                sourceUrl: "https://fixture.example/systemd-repair",
+                selectedText: hasSelection ? "Set WorkingDirectory before restart." : "",
+                surroundingContext: "The service worked manually but failed under systemd.",
+                contextTruncated: false,
+                hasSelection,
+                extractionMode: hasSelection
+                  ? "preferred-container"
+                  : "page-container",
+              },
+            }],
+        },
+        runtime: {
+          sendMessage: async (message) => message.type === "recall:inline:sync"
+            ? { ok: true, enabled: false }
+            : { ok: true, capture: { id: "fixture-capture", status: "processing" } },
+        },
+        permissions: {
+          contains: async () => false,
+          request: async () => true,
+          remove: async () => true,
         },
         storage: {
           local: {

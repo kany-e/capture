@@ -35,14 +35,15 @@ same draft entirely on device. Both paths produce editable text that enters the
 existing Capture API and storage/retrieval pipeline; neither creates an image
 store or a second notes database.
 
-Decision D-028 defines a planned, opt-in Chrome inline-capture boundary. Its
-Phase 1 work is documentation only: the current runtime still uses the toolbar
-and keyboard popup described by D-025. In Phase 2, a permitted content script
-may display transient UI after a completed selection and hand an explicitly
-saved request to an extension service worker. In Phase 3, an explicit browser
-region command may send one transient crop to the existing GPT OCR endpoint.
-Chrome cannot observe arbitrary macOS screenshots, and Apple Vision remains in
-the native application. See
+Decision D-028 defines the opt-in Chrome inline-capture boundary. Phase 2 now
+dynamically registers an isolated content script only after optional HTTP and
+HTTPS access is granted. A transient selection action and comment composer hand
+one frozen capture attempt to a shared extension service worker; the toolbar and
+keyboard popup use the same coordinator. B-014 retains the real unpacked-Chrome
+permission, localhost delivery, macOS display, and revocation gate. Phase 3 is
+still planned: an explicit browser region command may send one transient crop
+to the existing GPT OCR endpoint. Chrome cannot observe arbitrary macOS
+screenshots, and Apple Vision remains in the native application. See
 [`browser-inline-capture-spec.md`](browser-inline-capture-spec.md).
 
 ## Ownership

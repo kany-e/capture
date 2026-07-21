@@ -54,6 +54,21 @@
       </div>
 
       <button id="save-button" type="button" disabled>Save</button>
+
+      <section class="inline-setting" aria-labelledby="inline-setting-title">
+        <div>
+          <label id="inline-setting-title" for="inline-capture-toggle">
+            Show Add to REcall when I select text
+          </label>
+          <p>Optional website access · nothing is sent until you save</p>
+        </div>
+        <input
+          id="inline-capture-toggle"
+          type="checkbox"
+          aria-describedby="inline-permission-status"
+        />
+      </section>
+      <p id="inline-permission-status" class="inline-permission-status" role="status" hidden></p>
     </main>
     <script type="module" src="popup.js"></script>
   </body>
