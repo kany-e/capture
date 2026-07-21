@@ -137,14 +137,16 @@ not substitute clipboard data; the user may explicitly review the current
 clipboard or use the established clipboard shortcut.
 
 D-035 adds an opt-in compatibility branch without changing that default. The
-AX read returns a fallback ticket only for the exact application and focused
-control whose selected-text attribute failed after complete non-secure/protected
-evidence. Permission, focus, unknown-safety, secure/protected, no-selection,
-empty, and oversized errors bypass `SelectionClipboardFallbackService`. The
-service waits for shortcut modifiers to release, deep-copies the bounded ordered
-pasteboard items/types into memory, then revalidates the same PID, AX element,
-safety attributes, event-posting access, and Secure Event Input immediately
-before Copy. It requires two Copy attempts from that same control to produce
+AX read returns a fallback ticket for the exact frontmost application whose
+selected-text read failed. When a stable focused element and complete safety
+attributes exist, the ticket binds that exact element. Custom-drawn apps may
+instead receive an application-scoped ticket. Permission failure, Recall itself,
+known secure/protected content, empty/oversized text, and pre-transaction
+cancellation bypass `SelectionClipboardFallbackService`. The service waits for
+shortcut modifiers to release, deep-copies the bounded ordered pasteboard
+items/types into memory, then revalidates the same PID, the exact AX element when
+available, exposed safety attributes, event-posting access, and Secure Event
+Input immediately before Copy. It requires two Copy attempts from that scope to produce
 consecutive change counts and matching complete payloads before accepting text.
 The full cross-process AX and pasteboard transaction is isolated on a serial
 actor outside `MainActor`; only the resulting snapshot or error returns to the

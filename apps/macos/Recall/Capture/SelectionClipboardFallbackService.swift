@@ -61,14 +61,14 @@ protocol SelectionClipboardFallbackBackend: AnyObject, Sendable {
     func snapshotPasteboard() throws -> SelectionPasteboardArchive
     var pasteboardChangeCount: Int { get }
 
-    /// Revalidates the ticket's PID, exact AX focused element, complete
-    /// non-secure evidence, Secure Event Input, and event-posting permission as
-    /// one operation immediately adjacent to posting Command-C.
+    /// Revalidates the ticket's frontmost PID, exact AX focused element when
+    /// available, exposed safety evidence, Secure Event Input, and event-posting
+    /// permission as one operation immediately adjacent to posting Command-C.
     func postCopyIfTargetStillSafe(
         _ ticket: AccessibilitySelectionFallbackTicket
     ) throws
 
-    /// Rechecks the exact focused control and its complete non-secure evidence
+    /// Rechecks the application/control ticket and its available safety evidence
     /// after each asynchronous pasteboard observation.
     func targetStillMatches(_ ticket: AccessibilitySelectionFallbackTicket) -> Bool
     func copiedText() -> String?
@@ -388,10 +388,7 @@ final class SystemSelectionClipboardFallbackBackend: SelectionClipboardFallbackB
     func postCopyIfTargetStillSafe(
         _ ticket: AccessibilitySelectionFallbackTicket
     ) throws {
-        guard let focusedElement = matchingFocusedElement(for: ticket) else {
-            throw SelectionClipboardFallbackError.sourceApplicationChanged
-        }
-        try requireCompleteNonsecureEvidence(of: focusedElement)
+        _ = try validateTarget(for: ticket)
         guard !IsSecureEventInputEnabled() else {
             throw SelectionClipboardFallbackError.secureEventInput
         }
@@ -419,10 +416,7 @@ final class SystemSelectionClipboardFallbackBackend: SelectionClipboardFallbackB
         // Event construction is intentionally followed by one last complete
         // check so there is no separately callable "validated" state that can
         // go stale before posting.
-        guard let finalFocusedElement = matchingFocusedElement(for: ticket) else {
-            throw SelectionClipboardFallbackError.sourceApplicationChanged
-        }
-        try requireCompleteNonsecureEvidence(of: finalFocusedElement)
+        _ = try validateTarget(for: ticket)
         guard !IsSecureEventInputEnabled() else {
             throw SelectionClipboardFallbackError.secureEventInput
         }
@@ -433,9 +427,7 @@ final class SystemSelectionClipboardFallbackBackend: SelectionClipboardFallbackB
         // their result back to the still-focused ticket element immediately
         // before the first key event, rather than relying on the pre-query
         // focus check above.
-        guard matchingFocusedElement(for: ticket) != nil else {
-            throw SelectionClipboardFallbackError.sourceApplicationChanged
-        }
+        _ = try validateTarget(for: ticket)
 
         // The C events carry the Command flag themselves. Avoiding separate
         // modifier events narrows the interval in which the target app could
@@ -446,11 +438,8 @@ final class SystemSelectionClipboardFallbackBackend: SelectionClipboardFallbackB
     }
 
     func targetStillMatches(_ ticket: AccessibilitySelectionFallbackTicket) -> Bool {
-        guard let focusedElement = matchingFocusedElement(for: ticket) else {
-            return false
-        }
         do {
-            try requireCompleteNonsecureEvidence(of: focusedElement)
+            _ = try validateTarget(for: ticket)
         } catch {
             return false
         }
@@ -490,46 +479,87 @@ final class SystemSelectionClipboardFallbackBackend: SelectionClipboardFallbackB
         }
     }
 
-    private func matchingFocusedElement(
+    /// Revalidates the frontmost application and returns its current AX focused
+    /// element when one exists. Exact-element tickets require identity plus
+    /// complete evidence. Application-scoped tickets are used only for
+    /// custom-drawn apps that expose no stable focused element; for those, any
+    /// security attributes that are available remain fail-closed, while absent
+    /// attributes defer to Secure Event Input and the explicit user gesture.
+    private func validateTarget(
         for ticket: AccessibilitySelectionFallbackTicket
-    ) -> AXUIElement? {
+    ) throws -> AXUIElement? {
         guard ticket.processIdentifier > 0,
               ticket.processIdentifier != ProcessInfo.processInfo.processIdentifier,
-              let expectedFocusedElement = ticket.systemFocusedElement,
               workspace.frontmostApplication?.processIdentifier == ticket.processIdentifier else {
-            return nil
-        }
-
-        var ticketElementPID: pid_t = 0
-        guard AXUIElementGetPid(expectedFocusedElement, &ticketElementPID) == .success,
-              ticketElementPID == ticket.processIdentifier else {
-            return nil
+            throw SelectionClipboardFallbackError.sourceApplicationChanged
         }
 
         let systemWideElement = AXUIElementCreateSystemWide()
         applyMessagingTimeout(to: systemWideElement)
-        guard let focusedApplication = copyElementAttribute(
+        if let focusedApplication = copyElementAttribute(
             kAXFocusedApplicationAttribute as CFString,
             from: systemWideElement
-        ) else {
-            return nil
+        ) {
+            applyMessagingTimeout(to: focusedApplication)
+            var focusedApplicationPID: pid_t = 0
+            guard AXUIElementGetPid(focusedApplication, &focusedApplicationPID) == .success,
+                  focusedApplicationPID == ticket.processIdentifier else {
+                throw SelectionClipboardFallbackError.sourceApplicationChanged
+            }
         }
-        applyMessagingTimeout(to: focusedApplication)
 
-        var focusedApplicationPID: pid_t = 0
-        guard AXUIElementGetPid(focusedApplication, &focusedApplicationPID) == .success,
-              focusedApplicationPID == ticket.processIdentifier,
-              let currentFocusedElement = copyElementAttribute(
-                kAXFocusedUIElementAttribute as CFString,
-                from: focusedApplication
-              ) else {
-            return nil
+        let applicationElement = AXUIElementCreateApplication(ticket.processIdentifier)
+        applyMessagingTimeout(to: applicationElement)
+        let currentFocusedElement = copyElementAttribute(
+            kAXFocusedUIElementAttribute as CFString,
+            from: applicationElement
+        )
+        if let currentFocusedElement {
+            applyMessagingTimeout(to: currentFocusedElement)
         }
-        applyMessagingTimeout(to: currentFocusedElement)
-        guard CFEqual(currentFocusedElement, expectedFocusedElement) else {
-            return nil
+
+        if let expectedFocusedElement = ticket.systemFocusedElement {
+            var ticketElementPID: pid_t = 0
+            guard AXUIElementGetPid(expectedFocusedElement, &ticketElementPID) == .success,
+                  ticketElementPID == ticket.processIdentifier,
+                  let currentFocusedElement,
+                  CFEqual(currentFocusedElement, expectedFocusedElement) else {
+                throw SelectionClipboardFallbackError.sourceApplicationChanged
+            }
+            try requireCompleteNonsecureEvidence(of: currentFocusedElement)
+            return currentFocusedElement
+        }
+
+        if let currentFocusedElement {
+            try rejectKnownSecureEvidence(of: currentFocusedElement)
         }
         return currentFocusedElement
+    }
+
+    private func rejectKnownSecureEvidence(of element: AXUIElement) throws {
+        if let rawSubrole = copyAttribute(
+            kAXSubroleAttribute as CFString,
+            from: element
+        ) {
+            guard let subrole = rawSubrole as? String else {
+                throw SelectionClipboardFallbackError.sourceApplicationChanged
+            }
+            guard subrole.caseInsensitiveCompare("AXSecureTextField") != .orderedSame else {
+                throw SelectionClipboardFallbackError.secureEventInput
+            }
+        }
+
+        if let protectedContentValue = copyAttribute(
+            "AXContainsProtectedContent" as CFString,
+            from: element
+        ) {
+            guard CFGetTypeID(protectedContentValue) == CFBooleanGetTypeID() else {
+                throw SelectionClipboardFallbackError.sourceApplicationChanged
+            }
+            guard !CFBooleanGetValue((protectedContentValue as! CFBoolean)) else {
+                throw SelectionClipboardFallbackError.secureEventInput
+            }
+        }
     }
 
     private func requireCompleteNonsecureEvidence(of element: AXUIElement) throws {

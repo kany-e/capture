@@ -48,7 +48,7 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-032 | Stable development code identity for TCC-protected screenshot capture | Reliability/privacy safeguard | Implemented; 70/70 tests and live TCC rebuild-persistence proof pass |
 | D-033 | Deterministic Chrome action-popup dimensions | Reliability safeguard | Implemented; 68/68 tests and real-Chrome selected/metadata layouts pass |
 | D-034 | User-triggered native Accessibility selection capture | Addition | Implemented; 108/108 host tests and primary-path user acceptance pass |
-| D-035 | Opt-in transactional clipboard fallback for native selection | Compatibility/privacy safeguard | Implemented on draft PR #13; 145/145 host tests pass and WeChat acceptance is pending |
+| D-035 | Opt-in transactional clipboard fallback for native selection | Compatibility/privacy safeguard | Implemented on draft PR #13; 149/149 host tests pass and WeChat acceptance is pending |
 
 ## D-001 — Localhost monorepo architecture
 
@@ -963,7 +963,7 @@ testable while retaining the explicit shortcut as the reliable fallback.
 
 - Classification: Compatibility and privacy safeguard approved by user direction
 - Status: Implemented on `codex/native-accessibility-selection` / draft PR #13;
-  145/145 host tests pass and B-016 manual acceptance remains open
+  149/149 host tests pass and B-016 manual acceptance remains open
 - Product impact: Lets the explicit Capture Selection shortcut work in apps
   such as WeChat that can copy a selection but do not expose its text through AX
 - Schedule impact: Extends the current draft PR and adds B-016 real-device
@@ -972,11 +972,12 @@ testable while retaining the explicit shortcut as the reliable fallback.
 D-034 remains the primary path and continues to read selected text directly
 without touching the clipboard. D-035 adds a separately persisted **Clipboard
 Compatibility Mode** that is off by default. When the user explicitly enables
-it and invokes Capture Selection, the AX reader may issue a fallback ticket only
-for the exact application and focused control whose selected-text lookup failed
-after complete non-secure checks. Missing permission or focus, Recall itself,
-unknown safety state, secure/protected content, no selection, whitespace, and
-oversized input never enter this fallback.
+it and invokes Capture Selection, the AX reader may issue a fallback ticket for
+the exact frontmost application whose selected-text lookup failed. A stable AX
+focused element is retained when available with complete safety evidence; a
+custom-drawn app that omits that element uses an application-scoped ticket.
+Missing permission, Recall itself, known secure/protected content, whitespace,
+and oversized input never enter this fallback.
 
 The transaction waits for the global shortcut modifiers to be released and
 deep-copies every pasteboard item/type into bounded in-memory Data before event
@@ -984,9 +985,9 @@ injection. Any unmaterializable item, more than 100 items, more than 128 types
 per item, more than 64 MiB total data, or an observed pasteboard race aborts.
 The full AX/pasteboard transaction runs on a serial actor outside `MainActor`,
 so lazy-provider materialization and bounded cross-process AX waits do not block
-the app UI. Immediately before each event sequence, Recall revalidates the ticket's PID,
-exact AX focused element, complete non-secure attributes, event-posting access,
-and Secure Event Input. The backup is never logged, persisted, attached to a
+the app UI. Immediately before each event sequence, Recall revalidates the ticket's
+frontmost PID, exact AX focused element when available, all exposed safety
+attributes, event-posting access, and Secure Event Input. The backup is never logged, persisted, attached to a
 draft, or sent to the backend.
 
 One `NSPasteboard.changeCount` advance cannot identify who wrote the clipboard.
@@ -1008,6 +1009,9 @@ failure can also prevent full restoration. Clipboard history applications,
 Universal Clipboard, or other observers may record either temporary Copy.
 Settings and fallback review UI disclose this best-effort boundary; it must not
 be described as lossless, guaranteed, or private from clipboard observers.
+Application-scoped fallback also cannot prove per-control safety when a
+custom-drawn app omits those attributes; it remains opt-in and equivalent to the
+user explicitly asking Recall to perform Copy in that verified frontmost app.
 
 ## Pending decisions
 

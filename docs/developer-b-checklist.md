@@ -37,7 +37,7 @@ shortcut, background AX reading, secure/protected-content rejection, transient
 selection bounds, anchored Quick Capture, and backward-compatible shortcut
 migration. The host macOS suite passes 108/108, and the user accepted the
 primary AX path. WeChat then exposed an expected unsupported-control gap;
-D-035 is implemented with a 145/145 host suite; B-016 now gates its real-device
+D-035 is implemented with a 149/149 host suite; B-016 now gates its real-device
 clipboard compatibility acceptance before merge.
 
 Last baseline cross-check: 2026-07-18 against all sections of
@@ -91,7 +91,7 @@ Update protocol:
 | Safeguard | Stable Screen Recording identity | Complete and live-verified | D-032 passes 70/70 macOS tests; app-specific reset, authorization, rebuild persistence, selector launch, and cancellation pass |
 | Safeguard | Chrome action popup sizing | Complete and real-Chrome verified | D-033 uses a 344 × 510 root without viewport-height feedback; 68/68 tests and selected/metadata layouts pass |
 | Addition | Native Accessibility selection | Implemented; primary path accepted | D-034 adds explicit `Option+Shift+Command+S`, fail-closed AX reading, anchored review, safe v1 shortcut migration, and 108/108 macOS tests; user acceptance passed on 2026-07-21 |
-| Addition | Clipboard selection compatibility | Implemented; manual acceptance pending | D-035 adds an off-by-default transactional synthetic-Copy fallback for eligible post-safety AX failures; 145/145 host tests pass and B-016 is open |
+| Addition | Clipboard selection compatibility | Implemented; manual acceptance pending | D-035 adds an off-by-default transactional synthetic-Copy fallback with exact-control and application-scoped tickets; 149/149 host tests pass and B-016 is open |
 
 The D-023 integration closes B-010, the macOS slice closes B-006, and real
 provider plus unpacked-Chrome evidence closes B-007, B-008, and B-009. B-011 is
@@ -356,31 +356,31 @@ D-035/B-016 now cover the WeChat compatibility follow-up
 
 ## Active privacy/compatibility safeguard — transactional clipboard fallback
 
-Status: `[~]` D-035 implementation and its 145/145 host suite are complete on
+Status: `[~]` D-035 implementation and its 149/149 host suite are complete on
 draft PR #13; B-016 manual acceptance must pass before merge
 
 - [x] Keep the primary D-034 Accessibility path unchanged and add a separately
   persisted **Clipboard Compatibility Mode** that is off by default.
-- [x] Split safety-check uncertainty from a selected-text attribute failure.
-  Only the latter may enter fallback; permission/focus/self, secure/protected,
-  unknown-safety, no-selection, empty, oversized, and cancellation failures may
-  not synthesize Copy.
-- [x] Carry a fallback ticket from the exact AX application and focused element
-  whose selected-text lookup failed. Revalidate that same PID, element, complete
-  safety evidence, event-posting access, and Secure Event Input immediately
+- [x] Carry a fallback ticket from the exact frontmost application whose direct
+  selection read failed. Bind its focused AX element when available; use an
+  application-scoped ticket for custom-drawn apps that omit it. Permission/self,
+  known secure/protected, empty, oversized, and pre-transaction cancellation
+  failures may not synthesize Copy.
+- [x] Revalidate the same PID, the exact element when available, exposed safety
+  evidence, event-posting access, and Secure Event Input immediately
   before injection, after waiting for the shortcut modifiers to be released.
 - [x] Deep-copy bounded ordered pasteboard items/types into in-memory Data
   before Copy. Abort before mutation when any representation cannot be
   materialized or the item/type/64 MiB limits are exceeded.
 - [x] Treat `changeCount` as a race signal, not ownership proof. Require two Copy
   attempts to produce exact consecutive counts and matching complete payloads
-  from the same focus ticket before accepting text or attempting restoration.
+  from the same target ticket before accepting text or attempting restoration.
   Never log, persist, submit, or attach the backup.
 - [x] Disclose best-effort restoration and the unavoidable clipboard-history /
   Universal Clipboard visibility in Settings and fallback review UI, including
   macOS's missing writer identity/atomic restore and delayed-Copy residual risk.
 - [x] Complete automated service/store/privacy tests and pass the expanded
-  145/145 host suite.
+  149/149 host suite.
 - [ ] Pass B-016 in WeChat before any merge.
 
 ## Active reliability correction — stable Screen Recording identity
@@ -1651,8 +1651,9 @@ release candidates should repeat the interaction check.
 - Opened: 2026-07-21
 - Severity: Manual privacy/data-preservation/compatibility gate
 - Status: Open; required before merging D-035 / PR #13
-- Automated evidence: 145/145 host tests pass, including eligibility isolation,
-  exact Unicode, default-off and persisted opt-in, the AX focus ticket,
+- Automated evidence: 149/149 host tests pass, including eligibility isolation,
+  exact Unicode, default-off and persisted opt-in, exact-control and
+  application-scoped AX tickets,
   off-main serial transaction, event/security preflight, modifier release,
   consecutive-count and matching-
   payload confirmation, stale/late/competing-write rejection, restore failure,

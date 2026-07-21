@@ -115,10 +115,12 @@ macOS Accessibility access. Carbon hotkey registration itself, clipboard
 capture, and screenshot capture do not require Accessibility or Input Monitoring
 permission. Configure, disable, or restore all three actions in **Settings >
 Global capture shortcuts**. An off-by-default **Clipboard Compatibility Mode**
-can handle apps such as WeChat that pass Recall's secure-field checks and can
-copy a selection but do not expose its text to Accessibility. It temporarily
-sends Copy twice to the same verified control, requires matching results, and
-makes a best-effort restoration. macOS exposes neither clipboard-writer identity
+can handle custom-drawn apps such as WeChat that can copy a selection but do not
+expose selected text or even a focused control to Accessibility. It temporarily
+sends Copy twice to the verified frontmost application, binds to the exact AX
+control when one is available, requires matching results, and makes a best-effort
+restoration. Recall blocks Secure Event Input and known secure/protected controls,
+but custom-drawn apps may omit per-control safety attributes. macOS exposes neither clipboard-writer identity
 nor an atomic restore, so rare races or a very delayed Copy can still change the
 clipboard; history tools or Universal Clipboard may also record the transient
 copies.
@@ -236,16 +238,17 @@ The user accepted the primary native path on the stably signed app; PR #13 now
 remains open for D-035 WeChat and clipboard-preservation acceptance.
 
 D-035 adds the opt-in transactional clipboard fallback requested after initial
-real-device selection testing. It never runs for missing permission/focus,
-unknown safety state, secure/protected content, no selection, oversized text, or
-cancellation before the transaction begins. The AX failure produces a ticket for
-the exact application and focused control; that same non-secure control is
-revalidated immediately before each of two Copy attempts. Recall accepts only
+real-device selection testing. It never runs for missing permission, Recall
+itself, known secure/protected content, oversized text, or cancellation before
+the transaction begins. The AX failure produces a ticket for the exact frontmost
+application and, when available, its focused control. That scope is revalidated
+immediately before each of two Copy attempts, together with Secure Event Input
+and any exposed security attributes. Recall accepts only
 two consecutive, matching clipboard results and attempts restoration only while
 the observed change count remains unchanged. This substantially narrows races
 but cannot make restoration atomic or identify the writer. The in-memory backup
 is never logged, persisted, or sent to the backend. The current host suite passes
-145/145 tests. WeChat behavior and real AppKit preservation of rich text, images,
+149/149 tests. WeChat behavior and real AppKit preservation of rich text, images,
 and Finder-file clipboards remain manual acceptance gates.
 
 Final regression also passes 215 backend tests, 44/44 stress scenarios, and

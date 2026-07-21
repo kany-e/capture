@@ -39,8 +39,8 @@ split; they are no longer assignment gates.
   primary-path acceptance pass. WeChat's unsupported selected-text attribute
   motivated the separately gated D-035 compatibility fallback.
 - D-035 extends the same draft PR with an off-by-default transactional clipboard
-  compatibility mode for apps such as WeChat. It is restricted to post-safety
-  selected-text failures. Its current host suite passes 145/145; B-016
+  compatibility mode for apps such as WeChat. It supports exact-control tickets
+  and application-scoped tickets for custom-drawn apps. Its current host suite passes 149/149; B-016
   clipboard-preservation acceptance remains open.
 - The macOS app and Chrome extension are separate clients of the loopback
   FastAPI service. The app does not yet package or start that service.
@@ -106,12 +106,12 @@ not approval from a particular historical developer role.
    migrate safely, including an external conflict fallback that preserves the
    old actions. The original 108/108 host suite passes. D-035 adds a separately
    persisted, off-by-default Clipboard Compatibility Mode. A selected-text
-   failure after complete security evidence creates a ticket for the exact PID
-   and focused AX element. Recall revalidates that ticket before two Copy
+   failure creates a ticket for the exact frontmost PID and, when available,
+   focused AX element. Recall revalidates that scope before two Copy
    attempts, accepts only matching consecutive results, and then performs a
    best-effort restore. macOS has no writer identity or atomic restore, so the
    UI and documentation disclose residual writer and delayed-Copy races. The
-   expanded host suite passes 145/145. Do not merge until B-016 covers WeChat,
+   expanded host suite passes 149/149. Do not merge until B-016 covers WeChat,
    real rich clipboard formats, password fields, races, screen edges, and
    physical shortcuts.
 5. **App-managed local service lifecycle.** Define how a packaged Recall app

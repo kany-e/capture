@@ -214,6 +214,7 @@ final class AccessibilitySelectionServiceTests: XCTestCase {
         XCTAssertEqual(ticket.processIdentifier, 4_201)
         XCTAssertEqual(ticket.sourceApplication, "WeChat")
         XCTAssertNil(ticket.systemFocusedElement)
+        XCTAssertEqual(backend.fallbackFocusedElementWasProvided, true)
         XCTAssertEqual(
             backend.calls,
             [
@@ -227,6 +228,95 @@ final class AccessibilitySelectionServiceTests: XCTestCase {
                 .fallbackTicket,
             ]
         )
+    }
+
+    func testFallbackReadCreatesApplicationTicketWhenFocusedElementIsUnavailable() async throws {
+        let backend = AccessibilityBackendStub(
+            focusedElementError: .noValue,
+            sourceApplication: "WeChat",
+            processIdentifier: 4_202
+        )
+        let service = AccessibilitySelectionService(backend: backend)
+
+        let outcome = try await service.readSelectionForClipboardFallback(
+            promptIfNeeded: false
+        )
+
+        guard case let .clipboardFallback(ticket) = outcome else {
+            return XCTFail("Expected an application-scoped fallback ticket")
+        }
+        XCTAssertEqual(ticket.processIdentifier, 4_202)
+        XCTAssertEqual(ticket.sourceApplication, "WeChat")
+        XCTAssertEqual(backend.fallbackFocusedElementWasProvided, false)
+        XCTAssertEqual(
+            backend.calls,
+            [
+                .trust(promptIfNeeded: false),
+                .focusedApplication,
+                .currentApplication,
+                .focusedElement,
+                .fallbackTicket,
+            ]
+        )
+    }
+
+    func testFallbackReadTreatsNoSelectedTextValueAsClipboardEligible() async throws {
+        let backend = AccessibilityBackendStub(selectedTextError: .noValue)
+        let service = AccessibilitySelectionService(backend: backend)
+
+        let outcome = try await service.readSelectionForClipboardFallback(
+            promptIfNeeded: false
+        )
+
+        guard case .clipboardFallback = outcome else {
+            return XCTFail("Expected a clipboard fallback ticket")
+        }
+        XCTAssertEqual(backend.fallbackFocusedElementWasProvided, true)
+    }
+
+    func testFallbackReadUsesApplicationTicketWhenSafetyAttributesAreMissing() async throws {
+        for backend in [
+            AccessibilityBackendStub(
+                subroleWasAvailable: false,
+                selectedTextError: .unsupported
+            ),
+            AccessibilityBackendStub(
+                protectedContentWasAvailable: false,
+                selectedTextError: .cannotComplete
+            ),
+            AccessibilityBackendStub(subroleError: .cannotComplete),
+        ] {
+            let service = AccessibilitySelectionService(backend: backend)
+            let outcome = try await service.readSelectionForClipboardFallback(
+                promptIfNeeded: false
+            )
+
+            guard case .clipboardFallback = outcome else {
+                return XCTFail("Expected an application-scoped fallback ticket")
+            }
+            XCTAssertEqual(backend.fallbackFocusedElementWasProvided, false)
+        }
+    }
+
+    func testFallbackReadStillRejectsKnownSecureAndProtectedControls() async {
+        for backend in [
+            AccessibilityBackendStub(subrole: "AXSecureTextField"),
+            AccessibilityBackendStub(containsProtectedContent: true),
+        ] {
+            let service = AccessibilitySelectionService(backend: backend)
+            do {
+                _ = try await service.readSelectionForClipboardFallback(
+                    promptIfNeeded: false
+                )
+                XCTFail("Expected the known secure control to be rejected")
+            } catch {
+                XCTAssertEqual(
+                    error as? AccessibilitySelectionError,
+                    .secureTextInput
+                )
+            }
+            XCTAssertNil(backend.fallbackFocusedElementWasProvided)
+        }
     }
 
     func testSelectedTextFailureIsNotFallbackEligibleWithoutCompleteSafetyEvidence() async {
@@ -390,6 +480,7 @@ private final class AccessibilityBackendStub:
     private let lock = NSLock()
     private var recordedCalls: [AccessibilityBackendCall] = []
     private var recordedMainThreadStates: [Bool] = []
+    private var recordedFallbackFocusedElementWasProvided: Bool?
 
     init(
         isTrusted: Bool = true,
@@ -433,6 +524,10 @@ private final class AccessibilityBackendStub:
 
     var wasMainThread: [Bool] {
         lock.withLock { recordedMainThreadStates }
+    }
+
+    var fallbackFocusedElementWasProvided: Bool? {
+        lock.withLock { recordedFallbackFocusedElementWasProvided }
     }
 
     func isProcessTrusted(promptIfNeeded: Bool) -> Bool {
@@ -501,9 +596,12 @@ private final class AccessibilityBackendStub:
 
     func clipboardFallbackTicket(
         for application: AccessibilityStubElement,
-        focusedElement: AccessibilityStubElement
+        focusedElement: AccessibilityStubElement?
     ) throws -> AccessibilitySelectionFallbackTicket {
         record(.fallbackTicket)
+        lock.withLock {
+            recordedFallbackFocusedElementWasProvided = focusedElement != nil
+        }
         return AccessibilitySelectionFallbackTicket(
             processIdentifier: applicationProcessIdentifier,
             sourceApplication: applicationName

@@ -59,10 +59,10 @@ struct ShortcutSettingsView: View {
                     )
                 )
                 Text(
-                    "For apps that pass Recall's safety checks but do not expose selected "
-                        + "text, Capture Selection can send Copy twice to the same verified "
-                        + "control, confirm matching results, and attempt to restore the "
-                        + "previous clipboard."
+                    "For apps such as WeChat that do not expose selected text or a focused "
+                        + "control, Capture Selection can send Copy twice to the verified "
+                        + "frontmost app, confirm matching results, and attempt to restore "
+                        + "the previous clipboard."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -72,6 +72,9 @@ struct ShortcutSettingsView: View {
                 Text(
                     "Recall reads selected text only when you use Capture Selection. "
                         + "Clipboard and screenshot capture do not use Accessibility access. "
+                        + "Recall rejects secure input and protected controls when macOS "
+                        + "exposes them, but custom-drawn apps may omit per-control safety "
+                        + "attributes. "
                         + "macOS does not expose clipboard-writer identity or an atomic restore, "
                         + "so rare races or a very delayed Copy can still change the clipboard. "
                         + "Clipboard history apps and Universal Clipboard may record the "

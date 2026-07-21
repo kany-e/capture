@@ -143,10 +143,13 @@ struct AccessibilitySelectionSecurityInspection: Equatable, Sendable {
     let hasCompleteFallbackEvidence: Bool
 }
 
-/// Evidence captured from the exact AX application and focused control whose
-/// selected-text lookup failed after complete non-secure checks. The system
-/// clipboard backend retains the AX element so it can require the same control
-/// immediately before posting Copy.
+/// Evidence captured from the frontmost external application whose direct AX
+/// selection read failed. When the app exposes a stable focused control with
+/// complete non-secure evidence, `systemFocusedElement` binds the fallback to
+/// that exact element. Custom-drawn apps such as WeChat may expose no focused
+/// element; those tickets remain application-scoped and rely on explicit user
+/// invocation, frontmost-PID checks, Secure Event Input, and any safety
+/// attributes that become available before Copy.
 struct AccessibilitySelectionFallbackTicket: @unchecked Sendable {
     let identifier: UUID
     let processIdentifier: pid_t
@@ -197,7 +200,7 @@ protocol AccessibilitySelectionBackend: Sendable {
     func sourceApplicationName(for application: Element) -> String?
     func clipboardFallbackTicket(
         for application: Element,
-        focusedElement: Element
+        focusedElement: Element?
     ) throws -> AccessibilitySelectionFallbackTicket
 }
 
@@ -274,10 +277,24 @@ struct AccessibilitySelectionService<Backend: AccessibilitySelectionBackend>:
             }
             try Task.checkCancellation()
 
+            func clipboardFallbackOutcome(
+                focusedElement: Backend.Element?
+            ) throws -> AccessibilitySelectionReadOutcome {
+                .clipboardFallback(
+                    try backend.clipboardFallbackTicket(
+                        for: application,
+                        focusedElement: focusedElement
+                    )
+                )
+            }
+
             let focusedElement: Backend.Element
             do {
                 focusedElement = try backend.focusedElement(in: application)
             } catch {
+                if allowsClipboardFallbackTicket {
+                    return try clipboardFallbackOutcome(focusedElement: nil)
+                }
                 throw AccessibilitySelectionError.noFocusedElement
             }
             try Task.checkCancellation()
@@ -289,6 +306,9 @@ struct AccessibilitySelectionService<Backend: AccessibilitySelectionBackend>:
             do {
                 securityInspection = try backend.securityInspection(of: focusedElement)
             } catch {
+                if allowsClipboardFallbackTicket {
+                    return try clipboardFallbackOutcome(focusedElement: nil)
+                }
                 throw AccessibilitySelectionError.selectionSafetyUnavailable
             }
             if securityInspection.subrole?.caseInsensitiveCompare(
@@ -301,6 +321,9 @@ struct AccessibilitySelectionService<Backend: AccessibilitySelectionBackend>:
                 throw AccessibilitySelectionError.secureTextInput
             }
             try Task.checkCancellation()
+            let ticketFocusedElement = securityInspection.hasCompleteFallbackEvidence
+                ? focusedElement
+                : nil
 
             let text: String?
             do {
@@ -308,37 +331,41 @@ struct AccessibilitySelectionService<Backend: AccessibilitySelectionBackend>:
             } catch let error as AccessibilitySelectionBackendError {
                 switch error {
                 case .noValue:
+                    if allowsClipboardFallbackTicket {
+                        return try clipboardFallbackOutcome(
+                            focusedElement: ticketFocusedElement
+                        )
+                    }
                     throw AccessibilitySelectionError.noSelection
                 case .unsupported, .invalidValue, .cannotComplete, .failure:
+                    if allowsClipboardFallbackTicket {
+                        return try clipboardFallbackOutcome(
+                            focusedElement: ticketFocusedElement
+                        )
+                    }
                     guard securityInspection.hasCompleteFallbackEvidence else {
                         throw AccessibilitySelectionError.selectionSafetyUnavailable
                     }
-                    guard allowsClipboardFallbackTicket else {
-                        throw AccessibilitySelectionError.selectionUnavailable
-                    }
-                    return .clipboardFallback(
-                        try backend.clipboardFallbackTicket(
-                            for: application,
-                            focusedElement: focusedElement
-                        )
-                    )
+                    throw AccessibilitySelectionError.selectionUnavailable
                 }
             } catch {
+                if allowsClipboardFallbackTicket {
+                    return try clipboardFallbackOutcome(
+                        focusedElement: ticketFocusedElement
+                    )
+                }
                 guard securityInspection.hasCompleteFallbackEvidence else {
                     throw AccessibilitySelectionError.selectionSafetyUnavailable
                 }
-                guard allowsClipboardFallbackTicket else {
-                    throw AccessibilitySelectionError.selectionUnavailable
-                }
-                return .clipboardFallback(
-                    try backend.clipboardFallbackTicket(
-                        for: application,
-                        focusedElement: focusedElement
-                    )
-                )
+                throw AccessibilitySelectionError.selectionUnavailable
             }
 
             guard let text else {
+                if allowsClipboardFallbackTicket {
+                    return try clipboardFallbackOutcome(
+                        focusedElement: ticketFocusedElement
+                    )
+                }
                 throw AccessibilitySelectionError.noSelection
             }
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -417,10 +444,25 @@ struct SystemAccessibilitySelectionBackend: AccessibilitySelectionBackend, Senda
     func focusedApplication() throws -> SystemAccessibilityElement {
         let systemWideElement = AXUIElementCreateSystemWide()
         applyMessagingTimeout(to: systemWideElement)
-        let application: AXUIElement = try copyElementAttribute(
-            kAXFocusedApplicationAttribute as CFString,
-            from: systemWideElement
-        )
+        let application: AXUIElement
+        do {
+            application = try copyElementAttribute(
+                kAXFocusedApplicationAttribute as CFString,
+                from: systemWideElement
+            )
+        } catch {
+            // Some custom-drawn applications, notably current WeChat builds,
+            // omit the system-wide AX focused-application relationship even
+            // while they are visibly frontmost. NSWorkspace still provides a
+            // stable PID that can scope an explicit clipboard fallback.
+            guard let frontmostApplication = NSWorkspace.shared.frontmostApplication,
+                  frontmostApplication.processIdentifier > 0 else {
+                throw error
+            }
+            application = AXUIElementCreateApplication(
+                frontmostApplication.processIdentifier
+            )
+        }
         applyMessagingTimeout(to: application)
         return SystemAccessibilityElement(value: application)
     }
@@ -589,7 +631,7 @@ struct SystemAccessibilitySelectionBackend: AccessibilitySelectionBackend, Senda
 
     func clipboardFallbackTicket(
         for application: SystemAccessibilityElement,
-        focusedElement: SystemAccessibilityElement
+        focusedElement: SystemAccessibilityElement?
     ) throws -> AccessibilitySelectionFallbackTicket {
         var processIdentifier: pid_t = 0
         guard AXUIElementGetPid(application.value, &processIdentifier) == .success,
@@ -599,7 +641,7 @@ struct SystemAccessibilitySelectionBackend: AccessibilitySelectionBackend, Senda
         return AccessibilitySelectionFallbackTicket(
             processIdentifier: processIdentifier,
             sourceApplication: sourceApplicationName(for: application),
-            systemFocusedElement: focusedElement.value
+            systemFocusedElement: focusedElement?.value
         )
     }
 
