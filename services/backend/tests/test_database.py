@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import stat
 from pathlib import Path
 
-from app.database import (
+from mema_backend.database import (
     DATABASE_BUSY_TIMEOUT_SECONDS,
     MIGRATIONS_DIRECTORY,
     apply_migrations,
@@ -13,14 +14,39 @@ from app.database import (
 def test_database_connection_allows_bounded_write_lock_queueing(
     tmp_path: Path,
 ) -> None:
-    with database_connection(tmp_path / "recall.db") as connection:
+    with database_connection(tmp_path / "mema.db") as connection:
         busy_timeout_ms = connection.execute("PRAGMA busy_timeout").fetchone()[0]
 
     assert busy_timeout_ms == DATABASE_BUSY_TIMEOUT_SECONDS * 1_000
 
 
+def test_database_connection_creates_private_storage(tmp_path: Path) -> None:
+    database_path = tmp_path / "private" / "nested" / "mema.db"
+
+    with database_connection(database_path) as connection:
+        connection.execute("CREATE TABLE private_note (value TEXT)")
+        connection.commit()
+
+    assert stat.S_IMODE(database_path.parent.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(database_path.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(database_path.stat().st_mode) == 0o600
+
+
+def test_database_connection_tightens_existing_file_only(tmp_path: Path) -> None:
+    shared_parent = tmp_path / "configured-parent"
+    shared_parent.mkdir(mode=0o755)
+    database_path = shared_parent / "mema.db"
+    database_path.touch(mode=0o644)
+
+    with database_connection(database_path):
+        pass
+
+    assert stat.S_IMODE(shared_parent.stat().st_mode) == 0o755
+    assert stat.S_IMODE(database_path.stat().st_mode) == 0o600
+
+
 def test_migrations_are_idempotent_and_complete(tmp_path: Path) -> None:
-    database_path = tmp_path / "recall.db"
+    database_path = tmp_path / "mema.db"
 
     assert apply_migrations(database_path) == 5
     assert apply_migrations(database_path) == 5

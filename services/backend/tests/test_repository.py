@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from app.database import database_connection
-from app.models import CaptureUserUpdate, EnrichmentUpdate, NewCapture
-from app.repository import (
+from mema_backend.database import database_connection
+from mema_backend.models import CaptureUserUpdate, EnrichmentUpdate, NewCapture
+from mema_backend.repository import (
     CaptureAlreadyProcessingError,
     CaptureEditConflictError,
     CaptureNotFoundError,
@@ -48,7 +48,7 @@ def test_create_and_read_multilingual_captures(
     selected_text: str,
     user_note: str,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     created = repository.create(
         new_capture(selected_text=selected_text, user_note=user_note)
     )
@@ -61,7 +61,7 @@ def test_create_and_read_multilingual_captures(
 
 
 def test_nullable_source_fields_round_trip(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     created = repository.create(
         new_capture(
             source_app=None,
@@ -83,7 +83,7 @@ def test_nullable_source_fields_round_trip(tmp_path: Path) -> None:
 
 
 def test_arrays_embeddings_and_context_flag_round_trip(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     created = repository.create(new_capture(context_truncated=True))
 
     updated = repository.update_enrichment(
@@ -93,7 +93,7 @@ def test_arrays_embeddings_and_context_flag_round_trip(tmp_path: Path) -> None:
             ai_title="标题 Title",
             caveats=["first", "第二"],
             tags=["FastAPI", "SQLite", "顺序"],
-            entities=["Recall", "SQLite"],
+            entities=["Mema", "SQLite"],
             search_aliases=["saved fix", "以后查找"],
             embedding=[0.25, -0.5, 1.0],
         ),
@@ -102,7 +102,7 @@ def test_arrays_embeddings_and_context_flag_round_trip(tmp_path: Path) -> None:
     assert updated.context_truncated is True
     assert updated.caveats == ["first", "第二"]
     assert updated.tags == ["FastAPI", "SQLite", "顺序"]
-    assert updated.entities == ["Recall", "SQLite"]
+    assert updated.entities == ["Mema", "SQLite"]
     assert updated.search_aliases == ["saved fix", "以后查找"]
     assert updated.embedding == [0.25, -0.5, 1.0]
 
@@ -110,7 +110,7 @@ def test_arrays_embeddings_and_context_flag_round_trip(tmp_path: Path) -> None:
 def test_source_and_note_survive_repository_restart_byte_for_byte(
     tmp_path: Path,
 ) -> None:
-    database_path = tmp_path / "recall.db"
+    database_path = tmp_path / "mema.db"
     source = "  exact source\n第二行\nemoji: 🧠  "
     note = "\twhy I saved it\n不要修改\n"
     first_repository = CaptureRepository(database_path)
@@ -138,7 +138,7 @@ def test_recover_stale_processing_marks_only_processing_records_retryable(
             datetime(2026, 7, 18, 19, 3, tzinfo=timezone.utc),
         ]
     )
-    repository = CaptureRepository(tmp_path / "recall.db", clock=lambda: next(times))
+    repository = CaptureRepository(tmp_path / "mema.db", clock=lambda: next(times))
     stale = repository.create(
         new_capture(selected_text="immutable source", user_note="immutable note"),
         status="processing",
@@ -168,7 +168,7 @@ def test_enrichment_update_cannot_modify_source_or_user_note(tmp_path: Path) -> 
             datetime(2026, 7, 18, 19, 1, tzinfo=timezone.utc),
         ]
     )
-    repository = CaptureRepository(tmp_path / "recall.db", clock=lambda: next(times))
+    repository = CaptureRepository(tmp_path / "mema.db", clock=lambda: next(times))
     created = repository.create(
         new_capture(
             selected_text="immutable source",
@@ -204,7 +204,7 @@ def test_user_edit_preserves_captured_and_ai_layers_with_effective_overrides(
             datetime(2026, 7, 18, 19, 2, tzinfo=timezone.utc),
         ]
     )
-    database_path = tmp_path / "recall.db"
+    database_path = tmp_path / "mema.db"
     repository = CaptureRepository(database_path, clock=lambda: next(times))
     created = repository.create(new_capture(), status="ready")
     enriched = repository.update_enrichment(
@@ -266,7 +266,7 @@ def test_user_edit_preserves_captured_and_ai_layers_with_effective_overrides(
 
 
 def test_user_edit_is_rejected_while_ai_processing(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     created = repository.create(new_capture(), status="processing")
 
     with pytest.raises(CaptureEditConflictError):
@@ -284,7 +284,7 @@ def test_capture_list_supports_created_and_user_edited_sorting(tmp_path: Path) -
             datetime(2026, 7, 18, 19, 2, tzinfo=timezone.utc),
         ]
     )
-    repository = CaptureRepository(tmp_path / "recall.db", clock=lambda: next(times))
+    repository = CaptureRepository(tmp_path / "mema.db", clock=lambda: next(times))
     first = repository.create(new_capture(selected_text="first"), status="ready")
     second = repository.create(new_capture(selected_text="second"), status="ready")
     repository.update_user_fields(
@@ -316,7 +316,7 @@ def test_all_capture_states_can_be_stored(tmp_path: Path, status: str) -> None:
 
 
 def test_database_constraint_rejects_invalid_status(tmp_path: Path) -> None:
-    database_path = tmp_path / "recall.db"
+    database_path = tmp_path / "mema.db"
     repository = CaptureRepository(database_path)
     created = repository.create(new_capture())
 
@@ -329,7 +329,7 @@ def test_database_constraint_rejects_invalid_status(tmp_path: Path) -> None:
 
 
 def test_duplicate_client_capture_id_returns_first_capture(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     client_capture_id = "149f51e1-8c18-42d4-9778-3f3b062527a2"
 
     first, first_created = repository.create_or_get(
@@ -345,7 +345,7 @@ def test_duplicate_client_capture_id_returns_first_capture(tmp_path: Path) -> No
 
 
 def test_concurrent_duplicate_client_capture_id_creates_one_row(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     client_capture_id = "149f51e1-8c18-42d4-9778-3f3b062527a2"
 
     def create() -> tuple[str, bool]:
@@ -362,7 +362,7 @@ def test_concurrent_duplicate_client_capture_id_creates_one_row(tmp_path: Path) 
 
 
 def test_missing_capture_update_rolls_back(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
 
     with pytest.raises(CaptureNotFoundError):
         repository.update_enrichment(
@@ -372,7 +372,7 @@ def test_missing_capture_update_rolls_back(tmp_path: Path) -> None:
 
 
 def test_claim_enrichment_atomically_moves_error_to_processing(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     created = repository.create(new_capture(), status="error")
     repository.update_enrichment(
         created.id,
@@ -390,7 +390,7 @@ def test_claim_enrichment_atomically_moves_error_to_processing(tmp_path: Path) -
 def test_claim_enrichment_clears_generated_fields_from_ready_capture(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     created = repository.create(new_capture(), status="processing")
     repository.update_enrichment(
         created.id,
@@ -428,7 +428,7 @@ def test_claim_enrichment_clears_generated_fields_from_ready_capture(
 
 
 def test_claim_enrichment_rejects_concurrent_processing(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     created = repository.create(new_capture(), status="processing")
 
     with pytest.raises(CaptureAlreadyProcessingError):
@@ -436,7 +436,7 @@ def test_claim_enrichment_rejects_concurrent_processing(tmp_path: Path) -> None:
 
 
 def test_claim_enrichment_reports_missing_capture(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
 
     with pytest.raises(CaptureNotFoundError):
         repository.claim_enrichment("missing")

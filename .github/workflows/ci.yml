@@ -107,7 +107,7 @@ jobs:
         run: xcodebuild -version
       - name: Build and run macOS tests
         env:
-          RECALL_DERIVED_DATA_PATH: ${{ runner.temp }}/recall-derived-data
+          MEMA_DERIVED_DATA_PATH: ${{ runner.temp }}/mema-derived-data
         run: ./scripts/test-macos.sh
 
   required:

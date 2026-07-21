@@ -5,13 +5,13 @@ import { test } from "node:test";
 
 import {
   CAPTURE_LIMITS,
-  RECALL_BASE_URL,
-  RecallApiError,
-  RecallCaptureValidationError,
-  RecallUnavailableError,
+  MEMA_BASE_URL,
+  MemaApiError,
+  MemaCaptureValidationError,
+  MemaUnavailableError,
   buildCaptureRequest,
   createCapture,
-} from "../src/api/recall.js";
+} from "../src/api/mema.js";
 import { createCaptureAttempt } from "../src/popup/capture-attempt.js";
 
 
@@ -66,35 +66,36 @@ test("empty note and empty context use the contract null values", () => {
 test("request builder enforces user-authored and source-content limits", () => {
   assert.throws(
     () => buildCaptureRequest(extracted(), "🧠".repeat(CAPTURE_LIMITS.userNote + 1)),
-    RecallCaptureValidationError,
+    MemaCaptureValidationError,
   );
   assert.throws(
     () => buildCaptureRequest(extracted({
       selectedText: "x".repeat(CAPTURE_LIMITS.selectedText + 1),
     }), ""),
-    RecallCaptureValidationError,
+    MemaCaptureValidationError,
   );
   assert.throws(
     () => buildCaptureRequest(extracted({
       surroundingContext: "x".repeat(CAPTURE_LIMITS.surroundingContext + 1),
     }), ""),
-    RecallCaptureValidationError,
+    MemaCaptureValidationError,
   );
 });
 
 
-test("request builder bounds optional page metadata without breaking capture", () => {
-  const payload = buildCaptureRequest(extracted({
-    sourceTitle: "🧠".repeat(CAPTURE_LIMITS.sourceTitle + 1),
-    sourceUrl: `https://example.com/${"x".repeat(CAPTURE_LIMITS.sourceUrl)}`,
-  }), "", {
-    createId: () => "id",
-    now: () => new Date(0),
-  });
-
-  assert.equal(Array.from(payload.source_title).length, CAPTURE_LIMITS.sourceTitle);
-  assert.equal(payload.source_title.endsWith("🧠"), true);
-  assert.equal(payload.source_url, null);
+test("request builder reports oversized page metadata instead of dropping it", () => {
+  assert.throws(
+    () => buildCaptureRequest(extracted({
+      sourceTitle: "🧠".repeat(CAPTURE_LIMITS.sourceTitle + 1),
+    }), ""),
+    MemaCaptureValidationError,
+  );
+  assert.throws(
+    () => buildCaptureRequest(extracted({
+      sourceUrl: `https://example.com/${"x".repeat(CAPTURE_LIMITS.sourceUrl)}`,
+    }), ""),
+    MemaCaptureValidationError,
+  );
 });
 
 
@@ -138,21 +139,21 @@ test("API client posts one JSON request and accepts processing response", async 
 
   assert.deepEqual(response, { id: "capture-id", status: "processing" });
   assert.equal(calls.length, 1);
-  assert.equal(calls[0][0], `${RECALL_BASE_URL}/v1/captures`);
+  assert.equal(calls[0][0], `${MEMA_BASE_URL}/v1/captures`);
   assert.equal(calls[0][1].method, "POST");
   assert.deepEqual(calls[0][1].headers, { "Content-Type": "application/json" });
   assert.deepEqual(JSON.parse(calls[0][1].body), payload);
 });
 
 
-test("network failure becomes the explicit Recall unavailable error", async () => {
+test("network failure becomes the explicit Mema unavailable error", async () => {
   const fetchImpl = async () => {
     throw new TypeError("connection refused");
   };
 
   await assert.rejects(
     createCapture({}, { fetchImpl }),
-    RecallUnavailableError,
+    MemaUnavailableError,
   );
 });
 
@@ -172,7 +173,7 @@ test("backend error envelope remains visible without leaking transport details",
   await assert.rejects(
     createCapture({}, { fetchImpl }),
     (error) =>
-      error instanceof RecallApiError
+      error instanceof MemaApiError
       && error.code === "validation_error"
       && error.status === 422,
   );
@@ -186,7 +187,8 @@ test("manifest has only the approved permissions and fixed backend access", asyn
   ]);
 
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "0.4.0");
+  assert.equal(manifest.version, "1.0.0");
+  assert.equal(manifest.minimum_chrome_version, "102");
   assert.equal(packageMetadata.version, manifest.version);
   assert.deepEqual(manifest.permissions.sort(), [
     "activeTab",
@@ -255,12 +257,16 @@ test("popup preserves toolbar capture with branded, stable, scrollable controls"
   assert.match(html, /src="\.\.\/\.\.\/assets\/icons\/icon32\.png"/);
   assert.match(html, /id="settings-button"/);
   assert.match(html, /class="source-content"[\s\S]*tabindex="0"/);
-  assert.doesNotMatch(html, /Show Add to Recall when I select text/);
+  assert.doesNotMatch(html, /Show Add to Mema when I select text/);
   assert.match(popupSource, /"Saved\."/);
   assert.match(popupSource, /"Your source and note are safely stored\."/);
   assert.match(popupSource, /sendCaptureAttempt\(attempt\)/);
   assert.match(popupSource, /chrome\.runtime\.openOptionsPage\(\)/);
   assert.doesNotMatch(popupSource, /createInlinePermissionController/);
+  assert.match(popupSource, /chrome\.storage\.local\.remove/);
+  assert.match(popupSource, /DRAFT_TTL_MS = 24 \* 60 \* 60 \* 1_000/);
+  assert.match(popupSource, /updatedAt: Date\.now\(\)/);
+  assert.match(popupSource, /LEGACY_DRAFT_KEY_PREFIX/);
   assert.match(popupSource, /chrome\.storage\.local\.remove/);
   assert.match(popupSource, /event\.metaKey \|\| event\.ctrlKey/);
   assert.match(popupSource, /setAttribute\("aria-invalid"/);
@@ -300,7 +306,7 @@ test("settings owns inline access and links to Chrome shortcut management", asyn
     readFile(`${extensionRoot}/src/popup/popup.js`, "utf8"),
   ]);
 
-  assert.match(html, /Show Add to Recall when I select text/);
+  assert.match(html, /Show Add to Mema when I select text/);
   assert.match(html, /id="inline-capture-toggle"[\s\S]*disabled/);
   assert.match(html, /src="\.\.\/\.\.\/assets\/icons\/icon128\.png"/);
   assert.match(settingsSource, /createInlinePermissionController\(\)/);

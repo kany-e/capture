@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://recall.local/schemas/capture.schema.json",
+  "$id": "https://mema.local/schemas/capture.schema.json",
   "title": "CaptureCreateRequest",
   "description": "A source capture submitted by the macOS app or Chrome extension before AI enrichment.",
   "type": "object",
@@ -39,7 +39,8 @@
         "null"
       ],
       "maxLength": 2048,
-      "format": "uri"
+      "format": "uri",
+      "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://"
     },
     "selected_text": {
       "type": "string",
@@ -81,7 +82,8 @@
       "properties": {
         "selected_text": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": ".*\\S.*"
         }
       },
       "required": [
@@ -92,7 +94,8 @@
       "properties": {
         "surrounding_context": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": ".*\\S.*"
         }
       },
       "required": [
@@ -103,7 +106,8 @@
       "properties": {
         "source_title": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": ".*\\S.*"
         }
       },
       "required": [

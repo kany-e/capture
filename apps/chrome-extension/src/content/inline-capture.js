@@ -1,11 +1,15 @@
-(function installRecallInlineCapture(global) {
+(function installMemaInlineCapture(global) {
   "use strict";
 
-  if (global.__recallInlineCaptureController?.enabled) {
+  // An already-open tab can still host the controller injected by the
+  // pre-Mema dynamic registration. Remove it before installing this version.
+  global.__recallInlineCaptureController?.disable?.();
+
+  if (global.__memaInlineCaptureController?.enabled) {
     return;
   }
 
-  const core = global.RecallInlineCore;
+  const core = global.MemaInlineCore;
   if (
     !core
     || !global.document
@@ -15,9 +19,9 @@
     return;
   }
 
-  const CREATE_CAPTURE_MESSAGE = "recall:capture:create";
-  const INLINE_CAPTURE_STATUS_MESSAGE = "recall:inline:status";
-  const DISABLE_INLINE_CAPTURE_MESSAGE = "recall:inline:disable";
+  const CREATE_CAPTURE_MESSAGE = "mema:capture:create";
+  const INLINE_CAPTURE_STATUS_MESSAGE = "mema:inline:status";
+  const DISABLE_INLINE_CAPTURE_MESSAGE = "mema:inline:disable";
   const MAX_SELECTION_CHARACTERS = 12_000;
   const MAX_NOTE_CHARACTERS = 4_000;
   const PILL_TIMEOUT_MS = 4_000;
@@ -48,7 +52,7 @@
   }
 
   const host = document.createElement("div");
-  host.dataset.recallInlineRoot = "true";
+  host.dataset.memaInlineRoot = "true";
   host.style.cssText = [
     "all: initial !important",
     "position: fixed !important",
@@ -59,7 +63,7 @@
     "contain: layout style !important",
   ].join(";");
   const shadow = host.attachShadow({
-    mode: global.__RECALL_INLINE_TEST__ === true ? "open" : "closed",
+    mode: global.__MEMA_INLINE_TEST__ === true ? "open" : "closed",
     delegatesFocus: true,
   });
 
@@ -88,7 +92,7 @@
     :host { color-scheme: light dark; }
     * { box-sizing: border-box; }
     button, textarea { font: inherit; }
-    .recall-pill {
+    .mema-pill {
       position: fixed;
       display: none;
       align-items: center;
@@ -105,22 +109,22 @@
       font: 700 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       letter-spacing: -.01em;
     }
-    .recall-pill:hover { background: #aa244f; }
-    .recall-pill:focus { animation: none; }
-    .recall-pill:focus-visible,
-    .recall-button:focus-visible,
-    .recall-note:focus-visible {
+    .mema-pill:hover { background: #aa244f; }
+    .mema-pill:focus { animation: none; }
+    .mema-pill:focus-visible,
+    .mema-button:focus-visible,
+    .mema-note:focus-visible {
       outline: 3px solid rgba(201,47,99,.32);
       outline-offset: 2px;
     }
-    .recall-mark {
+    .mema-mark {
       width: 20px;
       height: 20px;
       flex: 0 0 20px;
       border-radius: 7px;
       box-shadow: 0 3px 8px rgba(88,23,48,.18);
     }
-    .recall-composer {
+    .mema-composer {
       position: fixed;
       display: none;
       overflow-x: hidden;
@@ -138,7 +142,7 @@
       scrollbar-gutter: stable;
       font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    .recall-header {
+    .mema-header {
       display: flex;
       align-items: flex-start;
       gap: 10px;
@@ -146,11 +150,11 @@
       touch-action: none;
       user-select: none;
     }
-    .recall-composer[data-dragging="true"] .recall-header { cursor: grabbing; }
-    .recall-header .recall-mark { width: 30px; height: 30px; flex-basis: 30px; border-radius: 10px; }
-    .recall-heading { min-width: 0; flex: 1 1 auto; }
-    .recall-title { margin: 0; font-size: 15px; font-weight: 760; letter-spacing: -.015em; }
-    .recall-source {
+    .mema-composer[data-dragging="true"] .mema-header { cursor: grabbing; }
+    .mema-header .mema-mark { width: 30px; height: 30px; flex-basis: 30px; border-radius: 10px; }
+    .mema-heading { min-width: 0; flex: 1 1 auto; }
+    .mema-title { margin: 0; font-size: 15px; font-weight: 760; letter-spacing: -.015em; }
+    .mema-source {
       overflow: hidden;
       margin: 2px 0 0;
       color: #806570;
@@ -161,15 +165,15 @@
       word-break: break-word;
       white-space: normal;
     }
-    .recall-selection-row,
-    .recall-note-row {
+    .mema-selection-row,
+    .mema-note-row {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
       gap: 8px;
     }
-    .recall-selection-row { margin-top: 12px; }
-    .recall-preview {
+    .mema-selection-row { margin-top: 12px; }
+    .mema-preview {
       overflow: auto;
       min-height: 48px;
       max-height: 128px;
@@ -186,12 +190,12 @@
       scrollbar-gutter: stable;
       white-space: pre-wrap;
     }
-    .recall-preview:focus-visible {
+    .mema-preview:focus-visible {
       outline: 3px solid rgba(201,47,99,.32);
       outline-offset: 2px;
     }
-    .recall-label { color: #624050; font-size: 12px; font-weight: 700; }
-    .recall-count {
+    .mema-label { color: #624050; font-size: 12px; font-weight: 700; }
+    .mema-count {
       min-width: 0;
       color: #8a6b77;
       font-size: 10px;
@@ -199,8 +203,8 @@
       overflow-wrap: anywhere;
       text-align: right;
     }
-    .recall-count[data-invalid="true"] { color: #a13d35; font-weight: 700; }
-    .recall-note {
+    .mema-count[data-invalid="true"] { color: #a13d35; font-weight: 700; }
+    .mema-note {
       width: 100%;
       min-height: 72px;
       margin-top: 7px;
@@ -213,10 +217,10 @@
       background: #fff;
       line-height: 1.4;
     }
-    .recall-note:focus { border-color: #c92f63; }
-    .recall-note[aria-invalid="true"] { border-color: #bd5148; }
-    .recall-privacy { margin: 8px 0 0; color: #8a6b77; font-size: 10px; }
-    .recall-status {
+    .mema-note:focus { border-color: #c92f63; }
+    .mema-note[aria-invalid="true"] { border-color: #bd5148; }
+    .mema-privacy { margin: 8px 0 0; color: #8a6b77; font-size: 10px; }
+    .mema-status {
       display: none;
       margin-top: 10px;
       padding: 8px 9px;
@@ -225,9 +229,9 @@
       background: #fde7ef;
       font-size: 11px;
     }
-    .recall-status[data-kind="error"] { color: #7c2e29; background: #fde8e5; }
-    .recall-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-    .recall-button {
+    .mema-status[data-kind="error"] { color: #7c2e29; background: #fde8e5; }
+    .mema-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+    .mema-button {
       min-height: 34px;
       border: 0;
       border-radius: 9px;
@@ -237,88 +241,88 @@
       background: #f3e8ec;
       font-weight: 700;
     }
-    .recall-button[data-primary="true"] { color: #fff; background: #c92f63; }
-    .recall-button:hover:not(:disabled) { filter: brightness(.94); }
-    .recall-button:disabled, .recall-note:disabled { cursor: default; opacity: .58; }
+    .mema-button[data-primary="true"] { color: #fff; background: #c92f63; }
+    .mema-button:hover:not(:disabled) { filter: brightness(.94); }
+    .mema-button:disabled, .mema-note:disabled { cursor: default; opacity: .58; }
     @media (prefers-color-scheme: dark) {
-      .recall-composer { color: #fff3f7; background: rgba(39,27,32,.98); border-color: #684151; }
-      .recall-source, .recall-count, .recall-privacy { color: #beaab2; }
-      .recall-preview, .recall-note { color: #f7eaf0; background: #34252b; border-color: #624653; }
-      .recall-label { color: #eed8e1; }
-      .recall-button { color: #f1dfe6; background: #503844; }
-      .recall-button[data-primary="true"] { color: #fff; background: #c92f63; }
+      .mema-composer { color: #fff3f7; background: rgba(39,27,32,.98); border-color: #684151; }
+      .mema-source, .mema-count, .mema-privacy { color: #beaab2; }
+      .mema-preview, .mema-note { color: #f7eaf0; background: #34252b; border-color: #624653; }
+      .mema-label { color: #eed8e1; }
+      .mema-button { color: #f1dfe6; background: #503844; }
+      .mema-button[data-primary="true"] { color: #fff; background: #c92f63; }
     }
     @media (prefers-reduced-motion: no-preference) {
-      .recall-pill, .recall-composer { animation: recall-enter 110ms ease-out; }
-      @keyframes recall-enter { from { opacity: 0; transform: translateY(2px); } }
+      .mema-pill, .mema-composer { animation: mema-enter 110ms ease-out; }
+      @keyframes mema-enter { from { opacity: 0; transform: translateY(2px); } }
     }
   `;
 
-  const pill = element("button", "recall-pill");
+  const pill = element("button", "mema-pill");
   pill.type = "button";
-  pill.setAttribute("aria-label", "Add selected text to Recall");
-  pill.append(brandIcon("recall-mark"));
-  pill.append(element("span", "", "Add to Recall"));
+  pill.setAttribute("aria-label", "Add selected text to Mema");
+  pill.append(brandIcon("mema-mark"));
+  pill.append(element("span", "", "Add to Mema"));
 
-  const composer = element("section", "recall-composer");
+  const composer = element("section", "mema-composer");
   composer.setAttribute("role", "dialog");
   composer.setAttribute("aria-modal", "false");
-  composer.setAttribute("aria-labelledby", "recall-inline-title");
+  composer.setAttribute("aria-labelledby", "mema-inline-title");
 
-  const header = element("header", "recall-header");
+  const header = element("header", "mema-header");
   header.title = "Drag to move";
-  header.append(brandIcon("recall-mark"));
-  const headingGroup = element("div", "recall-heading");
-  const heading = element("h2", "recall-title", "Add to Recall");
-  heading.id = "recall-inline-title";
-  const source = element("p", "recall-source");
+  header.append(brandIcon("mema-mark"));
+  const headingGroup = element("div", "mema-heading");
+  const heading = element("h2", "mema-title", "Add to Mema");
+  heading.id = "mema-inline-title";
+  const source = element("p", "mema-source");
   headingGroup.append(heading, source);
   header.append(headingGroup);
 
-  const selectionRow = element("div", "recall-selection-row");
-  const selectionLabel = element("span", "recall-label", "Selected text");
-  selectionLabel.id = "recall-inline-selection-label";
+  const selectionRow = element("div", "mema-selection-row");
+  const selectionLabel = element("span", "mema-label", "Selected text");
+  selectionLabel.id = "mema-inline-selection-label";
   const selectionCount = element(
     "span",
-    "recall-count",
+    "mema-count",
     "0 characters selected",
   );
-  selectionCount.id = "recall-inline-selection-count";
+  selectionCount.id = "mema-inline-selection-count";
   selectionRow.append(selectionLabel, selectionCount);
-  const preview = element("p", "recall-preview");
+  const preview = element("p", "mema-preview");
   preview.tabIndex = 0;
   preview.setAttribute("role", "region");
   preview.setAttribute("aria-labelledby", selectionLabel.id);
   preview.setAttribute("aria-describedby", selectionCount.id);
-  const noteRow = element("div", "recall-note-row");
-  const noteLabel = element("label", "recall-label", "Why are you saving this?");
-  noteLabel.htmlFor = "recall-inline-note";
+  const noteRow = element("div", "mema-note-row");
+  const noteLabel = element("label", "mema-label", "Why are you saving this?");
+  noteLabel.htmlFor = "mema-inline-note";
   const noteCount = element(
     "span",
-    "recall-count",
+    "mema-count",
     "Note: 0 / 4,000 characters",
   );
-  noteCount.id = "recall-inline-note-count";
+  noteCount.id = "mema-inline-note-count";
   noteRow.append(noteLabel, noteCount);
-  const note = element("textarea", "recall-note");
-  note.id = "recall-inline-note";
+  const note = element("textarea", "mema-note");
+  note.id = "mema-inline-note";
   note.rows = 3;
   note.placeholder = "Optional note, situation, or caution";
-  note.setAttribute("aria-describedby", "recall-inline-note-count recall-inline-privacy recall-inline-status");
+  note.setAttribute("aria-describedby", "mema-inline-note-count mema-inline-privacy mema-inline-status");
   const privacy = element(
     "p",
-    "recall-privacy",
-    "Nothing is sent until Save. Recall then sends this selection, page title and URL, and your note to its local service; configured AI enrichment follows Recall settings.",
+    "mema-privacy",
+    "Nothing is sent until Save. Mema then sends this selection, page title and URL, and your note to its local service; configured AI enrichment follows Mema settings.",
   );
-  privacy.id = "recall-inline-privacy";
-  const status = element("div", "recall-status");
-  status.id = "recall-inline-status";
+  privacy.id = "mema-inline-privacy";
+  const status = element("div", "mema-status");
+  status.id = "mema-inline-status";
   status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");
-  const actions = element("div", "recall-actions");
-  const cancelButton = element("button", "recall-button", "Cancel");
+  const actions = element("div", "mema-actions");
+  const cancelButton = element("button", "mema-button", "Cancel");
   cancelButton.type = "button";
-  const saveButton = element("button", "recall-button", "Save");
+  const saveButton = element("button", "mema-button", "Save");
   saveButton.type = "button";
   saveButton.dataset.primary = "true";
   actions.append(cancelButton, saveButton);
@@ -702,7 +706,7 @@
     } catch (_error) {
       showStatus(
         "error",
-        "Recall could not create a secure Capture request. Reload the page and try again.",
+        "Mema could not create a secure Capture request. Reload the page and try again.",
       );
       return;
     }
@@ -736,9 +740,12 @@
       }
 
       machine.succeed();
-      showStatus("success", "Saved to Recall ✓");
+      showStatus("success", "Saved to Mema ✓");
       updateControls();
-      successTimer = global.setTimeout(() => dismiss(), SUCCESS_TIMEOUT_MS);
+      successTimer = global.setTimeout(
+        () => dismiss({ restoreFocus: true }),
+        SUCCESS_TIMEOUT_MS,
+      );
     } catch (caught) {
       if (
         inlineCaptureInactive()
@@ -752,7 +759,7 @@
         : {
             code: "extension_unavailable",
             title: "Couldn’t save this Capture.",
-            detail: "Recall’s extension service is unavailable. Reload the extension and try again.",
+            detail: "Mema’s extension service is unavailable. Reload the extension and try again.",
             retryable: true,
           };
       machine.fail(error);
@@ -774,7 +781,7 @@
     }
   }
 
-  function eventIsInsideRecall(event) {
+  function eventIsInsideMema(event) {
     return event.composedPath?.().includes(host) ?? false;
   }
 
@@ -838,8 +845,8 @@
     listeners.clear();
     chrome.runtime.onMessage?.removeListener?.(runtimeMessageListener);
     host.remove();
-    if (global.__recallInlineCaptureController === controller) {
-      global.__recallInlineCaptureController = null;
+    if (global.__memaInlineCaptureController === controller) {
+      global.__memaInlineCaptureController = null;
     }
   }
 
@@ -858,7 +865,7 @@
     },
     disable: disableInlineCapture,
   });
-  global.__recallInlineCaptureController = controller;
+  global.__memaInlineCaptureController = controller;
   chrome.runtime.onMessage.addListener(runtimeMessageListener);
 
   listeners.listen(pill, "mouseenter", () => clearTimer(pillTimer));
@@ -887,7 +894,7 @@
   listeners.listen(document, "pointerdown", (event) => {
     if (
       inlineCaptureInactive()
-      || eventIsInsideRecall(event)
+      || eventIsInsideMema(event)
       || !core.shouldDismissForOutsidePointer(machine.state)
     ) {
       return;
@@ -896,7 +903,7 @@
   }, true);
 
   listeners.listen(document, "pointerup", (event) => {
-    if (inlineCaptureInactive() || eventIsInsideRecall(event)) {
+    if (inlineCaptureInactive() || eventIsInsideMema(event)) {
       return;
     }
     scheduleSelectionAction(event.target);
@@ -905,7 +912,7 @@
   listeners.listen(document, "keyup", (event) => {
     if (
       inlineCaptureInactive()
-      || eventIsInsideRecall(event)
+      || eventIsInsideMema(event)
       || !core.shouldObserveKeyboardSelection(event)
     ) {
       return;

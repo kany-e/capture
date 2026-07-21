@@ -5,9 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
-import app.embeddings as embeddings_module
-from app.config import REPOSITORY_ROOT
-from app.embeddings import (
+import mema_backend.embeddings as embeddings_module
+from mema_backend.config import REPOSITORY_ROOT
+from mema_backend.embeddings import (
     EMBEDDING_MAX_RETRIES,
     EMBEDDING_TIMEOUT_SECONDS,
     EmbeddingProviderError,
@@ -15,13 +15,13 @@ from app.embeddings import (
     build_embedding_input,
     cosine_similarity,
 )
-from app.enrichment import (
+from mema_backend.enrichment import (
     EnrichmentPayload,
     EnrichmentProviderError,
     EnrichmentService,
 )
-from app.models import EnrichmentUpdate, NewCapture
-from app.repository import CaptureRepository
+from mema_backend.models import EnrichmentUpdate, NewCapture
+from mema_backend.repository import CaptureRepository
 
 
 class FakeEmbeddings:
@@ -105,7 +105,7 @@ def ready_fixture(repository: CaptureRepository):
 
 
 def test_embedding_input_matches_exact_checked_in_fixture(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = ready_fixture(repository)
     expected_path = REPOSITORY_ROOT / "contracts/examples/embedding-input.txt"
 
@@ -119,7 +119,7 @@ def test_embedding_input_matches_exact_checked_in_fixture(tmp_path: Path) -> Non
 def test_embedding_input_normalizes_outer_space_and_line_endings(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(
         NewCapture(
             captured_at="2026-07-18T19:00:00Z",
@@ -146,7 +146,7 @@ def test_embedding_input_normalizes_outer_space_and_line_endings(
 
 
 def test_embedding_input_prefers_explicit_user_organization(tmp_path: Path) -> None:
-    record = ready_fixture(CaptureRepository(tmp_path / "recall.db"))
+    record = ready_fixture(CaptureRepository(tmp_path / "mema.db"))
     record = record.model_copy(
         update={
             "user_title": "My durable title",
@@ -280,7 +280,7 @@ def test_cosine_similarity_is_bounded_and_safe(
 def test_service_embeds_only_valid_enrichment_and_persists_vector(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture_input, enrichment = fixture_capture_and_enrichment()
     capture = repository.create(capture_input, status="processing")
     embedding_provider = RecordingEmbeddingProvider([0.1, 0.2, 0.3])
@@ -301,7 +301,7 @@ def test_service_embeds_only_valid_enrichment_and_persists_vector(
 def test_embedding_failure_keeps_ready_capture_with_null_vector(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture_input, enrichment = fixture_capture_and_enrichment()
     capture = repository.create(capture_input, status="processing")
     embedding_provider = RecordingEmbeddingProvider(
@@ -323,7 +323,7 @@ def test_embedding_failure_keeps_ready_capture_with_null_vector(
 
 
 def test_failed_enrichment_never_calls_embedding_provider(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture_input, _ = fixture_capture_and_enrichment()
     capture = repository.create(capture_input, status="processing")
     embedding_provider = RecordingEmbeddingProvider()
@@ -338,7 +338,7 @@ def test_failed_enrichment_never_calls_embedding_provider(tmp_path: Path) -> Non
 
 
 def test_embedding_json_survives_repository_restart(tmp_path: Path) -> None:
-    database_path = tmp_path / "recall.db"
+    database_path = tmp_path / "mema.db"
     first_repository = CaptureRepository(database_path)
     capture = ready_fixture(first_repository)
     first_repository.update_enrichment(

@@ -1,6 +1,6 @@
-# Recall architecture baseline
+# Mema architecture
 
-Status: Accepted baseline; current priorities are tracked in
+Status: Current submission architecture; later priorities are tracked in
 [`roadmap.md`](roadmap.md)
 
 Last updated: 2026-07-21
@@ -14,6 +14,7 @@ handoffs. It does not replace [`product-plan.md`](product-plan.md).
 Chrome extension ─┐
                   ├─ HTTP JSON on 127.0.0.1:8765 ─ Local FastAPI backend
 macOS application ┘                              ├─ SQLite / FTS5
+                                                  ├─ local attachment files
                                                   ├─ OpenAI Responses API
                                                   └─ OpenAI Embeddings API
 macOS screenshot ── explicit choice ──────────────┬─ GPT OCR via backend
@@ -38,11 +39,17 @@ optional personal note stays independent; neither creates an image store or a
 second notes database. The macOS system selection command briefly uses a random
 OS temporary PNG and removes it after success, cancellation, or failure.
 
+Decision D-037 adds a separate **Image note** path. It persists one original
+PNG/JPEG plus normalized attachment metadata before any optional background
+analysis. This does not change D-027: **Text note** screenshots remain
+transient. Image analysis requires both the global privacy switch and the
+per-Capture opt-in, and derived model fields never replace the original image.
+
 ## Native global capture boundary
 
 Decision D-031 adds native global screenshot and clipboard entry points without
 changing the Capture pipeline or the app's ordinary lifecycle. D-034 extends
-the same coordinator with explicit Accessibility selection capture. Recall
+the same coordinator with explicit Accessibility selection capture. Mema
 remains a normal Dock application with its existing `MenuBarExtra`; it must be
 running, but closing the main window does not destroy app-level capture state.
 
@@ -100,7 +107,7 @@ Carbon Selection hotkey / menu command
                  │
                  ▼
        GlobalCaptureCoordinator
-                 │ before Recall activation
+                 │ before Mema activation
                  ▼
  AccessibilitySelectionService ─ permission / focused external app
                  │                secure + protected-content checks
@@ -120,7 +127,7 @@ Carbon Selection hotkey / menu command
 ```
 
 Cross-process AX calls run outside the main actor and use a bounded messaging
-timeout. Permission is checked before any focused-element attribute. Recall and
+timeout. Permission is checked before any focused-element attribute. Mema and
 same-bundle processes, secure text fields, protected content, missing/empty
 selection, and sources longer than 12,000 Unicode scalars fail closed. Bounds are
 best effort: lack of `AXBoundsForRange` centers the review window on the current
@@ -140,7 +147,7 @@ D-035 adds an opt-in compatibility branch without changing that default. The
 AX read returns a fallback ticket for the exact frontmost application whose
 selected-text read failed. When a stable focused element and complete safety
 attributes exist, the ticket binds that exact element. Custom-drawn apps may
-instead receive an application-scoped ticket. Permission failure, Recall itself,
+instead receive an application-scoped ticket. Permission failure, Mema itself,
 known secure/protected content, empty/oversized text, and pre-transaction
 cancellation bypass `SelectionClipboardFallbackService`. The service waits for
 shortcut modifiers to release, deep-copies the bounded ordered pasteboard
@@ -153,7 +160,7 @@ actor outside `MainActor`; only the resulting snapshot or error returns to the
 main-actor store, so a slow pasteboard owner cannot synchronously freeze the UI.
 
 `NSPasteboard.changeCount` detects many stale or competing writes but does not
-identify a writer, and AppKit offers no atomic compare-and-restore. Recall
+identify a writer, and AppKit offers no atomic compare-and-restore. Mema
 therefore attempts restoration only after the double confirmation and only while
 the last observed count remains unchanged; detected ambiguity stops without a
 draft or restore. A sufficiently narrow writer race, a Copy processed after the
@@ -163,7 +170,7 @@ copies. Settings exposes the off-by-default toggle and these limitations.
 
 Legacy `globalShortcutConfiguration.v1` data decodes the new selection field
 additively and is rewritten without losing screenshot/clipboard choices. If the
-new default cannot register during migration, Recall disables only that new
+new default cannot register during migration, Mema disables only that new
 action and keeps the two existing registrations active. Passive selection
 notifications and a non-activating inline pill remain a separate opt-in design.
 
@@ -172,8 +179,8 @@ notifications and a non-activating inline pill remain a separate opt-in design.
 Carbon hotkey registration itself needs neither Accessibility nor Input
 Monitoring permission, but launching the interactive screenshot selector is a
 separate Screen Recording-protected operation. macOS associates that approval
-with the app's designated code requirement rather than only the `Recall` name or
-`com.recall.macos` bundle identifier.
+with the app's designated code requirement rather than only the `Mema` name or
+`com.camarow.mema` bundle identifier.
 
 Decision D-032 therefore separates portable buildability from interactive TCC
 acceptance:
@@ -203,7 +210,7 @@ new ad-hoc build has a new CDHash-specific requirement; therefore an enabled
 same-name row left by an older build is not permission evidence for the current
 process. `CODE_SIGNING_ALLOWED=NO` can prove compilation and unit behavior but
 cannot close the Screen Recording gate. Migrating once requires quitting every
-Recall copy, resetting only `ScreenCapture` for `com.recall.macos`, authorizing
+Mema copy, resetting only `ScreenCapture` for `com.camarow.mema`, authorizing
 the verified stable build, and relaunching it. No Screen Recording entitlement
 is added, and this identity correction changes no screenshot-data boundary.
 
@@ -230,7 +237,7 @@ script then sends one frozen attempt to the extension service worker; toolbar
 and inline capture share the same validation, retry identity, and localhost
 delivery coordinator. The page script never calls the backend directly.
 Revoking access unregisters future injection and immediately asks already-open
-tabs to remove Recall controls and listeners.
+tabs to remove Mema controls and listeners.
 
 Decision D-030, merged through PR #9 at `0c1083e`, temporarily disables
 browser-generated surrounding context in both entry points. With a selection,
@@ -287,7 +294,7 @@ but current work is assigned by component rather than person.
 Owned paths:
 
 - `apps/macos/`
-- `docs/demo-script.md`
+- `docs/judge-walkthrough.md`
 
 Responsibilities:
 
@@ -412,8 +419,8 @@ No P1 or P2 feature begins before the three product-plan vertical slices work.
 - External vector databases
 - Redis, Celery, or a durable distributed queue
 - WebSockets
-- General OCR, persistent image memories, image/chart understanding, or
-  full-page offline snapshots. D-027 is the bounded text-only screenshot
-  exception; it does not add an image store.
+- Full-page offline snapshots or browser-region screenshot capture. Native
+  screenshot text extraction and explicitly persisted one-image notes are the
+  bounded implemented image paths.
 - Multi-agent orchestration
 - Production App Store packaging and notarization

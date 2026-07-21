@@ -1,8 +1,8 @@
 import {
   CAPTURE_LIMITS,
-} from "../api/recall.js";
+} from "../api/mema.js";
 import {
-  RecallCoordinatorError,
+  MemaCoordinatorError,
   buildCaptureAttempt,
   sendCaptureAttempt,
 } from "../api/messages.js";
@@ -32,6 +32,9 @@ let retryAllowed = true;
 
 const captureAttempt = createCaptureAttempt(buildCaptureAttempt);
 const SUCCESS_CLOSE_DELAY_MS = 700;
+const DRAFT_TTL_MS = 24 * 60 * 60 * 1_000;
+// Pre-Mema drafts have no timestamp, so they cannot satisfy the privacy TTL.
+const LEGACY_DRAFT_KEY_PREFIX = "recall-note-draft:";
 
 
 function showStatus(kind, title, detail) {
@@ -95,8 +98,17 @@ async function restoreDraft() {
   }
   const stored = await chrome.storage.local.get(draftKey);
   const draft = stored[draftKey];
-  if (draft?.url === activeTab.url && typeof draft.note === "string") {
+  const age = Date.now() - Number(draft?.updatedAt);
+  if (
+    draft?.url === activeTab.url
+    && typeof draft.note === "string"
+    && Number.isFinite(age)
+    && age >= 0
+    && age <= DRAFT_TTL_MS
+  ) {
     noteInput.value = draft.note;
+  } else if (draft !== undefined) {
+    await chrome.storage.local.remove(draftKey);
   }
 }
 
@@ -109,6 +121,7 @@ async function persistDraft() {
     [draftKey]: {
       url: activeTab.url,
       note: noteInput.value,
+      updatedAt: Date.now(),
     },
   });
 }
@@ -133,8 +146,11 @@ async function initialize() {
       throw new Error("missing_capture_result");
     }
 
-    draftKey = `recall-note-draft:${activeTab.id}`;
+    draftKey = `mema-note-draft:${activeTab.id}`;
     try {
+      await chrome.storage.local.remove(
+        `${LEGACY_DRAFT_KEY_PREFIX}${activeTab.id}`,
+      );
       await restoreDraft();
     } catch (_error) {
       // Draft storage is optional and must never block a new Capture.
@@ -205,7 +221,7 @@ async function submitCapture() {
     saveButton.textContent = "Saved";
     closeAfterSuccess();
   } catch (error) {
-    if (error instanceof RecallCoordinatorError) {
+    if (error instanceof MemaCoordinatorError) {
       retryAllowed = error.retryable;
       showStatus("error", error.title, error.message);
     } else {

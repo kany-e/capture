@@ -10,7 +10,7 @@ VENV_PYTHON="${VENV_ROOT}/bin/python"
 BOOTSTRAP_PYTHON="${PYTHON_BIN:-python3}"
 
 fail() {
-  printf 'Recall startup error: %s\n' "$1" >&2
+  printf 'Mema startup error: %s\n' "$1" >&2
   exit 1
 }
 
@@ -44,6 +44,28 @@ raise SystemExit(0 if only_local_editable else 1)
 '
 }
 
+project_install_is_current() {
+  (
+    cd "${BACKEND_ROOT}"
+    "${VENV_PYTHON}" - <<'PY'
+import re
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+
+contents = Path("pyproject.toml").read_text(encoding="utf-8")
+project = re.search(r"(?ms)^\[project\]\s*$.*?(?=^\[|\Z)", contents)
+declared = re.search(r'(?m)^version\s*=\s*"([^"]+)"\s*$', project.group(0)) if project else None
+if declared is None:
+    raise SystemExit(1)
+try:
+    installed = version("mema-backend")
+except PackageNotFoundError:
+    raise SystemExit(1)
+raise SystemExit(0 if installed == declared.group(1) else 1)
+PY
+  )
+}
+
 if [[ ! -x "${VENV_PYTHON}" ]]; then
   command -v "${BOOTSTRAP_PYTHON}" >/dev/null 2>&1 \
     || fail "Python 3.10 or later was not found. Set PYTHON_BIN to a compatible interpreter."
@@ -59,6 +81,7 @@ python_is_supported "${VENV_PYTHON}" \
 
 if ! "${VENV_PYTHON}" -c \
   'import fastapi, openai, pydantic_settings, pytest, uvicorn' >/dev/null 2>&1 \
+  || ! project_install_is_current \
   || ! dependencies_are_current; then
   printf 'Installing backend dependencies\n'
   (
@@ -70,39 +93,40 @@ fi
 
 "${VENV_PYTHON}" -m pip check >/dev/null \
   || fail "The backend virtual environment has incompatible dependencies."
+project_install_is_current \
+  || fail "The backend virtual environment does not contain the current Mema package."
 dependencies_are_current \
   || fail "The backend virtual environment does not satisfy requirements.txt."
 
 SETTINGS="$({
   cd "${BACKEND_ROOT}"
   "${VENV_PYTHON}" - <<'PY'
-from app.config import get_settings
+from mema_backend.config import get_settings
 
 settings = get_settings()
 print(
     "|".join(
         (
-            settings.recall_host,
-            str(settings.recall_port),
-            str(settings.recall_database_path),
+            settings.mema_host,
+            str(settings.mema_port),
+            str(settings.mema_database_path),
             "yes" if settings.openai_configured else "no",
         )
     )
 )
 PY
-})" || fail "Recall configuration is invalid. Check the root .env file."
+})" || fail "Mema configuration is invalid. Check the root .env file."
 
-IFS='|' read -r RECALL_HOST RECALL_PORT RECALL_DATABASE OPENAI_CONFIGURED \
+IFS='|' read -r MEMA_HOST MEMA_PORT MEMA_DATABASE OPENAI_CONFIGURED \
   <<< "${SETTINGS}"
-if [[ "${RECALL_HOST}" == *:* ]]; then
-  URL_HOST="[${RECALL_HOST}]"
+if [[ "${MEMA_HOST}" == *:* ]]; then
+  URL_HOST="[${MEMA_HOST}]"
 else
-  URL_HOST="${RECALL_HOST}"
+  URL_HOST="${MEMA_HOST}"
 fi
 
-BASE_URL="http://${URL_HOST}:${RECALL_PORT}"
+BASE_URL="http://${URL_HOST}:${MEMA_PORT}"
 HEALTH_URL="${BASE_URL}/health"
-CHECKLIST_URL="${BASE_URL}/dev/checklist"
 
 health_response() {
   "${VENV_PYTHON}" - "${HEALTH_URL}" <<'PY'
@@ -125,7 +149,7 @@ PY
 }
 
 port_is_open() {
-  "${VENV_PYTHON}" - "${RECALL_HOST}" "${RECALL_PORT}" <<'PY'
+  "${VENV_PYTHON}" - "${MEMA_HOST}" "${MEMA_PORT}" <<'PY'
 import socket
 import sys
 
@@ -138,24 +162,23 @@ PY
 }
 
 if HEALTH_JSON="$(health_response 2>/dev/null)"; then
-  printf 'Recall backend is already healthy.\n'
+  printf 'Mema backend is already healthy.\n'
   printf 'Health:   %s\n' "${HEALTH_URL}"
-  printf 'Checklist: %s\n' "${CHECKLIST_URL}"
   printf 'Status:   %s\n' "${HEALTH_JSON}"
   exit 0
 fi
 
 if port_is_open >/dev/null 2>&1; then
-  fail "${RECALL_HOST}:${RECALL_PORT} is already in use, but Recall health is not OK."
+  fail "${MEMA_HOST}:${MEMA_PORT} is already in use, but Mema health is not OK."
 fi
 
-printf 'Starting Recall backend\n'
-printf 'Database: %s\n' "${RECALL_DATABASE}"
+printf 'Starting Mema backend\n'
+printf 'Database: %s\n' "${MEMA_DATABASE}"
 printf 'OpenAI configured: %s\n' "${OPENAI_CONFIGURED}"
 
 (
   cd "${BACKEND_ROOT}"
-  exec "${VENV_PYTHON}" -m app
+  exec "${VENV_PYTHON}" -m mema_backend
 ) &
 SERVER_PID=$!
 
@@ -186,9 +209,8 @@ done
 [[ -n "${HEALTH_JSON}" ]] \
   || fail "Backend did not become healthy within 10 seconds."
 
-printf 'Recall is ready.\n'
+printf 'Mema is ready.\n'
 printf 'Health:   %s\n' "${HEALTH_URL}"
-printf 'Checklist: %s\n' "${CHECKLIST_URL}"
 printf 'Status:   %s\n' "${HEALTH_JSON}"
 printf 'Press Control-C to stop the backend.\n'
 

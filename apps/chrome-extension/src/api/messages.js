@@ -1,10 +1,10 @@
-export const CREATE_CAPTURE_MESSAGE = "recall:capture:create";
-export const SYNC_INLINE_CAPTURE_MESSAGE = "recall:inline:sync";
-export const INLINE_CAPTURE_STATUS_MESSAGE = "recall:inline:status";
-export const DISABLE_INLINE_CAPTURE_MESSAGE = "recall:inline:disable";
+export const CREATE_CAPTURE_MESSAGE = "mema:capture:create";
+export const SYNC_INLINE_CAPTURE_MESSAGE = "mema:inline:sync";
+export const INLINE_CAPTURE_STATUS_MESSAGE = "mema:inline:status";
+export const DISABLE_INLINE_CAPTURE_MESSAGE = "mema:inline:disable";
 
 
-export class RecallCoordinatorError extends Error {
+export class MemaCoordinatorError extends Error {
   constructor(
     detail,
     {
@@ -14,7 +14,7 @@ export class RecallCoordinatorError extends Error {
     } = {},
   ) {
     super(detail);
-    this.name = "RecallCoordinatorError";
+    this.name = "MemaCoordinatorError";
     this.code = code;
     this.title = title;
     this.retryable = retryable;
@@ -87,8 +87,8 @@ export async function sendCaptureAttempt(
       attempt,
     });
   } catch (_error) {
-    throw new RecallCoordinatorError(
-      "Recall’s extension service is unavailable. Reload the extension and try again.",
+    throw new MemaCoordinatorError(
+      "Mema’s extension service is unavailable. Reload the extension and try again.",
       { code: "extension_unavailable", retryable: true },
     );
   }
@@ -99,7 +99,7 @@ export async function sendCaptureAttempt(
   }
 
   const error = response?.error;
-  throw new RecallCoordinatorError(
+  throw new MemaCoordinatorError(
     typeof error?.detail === "string"
       ? error.detail
       : "Try again in a moment.",

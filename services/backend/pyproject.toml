@@ -3,9 +3,10 @@ requires = ["setuptools>=68", "wheel>=0.43,<1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "recall-backend"
-version = "0.9.0"
-description = "Local FastAPI backend for Recall"
+name = "mema-backend"
+version = "1.0.0"
+description = "Local FastAPI backend for Mema"
+license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
   "fastapi>=0.115,<1.0",
@@ -14,6 +15,9 @@ dependencies = [
   "pydantic-settings>=2.6,<3.0",
   "uvicorn>=0.30,<1.0",
 ]
+
+[project.scripts]
+mema-backend = "mema_backend.__main__:main"
 
 [project.optional-dependencies]
 dev = [
@@ -24,7 +28,7 @@ dev = [
 ]
 
 [tool.setuptools.package-data]
-app = ["migrations/*.sql", "schemas/*.json", "static/*.html"]
+mema_backend = ["migrations/*.sql", "schemas/*.json"]
 
 [tool.pytest.ini_options]
 addopts = "-q"

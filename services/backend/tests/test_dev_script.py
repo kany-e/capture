@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 
-from app.config import REPOSITORY_ROOT
+from mema_backend.config import REPOSITORY_ROOT
 
 
 def test_clean_start_script_is_executable_and_valid_bash() -> None:
@@ -38,3 +38,5 @@ def test_clean_start_script_repairs_stale_requirement_versions() -> None:
     assert "--report -" in script
     assert 'report.get("install", [])' in script
     assert script.count("dependencies_are_current") >= 3
+    assert "project_install_is_current" in script
+    assert 'version("mema-backend")' in script

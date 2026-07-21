@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pytest
 
-from app.database import database_connection
-from app.models import EnrichmentUpdate, NewCapture
-from app.repository import CaptureRepository
-from app.search import (
+from mema_backend.database import database_connection
+from mema_backend.models import EnrichmentUpdate, NewCapture
+from mema_backend.repository import CaptureRepository
+from mema_backend.search import (
     HybridSearchService,
     build_fts_match_query,
     is_technical_query,
     metadata_bonus,
 )
-from app.embeddings import cosine_similarity
+from mema_backend.embeddings import cosine_similarity
 
 
 def new_capture(**overrides: object) -> NewCapture:
@@ -63,7 +63,7 @@ def create_ready_capture(
         capture.id,
         EnrichmentUpdate(
             status="ready",
-            ai_title=str(overrides.get("source_title", "Recall memory")),
+            ai_title=str(overrides.get("source_title", "Mema memory")),
             ai_summary="Contextual saved-memory summary",
             problem="Remember the relevant source",
             key_insight="Use the saved context",
@@ -75,17 +75,17 @@ def create_ready_capture(
 
 
 def test_keyword_search_finds_title_selection_and_user_note(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(
         new_capture(
             source_title="Rare Quasar Deployment Guide",
-            selected_text="Set WorkingDirectory=/srv/recall before restart.",
+            selected_text="Set WorkingDirectory=/srv/mema before restart.",
             user_note="This was the only fix that worked on my VPS.",
         ),
         status="error",
     )
 
-    for query in ("Quasar", "WorkingDirectory=/srv/recall", "only fix"):
+    for query in ("Quasar", "WorkingDirectory=/srv/mema", "only fix"):
         matches = repository.search_captures(query=query, limit=20)
         assert [match.capture.id for match in matches] == [capture.id]
         assert matches[0].keyword_score == 1.0
@@ -96,7 +96,7 @@ def test_keyword_search_finds_ai_tag_entity_and_alias(
     tmp_path: Path,
     query: str,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(new_capture(), status="processing")
     repository.update_enrichment(
         capture.id,
@@ -119,8 +119,8 @@ def test_keyword_search_finds_ai_tag_entity_and_alias(
     [
         "HTTP 502",
         "ERR_MODULE_NOT_FOUND",
-        "/etc/systemd/system/recall.service",
-        "systemctl restart recall.service",
+        "/etc/systemd/system/mema.service",
+        "systemctl restart mema.service",
         "v2.4.1",
         "https://docs.example.com/v2.4.1/repair",
     ],
@@ -129,13 +129,13 @@ def test_technical_identifiers_and_paths_remain_searchable(
     tmp_path: Path,
     query: str,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(
         new_capture(
             selected_text=(
                 "HTTP 502 ERR_MODULE_NOT_FOUND in "
-                "/etc/systemd/system/recall.service after v2.4.1. Run "
-                "systemctl restart recall.service and check "
+                "/etc/systemd/system/mema.service after v2.4.1. Run "
+                "systemctl restart mema.service and check "
                 "https://docs.example.com/v2.4.1/repair"
             )
         ),
@@ -148,7 +148,7 @@ def test_technical_identifiers_and_paths_remain_searchable(
 
 
 def test_chinese_query_finds_mixed_language_content(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(
         new_capture(
             selected_text="English FastAPI source",
@@ -165,15 +165,15 @@ def test_chinese_query_finds_mixed_language_content(tmp_path: Path) -> None:
     assert [match.capture.id for match in matches] == [capture.id]
 
 
-@pytest.mark.parametrize("query", ["Recall", "成功", "功"])
+@pytest.mark.parametrize("query", ["Mema", "成功", "功"])
 def test_keyword_search_recovers_literal_fragments_missed_by_fts(
     tmp_path: Path,
     query: str,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(
         new_capture(
-            selected_text="RecallSearchSmokeTest",
+            selected_text="MemaSearchSmokeTest",
             user_note="这是我唯一成功的修复方法。",
         ),
         status="error",
@@ -188,17 +188,17 @@ def test_keyword_search_recovers_literal_fragments_missed_by_fts(
 def test_literal_fragments_are_merged_with_existing_fts_matches(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     fragment_capture = repository.create(
-        new_capture(selected_text="RecallSearchSmokeTest"),
+        new_capture(selected_text="MemaSearchSmokeTest"),
         status="error",
     )
     token_capture = repository.create(
-        new_capture(selected_text="Recall is also a complete token here."),
+        new_capture(selected_text="Mema is also a complete token here."),
         status="error",
     )
 
-    matches = repository.search_captures(query="Recall", limit=20)
+    matches = repository.search_captures(query="Mema", limit=20)
 
     assert {match.capture.id for match in matches} == {
         fragment_capture.id,
@@ -219,7 +219,7 @@ def test_empty_query_returns_recent_captures_and_no_result_is_empty(
         ]
     )
     repository = CaptureRepository(
-        tmp_path / "recall.db",
+        tmp_path / "mema.db",
         clock=lambda: next(times),
     )
     for text in ("oldest", "middle", "newest"):
@@ -239,7 +239,7 @@ def test_empty_query_returns_recent_captures_and_no_result_is_empty(
 def test_failed_enrichment_capture_remains_searchable_from_raw_fields(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(
         new_capture(selected_text="Raw fallback keyword aurora-failure"),
         status="processing",
@@ -261,7 +261,7 @@ def test_failed_enrichment_capture_remains_searchable_from_raw_fields(
 def test_retry_synchronizes_generated_fields_and_preserves_raw_search(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(
         new_capture(selected_text="immutable-source-token"),
         status="processing",
@@ -285,7 +285,7 @@ def test_retry_synchronizes_generated_fields_and_preserves_raw_search(
 
 
 def test_exact_phrase_bonus_and_keyword_scores_are_normalized(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     exact = repository.create(
         new_capture(selected_text="systemd working directory fix"),
         status="ready",
@@ -312,7 +312,7 @@ def test_exact_phrase_bonus_and_keyword_scores_are_normalized(tmp_path: Path) ->
 
 
 def test_delete_trigger_removes_fts_row(tmp_path: Path) -> None:
-    database_path = tmp_path / "recall.db"
+    database_path = tmp_path / "mema.db"
     repository = CaptureRepository(database_path)
     capture = repository.create(new_capture(selected_text="delete-index-token"))
 
@@ -336,7 +336,7 @@ def test_fts_query_escapes_client_operators_and_quotes() -> None:
 def test_vague_personal_query_retrieves_semantic_only_capture(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     intended = create_ready_capture(
         repository,
         embedding=[1.0, 0.0],
@@ -367,7 +367,7 @@ def test_vague_personal_query_retrieves_semantic_only_capture(
 def test_technical_identifier_query_favors_exact_keyword_match(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     exact = create_ready_capture(
         repository,
         embedding=[0.6, 0.8],
@@ -395,7 +395,7 @@ def test_technical_identifier_query_favors_exact_keyword_match(
 def test_chinese_semantic_query_retrieves_english_source_with_chinese_note(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     intended = create_ready_capture(
         repository,
         embedding=[0.9, 0.1],
@@ -422,7 +422,7 @@ def test_chinese_semantic_query_retrieves_english_source_with_chinese_note(
 def test_missing_capture_embedding_falls_back_per_result_without_crashing(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     keyword_only = create_ready_capture(
         repository,
         embedding=None,
@@ -449,7 +449,7 @@ def test_missing_capture_embedding_falls_back_per_result_without_crashing(
 def test_query_embedding_failure_preserves_layer5_fts_results(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     exact = create_ready_capture(
         repository,
         embedding=[1.0, 0.0],
@@ -475,7 +475,7 @@ def test_query_embedding_failure_preserves_layer5_fts_results(
 def test_hybrid_score_order_is_deterministic_for_fixed_vectors(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     create_ready_capture(
         repository,
         embedding=[0.8, 0.2],
@@ -504,7 +504,7 @@ def test_hybrid_score_order_is_deterministic_for_fixed_vectors(
 
 
 def test_metadata_bonus_covers_all_four_baseline_signals(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = create_ready_capture(
         repository,
         embedding=[1.0, 0.0],
@@ -531,7 +531,7 @@ def test_metadata_bonus_covers_all_four_baseline_signals(tmp_path: Path) -> None
     "query",
     [
         "HTTP 502",
-        "/etc/systemd/system/recall.service",
+        "/etc/systemd/system/mema.service",
         "package-name",
         "snake_case",
         "0xFF",

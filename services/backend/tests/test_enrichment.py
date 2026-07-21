@@ -6,9 +6,9 @@ from types import SimpleNamespace
 
 import pytest
 
-import app.enrichment as enrichment_module
-from app.config import REPOSITORY_ROOT
-from app.enrichment import (
+import mema_backend.enrichment as enrichment_module
+from mema_backend.config import REPOSITORY_ROOT
+from mema_backend.enrichment import (
     ENRICHMENT_MAX_RETRIES,
     ENRICHMENT_TIMEOUT_SECONDS,
     SYSTEM_INSTRUCTIONS,
@@ -21,8 +21,8 @@ from app.enrichment import (
     build_user_input,
     enrichment_schema,
 )
-from app.models import EnrichmentUpdate, NewCapture
-from app.repository import CaptureRepository
+from mema_backend.models import EnrichmentUpdate, NewCapture
+from mema_backend.repository import CaptureRepository
 
 
 def new_capture(**overrides: object) -> NewCapture:
@@ -33,7 +33,7 @@ def new_capture(**overrides: object) -> NewCapture:
         "source_app": "Google Chrome",
         "source_title": "Nginx serves 502 after moving a FastAPI service",
         "source_url": "https://example.com/questions/fastapi-nginx-502",
-        "selected_text": "Set WorkingDirectory=/srv/recall and restart Nginx.",
+        "selected_text": "Set WorkingDirectory=/srv/mema and restart Nginx.",
         "surrounding_context": "The service returned HTTP 502 under systemd.",
         "context_truncated": False,
         "user_note": "This was the only fix that worked on my VPS.",
@@ -141,7 +141,7 @@ def test_provider_bounds_timeout_and_disables_sdk_retries(
 
 
 def test_provider_sends_one_strict_schema_request(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(new_capture(), status="processing")
     provider, responses = provider_for_output(json.dumps(valid_output()))
 
@@ -151,16 +151,17 @@ def test_provider_sends_one_strict_schema_request(tmp_path: Path) -> None:
     assert len(responses.calls) == 1
     request = responses.calls[0]
     assert request["model"] == "gpt-5.6"
+    assert request["store"] is False
     assert request["instructions"] == SYSTEM_INSTRUCTIONS
     assert request["text"] == {
         "format": {
             "type": "json_schema",
-            "name": "recall_enrichment",
+            "name": "mema_enrichment",
             "strict": True,
             "schema": enrichment_schema(),
         }
     }
-    assert "WorkingDirectory=/srv/recall" in str(request["input"])
+    assert "WorkingDirectory=/srv/mema" in str(request["input"])
     assert "only fix that worked" in str(request["input"])
 
 
@@ -168,7 +169,7 @@ def test_provider_sends_one_strict_schema_request(tmp_path: Path) -> None:
     "overrides",
     [
         {"source_title": "General article", "selected_text": "Plastic packaging became normalized after wartime production."},
-        {"selected_text": "Run systemctl restart recall.service after editing /etc/systemd/system/recall.service."},
+        {"selected_text": "Run systemctl restart mema.service after editing /etc/systemd/system/mema.service."},
         {"selected_text": "English source", "user_note": "这是我唯一成功的修复方法。"},
         {"selected_text": "Saved without a note", "user_note": None},
         {"surrounding_context": "x" * 20_000},
@@ -178,7 +179,7 @@ def test_user_input_contains_representative_fixture_content(
     tmp_path: Path,
     overrides: dict[str, object],
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(new_capture(**overrides))
 
     prompt = build_user_input(capture)
@@ -193,7 +194,7 @@ def test_user_input_contains_representative_fixture_content(
 
 
 def test_missing_note_instruction_forbids_inventing_a_reason(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(new_capture(user_note=None))
 
     assert build_user_input(capture).endswith("USER NOTE:\n")
@@ -201,7 +202,7 @@ def test_missing_note_instruction_forbids_inventing_a_reason(tmp_path: Path) -> 
 
 
 def test_prompt_normalization_does_not_modify_stored_source(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     original = "  first\r\nsecond\r  "
     capture = repository.create(new_capture(selected_text=original))
 
@@ -214,7 +215,7 @@ def test_prompt_normalization_does_not_modify_stored_source(tmp_path: Path) -> N
 
 
 def test_provider_detects_refusal(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(new_capture())
     refusal = SimpleNamespace(type="refusal", refusal="Cannot comply")
     message = SimpleNamespace(type="message", content=[refusal])
@@ -227,7 +228,7 @@ def test_provider_detects_refusal(tmp_path: Path) -> None:
 def test_provider_rejects_incomplete_response_even_with_valid_json(
     tmp_path: Path,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(new_capture())
     provider, _ = provider_for_output(
         json.dumps(valid_output()),
@@ -252,7 +253,7 @@ def test_provider_rejects_structurally_or_semantically_invalid_output(
     tmp_path: Path,
     output: str,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(new_capture())
     provider, _ = provider_for_output(output)
 
@@ -272,7 +273,7 @@ def test_provider_wraps_remote_failures_without_exposing_details(
     tmp_path: Path,
     provider_error: Exception,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(new_capture())
     responses = FakeResponses(error=provider_error)
     provider = OpenAIEnrichmentProvider(
@@ -288,7 +289,7 @@ def test_provider_wraps_remote_failures_without_exposing_details(
 
 
 def test_service_stores_valid_result_without_modifying_source(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(new_capture(), status="processing")
     result = EnrichmentPayload.model_validate(valid_output())
 
@@ -324,7 +325,7 @@ def test_service_persists_safe_error_without_source_loss(
     error: Exception,
     expected_message: str,
 ) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(new_capture(), status="processing")
 
     EnrichmentService(repository, FailingProvider(error)).run(capture.id)
@@ -339,7 +340,7 @@ def test_service_persists_safe_error_without_source_loss(
 
 
 def test_failed_retry_preserves_existing_enrichment_version(tmp_path: Path) -> None:
-    repository = CaptureRepository(tmp_path / "recall.db")
+    repository = CaptureRepository(tmp_path / "mema.db")
     capture = repository.create(new_capture(), status="processing")
     repository.update_enrichment(
         capture.id,

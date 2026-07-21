@@ -5,10 +5,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import get_settings
-from app.main import app
-from app.models import NewCapture
-from app.repository import (
+from mema_backend.config import get_settings
+from mema_backend.main import app
+from mema_backend.models import NewCapture
+from mema_backend.repository import (
     CaptureRepository,
     INTERRUPTED_PROCESSING_ERROR_MESSAGE,
 )
@@ -19,7 +19,7 @@ def isolated_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     # Explicitly override a developer's repository-root .env for tests that
     # exercise the provider-off contract.
     monkeypatch.setenv("OPENAI_API_KEY", "")
-    monkeypatch.setenv("RECALL_DATABASE_PATH", str(tmp_path / "recall.db"))
+    monkeypatch.setenv("MEMA_DATABASE_PATH", str(tmp_path / "mema.db"))
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -57,7 +57,7 @@ def test_startup_recovers_interrupted_processing_capture(
     tmp_path: Path,
 ) -> None:
     database_path = tmp_path / "restart.db"
-    monkeypatch.setenv("RECALL_DATABASE_PATH", str(database_path))
+    monkeypatch.setenv("MEMA_DATABASE_PATH", str(database_path))
     get_settings.cache_clear()
     repository = CaptureRepository(database_path)
     stale = repository.create(
@@ -85,7 +85,7 @@ def test_startup_recovers_interrupted_processing_capture(
 def test_health_returns_503_when_database_cannot_be_opened(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RECALL_DATABASE_PATH", "/dev/null/recall.db")
+    monkeypatch.setenv("MEMA_DATABASE_PATH", "/dev/null/mema.db")
     get_settings.cache_clear()
 
     with TestClient(app) as client:

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Recall popup harness</title>
+    <title>Mema popup harness</title>
     <link rel="stylesheet" href="../../src/popup/popup.css" />
   </head>
   <body>
@@ -41,7 +41,7 @@
         },
         runtime: {
           sendMessage: async (message) => {
-            if (message.type === "recall:inline:sync") {
+            if (message.type === "mema:inline:sync") {
               return { ok: true, enabled: inlineEnabled };
             }
             if (offline) {

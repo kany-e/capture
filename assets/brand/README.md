@@ -1,11 +1,11 @@
-# Recall brand assets
+# Mema brand assets
 
-`recall-app-icon-1024.png` is the checked-in full-resolution source supplied for
-the current Recall app mark. Runtime-sized exports live with the clients that
+`mema-app-icon-1024.png` is the checked-in full-resolution source supplied for
+the current Mema app mark. Runtime-sized exports live with the clients that
 consume them:
 
 - macOS AppIcon variants are in
-  `apps/macos/Recall/Resources/Assets.xcassets/AppIcon.appiconset/`;
+  `apps/macos/Mema/Resources/Assets.xcassets/AppIcon.appiconset/`;
 - Chrome extension icons are in `apps/chrome-extension/assets/icons/`.
 
 Keep the generated sizes and their manifests in sync when the mark changes. The

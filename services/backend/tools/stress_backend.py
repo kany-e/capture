@@ -28,15 +28,15 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.config import get_settings
-from app.enrichment import EnrichmentPayload
-from app.main import (
+from mema_backend.config import get_settings
+from mema_backend.enrichment import EnrichmentPayload
+from mema_backend.main import (
     app,
     get_embedding_provider,
     get_enrichment_provider,
 )
-from app.models import EnrichmentUpdate, NewCapture
-from app.repository import CaptureRepository
+from mema_backend.models import EnrichmentUpdate, NewCapture
+from mema_backend.repository import CaptureRepository
 
 
 CAPTURED_AT = "2026-07-18T12:00:00-07:00"
@@ -118,7 +118,7 @@ class ValidEnrichmentProvider:
             key_insight="Keep source and personal note separate",
             why_saved=marker,
             caveats=["Deterministic local stress provider"],
-            tags=["stress", "recall"],
+            tags=["stress", "mema"],
             entities=[capture.source_app or "Unknown app"],
             search_aliases=[marker, "confusing saved thing"],
         )
@@ -167,7 +167,7 @@ def payload(**overrides: object) -> dict[str, object]:
         "source_app": "Stress Browser",
         "source_title": "Stress card",
         "source_url": "https://example.test/stress",
-        "selected_text": "A deterministic stress card with token recall-stress.",
+        "selected_text": "A deterministic stress card with token mema-stress.",
         "surrounding_context": "Nearby context for the captured selection.",
         "context_truncated": False,
         "user_note": "Remember this during the stress test.",
@@ -179,9 +179,9 @@ def payload(**overrides: object) -> dict[str, object]:
 
 @contextmanager
 def disposable_client(database_path: Path) -> Iterator[TestClient]:
-    old_database = os.environ.get("RECALL_DATABASE_PATH")
+    old_database = os.environ.get("MEMA_DATABASE_PATH")
     old_key = os.environ.pop("OPENAI_API_KEY", None)
-    os.environ["RECALL_DATABASE_PATH"] = str(database_path)
+    os.environ["MEMA_DATABASE_PATH"] = str(database_path)
     get_settings.cache_clear()
     app.dependency_overrides.clear()
     try:
@@ -191,9 +191,9 @@ def disposable_client(database_path: Path) -> Iterator[TestClient]:
         app.dependency_overrides.clear()
         get_settings.cache_clear()
         if old_database is None:
-            os.environ.pop("RECALL_DATABASE_PATH", None)
+            os.environ.pop("MEMA_DATABASE_PATH", None)
         else:
-            os.environ["RECALL_DATABASE_PATH"] = old_database
+            os.environ["MEMA_DATABASE_PATH"] = old_database
         if old_key is not None:
             os.environ["OPENAI_API_KEY"] = old_key
 
@@ -277,7 +277,7 @@ def run_validation_stress(root: Path, results: Results) -> None:
             ),
             ("unknown_field", payload(unexpected="surprise"), 422),
             ("invalid_timestamp", payload(captured_at="2026-07-18 12:00:00"), 422),
-            ("javascript_source_url", payload(source_url="javascript:alert(1)"), 202),
+            ("javascript_source_url", payload(source_url="javascript:alert(1)"), 422),
             ("integer_boolean_contract_drift", payload(context_truncated=1), 422),
             ("string_boolean_contract_drift", payload(context_truncated="false"), 422),
         ]
@@ -573,7 +573,7 @@ def run_retrieval_stress(root: Path, results: Results) -> None:
         repository,
         selected_text="Enable SQLite WAL mode for concurrent readers.",
         user_note="This fixed lock errors in the desktop app.",
-        source_title="Enable WAL for Recall",
+        source_title="Enable WAL for Mema",
         embedding=[1.0, 0.0, 0.0, 0.0],
         tags=["sqlite", "wal", "fix"],
     )
@@ -1008,7 +1008,7 @@ def run_corruption_and_cors_stress(root: Path, results: Results) -> None:
         results.add(
             "cors",
             "unconfigured_extension_origin",
-            "pass" if allowed.status_code == 400 else "break",
+            "pass" if allowed.status_code == 403 else "break",
             "unconfigured extension origin is rejected",
             compact_response(allowed),
             started,
@@ -1043,7 +1043,7 @@ def main() -> int:
     logging.getLogger().setLevel(logging.CRITICAL)
     results = Results()
     started = time.perf_counter()
-    with tempfile.TemporaryDirectory(prefix="recall-backend-stress-") as directory:
+    with tempfile.TemporaryDirectory(prefix="mema-backend-stress-") as directory:
         root = Path(directory)
         scenarios = (
             ("validation_group", lambda: run_validation_stress(root, results)),

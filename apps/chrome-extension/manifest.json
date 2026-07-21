@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Recall Capture",
-  "version": "0.4.0",
-  "description": "Save selected web context and a personal note to the local Recall app.",
+  "name": "Mema",
+  "version": "1.0.0",
+  "minimum_chrome_version": "102",
+  "description": "Save selected web context and a personal note to the local Mema app.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -26,7 +27,7 @@
     "128": "assets/icons/icon128.png"
   },
   "action": {
-    "default_title": "Save to Recall",
+    "default_title": "Save to Mema",
     "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "assets/icons/icon16.png",
@@ -57,7 +58,7 @@
         "default": "Ctrl+Shift+Y",
         "mac": "Command+Shift+Y"
       },
-      "description": "Open Recall capture"
+      "description": "Open Mema capture"
     }
   }
 }

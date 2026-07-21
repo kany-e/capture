@@ -1,4 +1,4 @@
-# Recall Chrome extension
+# Mema Chrome extension
 
 This is a build-free Manifest V3 extension. Chrome runs the checked-in ES
 modules directly; only Node's built-in test runner is used during development.
@@ -10,7 +10,7 @@ independent artwork.
 
 ## Load unpacked
 
-1. Start the Recall backend at `http://127.0.0.1:8765`.
+1. Start the Mema backend at `http://127.0.0.1:8765`.
 2. Open `chrome://extensions` in Google Chrome.
 3. Enable **Developer mode**.
 4. Choose **Load unpacked** and select this `apps/chrome-extension/` directory.
@@ -18,22 +18,22 @@ independent artwork.
 6. Add its exact origin to the untracked root `.env`, for example:
 
    ```text
-   RECALL_CORS_ORIGINS=chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+   MEMA_CORS_ORIGINS=chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
    ```
 
 7. Restart the backend, open an ordinary `http` or `https` page, select text,
-   and use the Recall toolbar action.
+   and use the Mema toolbar action.
 
 ## Capture paths
 
 Toolbar and keyboard capture remain available with no broad website access. For
 the lower-friction inline path, open the popup's Settings page and enable **Show
-Add to Recall when I select text**. Chrome then asks for optional HTTP/HTTPS
+Add to Mema when I select text**. Chrome then asks for optional HTTP/HTTPS
 website access.
 Inline capture is off by default. Granting access dynamically injects the inline
 behavior into already-open web pages, so a refresh is not required.
 
-After an eligible mouse or keyboard selection, a transient **Add to Recall**
+After an eligible mouse or keyboard selection, a transient **Add to Mema**
 action appears beside the selection without moving page layout or focus. Open it
 to review the selection, add an optional note, then choose **Save**. The
 Unicode-aware selected-text count is separate from the note's 4,000-character
@@ -45,13 +45,13 @@ the established line-ending and outer-whitespace normalization; longer
 selections show their full count and clearly state that only the first 12,000
 characters will be saved.
 
-Escape or Cancel closes Recall UI; ordinary page keyboard behavior is not
+Escape or Cancel closes Mema UI; ordinary page keyboard behavior is not
 prevented. Inputs, editable regions, Chrome internal pages, the built-in PDF
 viewer, and iframe content are not supported by this path.
 
 For the keyboard-first path, press `Command+Shift+Y` on macOS or
 `Control+Shift+Y` on other platforms. Chrome may reserve or override suggested
-shortcuts; confirm or customize Recall's binding at `chrome://extensions/shortcuts`.
+shortcuts; confirm or customize Mema's binding at `chrome://extensions/shortcuts`.
 The popup Settings page displays the active binding and opens that Chrome-owned
 shortcut manager; extensions cannot silently rewrite their own command keys.
 The popup focuses the optional note. Press `Command+Enter` or `Control+Enter` to
@@ -67,7 +67,7 @@ scrollable metadata region for unusually long values.
 The extension always requests only `activeTab`, `scripting`, `storage`, and
 access to the fixed localhost backend. HTTP/HTTPS page access is optional,
 explicit, and revocable. Turning inline capture off unregisters future behavior
-and removes existing Recall controls from open tabs; toolbar capture continues
+and removes existing Mema controls from open tabs; toolbar capture continues
 to work. A page restored from Chrome's back-forward cache rechecks the current
 permission before inline behavior resumes, and the service worker checks it
 again before accepting a content-script save.
@@ -97,7 +97,7 @@ attach, or persist page images; image attachments require a separate storage,
 privacy, deletion, and migration design.
 
 If no text is selected, the popup explains that it will save page metadata
-without page text. If Recall is unavailable, the popup displays the required
+without page text. If Mema is unavailable, the popup displays the required
 recovery message instead of failing silently.
 
 Both capture paths validate the shared Unicode-aware Capture limits before
@@ -130,4 +130,6 @@ real Shadow DOM controls. Use `inline-capture-harness.html` through the unpacked
 extension for CSP and injection acceptance; the standalone fixture is not CSP
 evidence.
 
-The dependency-free suite currently contains 70 tests.
+The dependency-free suite covers contract validation, idempotent retries,
+permissions, legacy-registration migration, revocation, focus behavior, and
+every shipped JavaScript file.

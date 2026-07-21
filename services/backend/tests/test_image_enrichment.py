@@ -7,13 +7,13 @@ from types import SimpleNamespace
 
 import pytest
 
-import app.image_enrichment as image_enrichment_module
-from app.enrichment import (
+import mema_backend.image_enrichment as image_enrichment_module
+from mema_backend.enrichment import (
     EnrichmentProviderError,
     EnrichmentRefusalError,
     InvalidEnrichmentOutputError,
 )
-from app.image_enrichment import (
+from mema_backend.image_enrichment import (
     IMAGE_ENRICHMENT_MAX_RETRIES,
     IMAGE_ENRICHMENT_TIMEOUT_SECONDS,
     IMAGE_SYSTEM_INSTRUCTIONS,
@@ -21,8 +21,8 @@ from app.image_enrichment import (
     OpenAIImageEnrichmentProvider,
     image_enrichment_schema,
 )
-from app.models import NewCapture
-from app.repository import CaptureRepository
+from mema_backend.models import NewCapture
+from mema_backend.repository import CaptureRepository
 
 
 def valid_output() -> dict[str, object]:
@@ -83,7 +83,7 @@ def provider_for(
 
 
 def capture_record(tmp_path: Path):
-    return CaptureRepository(tmp_path / "recall.db").create(
+    return CaptureRepository(tmp_path / "mema.db").create(
         NewCapture(
             captured_at="2026-07-21T10:30:00-07:00",
             source_type="screenshot",
@@ -145,7 +145,7 @@ def test_provider_sends_one_strict_high_detail_multimodal_request(
     assert request["text"] == {
         "format": {
             "type": "json_schema",
-            "name": "recall_image_enrichment",
+            "name": "mema_image_enrichment",
             "strict": True,
             "schema": image_enrichment_schema(),
         }

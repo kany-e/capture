@@ -2,14 +2,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  RecallApiError,
-  RecallCaptureValidationError,
-  RecallUnavailableError,
-} from "../src/api/recall.js";
+  MemaApiError,
+  MemaCaptureValidationError,
+  MemaUnavailableError,
+} from "../src/api/mema.js";
 import {
   CREATE_CAPTURE_MESSAGE,
+  DISABLE_INLINE_CAPTURE_MESSAGE,
   INLINE_CAPTURE_STATUS_MESSAGE,
-  RecallCoordinatorError,
+  MemaCoordinatorError,
   SYNC_INLINE_CAPTURE_MESSAGE,
   buildCaptureAttempt,
   sendCaptureAttempt,
@@ -21,6 +22,8 @@ import {
 import {
   INLINE_CAPTURE_SCRIPT_FILES,
   INLINE_CAPTURE_SCRIPT_ID,
+  LEGACY_DISABLE_INLINE_CAPTURE_MESSAGE,
+  LEGACY_INLINE_CAPTURE_SCRIPT_ID,
   createInlineCaptureReconciler,
   disableInlineCaptureInOpenTabs,
   injectInlineCaptureInOpenTabs,
@@ -97,7 +100,7 @@ test("message client returns coordinated captures and preserves safe error metad
         },
       }),
     }),
-    (error) => error instanceof RecallCoordinatorError
+    (error) => error instanceof MemaCoordinatorError
       && error.code === "validation_error"
       && error.title === "Cannot save."
       && error.retryable === false,
@@ -109,7 +112,7 @@ test("message client returns coordinated captures and preserves safe error metad
         throw new Error("worker stopped");
       },
     }),
-    (error) => error instanceof RecallCoordinatorError
+    (error) => error instanceof MemaCoordinatorError
       && error.code === "extension_unavailable"
       && error.retryable === true,
   );
@@ -164,32 +167,32 @@ test("coordinator strictly rejects malformed or expanded messages before transpo
 
 test("coordinator exposes only safe retry choices for transport and API failures", async (t) => {
   const cases = [
-    ["network or timeout", new RecallUnavailableError(), true],
-    ["invalid success response", new RecallApiError("Invalid response.", {
+    ["network or timeout", new MemaUnavailableError(), true],
+    ["invalid success response", new MemaApiError("Invalid response.", {
       code: "invalid_response",
       status: 202,
     }), true],
-    ["request timeout", new RecallApiError("Timed out.", {
+    ["request timeout", new MemaApiError("Timed out.", {
       code: "request_timeout",
       status: 408,
     }), true],
-    ["rate limited", new RecallApiError("Slow down.", {
+    ["rate limited", new MemaApiError("Slow down.", {
       code: "rate_limited",
       status: 429,
     }), true],
-    ["server failure", new RecallApiError("Unavailable.", {
+    ["server failure", new MemaApiError("Unavailable.", {
       code: "server_error",
       status: 503,
     }), true],
-    ["ordinary client error", new RecallApiError("Conflict.", {
+    ["ordinary client error", new MemaApiError("Conflict.", {
       code: "conflict",
       status: 409,
     }), false],
-    ["backend validation", new RecallApiError("Invalid.", {
+    ["backend validation", new MemaApiError("Invalid.", {
       code: "validation_error",
       status: 422,
     }), false],
-    ["local contract validation", new RecallCaptureValidationError("Too long."), false],
+    ["local contract validation", new MemaCaptureValidationError("Too long."), false],
   ];
 
   for (const [name, error, retryable] of cases) {
@@ -211,7 +214,9 @@ function scriptingDouble(registered = []) {
   const calls = [];
   return {
     calls,
-    getRegisteredContentScripts: async () => [...current],
+    getRegisteredContentScripts: async ({ ids } = {}) => current.filter(
+      ({ id }) => !ids || ids.includes(id),
+    ),
     registerContentScripts: async (scripts) => {
       calls.push(["register", scripts]);
       current = scripts;
@@ -222,7 +227,7 @@ function scriptingDouble(registered = []) {
     },
     unregisterContentScripts: async (details) => {
       calls.push(["unregister", details]);
-      current = [];
+      current = current.filter(({ id }) => !details.ids.includes(id));
     },
     executeScript: async (details) => {
       calls.push(["inject", details]);
@@ -250,6 +255,25 @@ test("enabling registers inline capture and injects every already-open web tab",
       { target: { tabId: 7 }, files: [...INLINE_CAPTURE_SCRIPT_FILES] },
     ],
   );
+});
+
+
+test("upgrade removes the legacy dynamic registration before enabling Mema", async () => {
+  const scripting = scriptingDouble([{ id: LEGACY_INLINE_CAPTURE_SCRIPT_ID }]);
+
+  const enabled = await createInlineCaptureReconciler({
+    permissions: { contains: async () => true },
+    scripting,
+    tabs: { query: async () => [] },
+  })();
+
+  assert.equal(enabled, true);
+  assert.deepEqual(scripting.calls[0], [
+    "unregister",
+    { ids: [LEGACY_INLINE_CAPTURE_SCRIPT_ID] },
+  ]);
+  assert.equal(scripting.calls[1][0], "register");
+  assert.equal(scripting.calls[1][1][0].id, INLINE_CAPTURE_SCRIPT_ID);
 });
 
 
@@ -319,10 +343,15 @@ test("revocation unregisters behavior and notifies all injected tabs", async () 
     "unregister",
     { ids: [INLINE_CAPTURE_SCRIPT_ID] },
   ]]);
-  assert.deepEqual(messages.map(([tabID]) => tabID), [3, 7]);
+  assert.deepEqual(messages, [
+    [3, { type: DISABLE_INLINE_CAPTURE_MESSAGE }],
+    [3, { type: LEGACY_DISABLE_INLINE_CAPTURE_MESSAGE }],
+    [7, { type: DISABLE_INLINE_CAPTURE_MESSAGE }],
+    [7, { type: LEGACY_DISABLE_INLINE_CAPTURE_MESSAGE }],
+  ]);
 
   const result = await disableInlineCaptureInOpenTabs(tabs);
-  assert.deepEqual(result, { attempted: 2, succeeded: 1, failed: 1 });
+  assert.deepEqual(result, { attempted: 4, succeeded: 2, failed: 2 });
 });
 
 
@@ -444,7 +473,7 @@ test("read-only inline status messages report permission without reconciling tab
     {
       ok: false,
       enabled: false,
-      error: "Recall could not verify inline capture access.",
+      error: "Mema could not verify inline capture access.",
     },
   );
   assert.equal(reconciled, false);

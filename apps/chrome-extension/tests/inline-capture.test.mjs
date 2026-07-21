@@ -18,7 +18,7 @@ function loadCore() {
   const context = { globalThis: null };
   context.globalThis = context;
   vm.runInNewContext(coreSource, context, { filename: "inline-core.js" });
-  return context.RecallInlineCore;
+  return context.MemaInlineCore;
 }
 
 
@@ -212,7 +212,7 @@ test("outside pointers dismiss transient UI but preserve submission results and 
 });
 
 
-test("Escape closes Recall UI without consuming the page event", () => {
+test("Escape closes Mema UI without consuming the page event", () => {
   const core = loadCore();
   const dismissibleStates = [
     core.STATES.pill,
@@ -446,30 +446,38 @@ test("inline composer distinguishes selection and note counts with a scrollable 
   assert.match(captureSource, /Note: \$\{count\.toLocaleString\(\)\}/);
   assert.match(captureSource, /preview\.tabIndex = 0/);
   assert.match(captureSource, /preview\.setAttribute\("role", "region"\)/);
-  assert.match(captureSource, /\.recall-preview \{[\s\S]*overflow: auto;/);
-  assert.match(captureSource, /\.recall-preview \{[\s\S]*max-height: 128px;/);
-  assert.match(captureSource, /\.recall-composer \{[\s\S]*overflow-x: hidden;/);
-  assert.match(captureSource, /\.recall-composer \{[\s\S]*overflow-y: auto;/);
+  assert.match(captureSource, /\.mema-preview \{[\s\S]*overflow: auto;/);
+  assert.match(captureSource, /\.mema-preview \{[\s\S]*max-height: 128px;/);
+  assert.match(captureSource, /\.mema-composer \{[\s\S]*overflow-x: hidden;/);
+  assert.match(captureSource, /\.mema-composer \{[\s\S]*overflow-y: auto;/);
   assert.match(
     captureSource,
-    /\.recall-composer \{[\s\S]*max-height: calc\(100vh - 16px\);/,
+    /\.mema-composer \{[\s\S]*max-height: calc\(100vh - 16px\);/,
   );
   assert.doesNotMatch(captureSource, /-webkit-line-clamp: 2/);
 });
 
 
-test("inline composer uses Recall branding, wraps source titles, and drags within the viewport", () => {
+test("inline composer uses Mema branding, wraps source titles, and drags within the viewport", () => {
   assert.match(captureSource, /chrome\.runtime\.getURL\("assets\/icons\/icon32\.png"\)/);
-  assert.match(captureSource, /\.recall-source \{[\s\S]*overflow-wrap: anywhere;/);
-  assert.match(captureSource, /\.recall-source \{[\s\S]*white-space: normal;/);
-  assert.match(captureSource, /\.recall-source \{[\s\S]*max-height: 2\.7em;/);
-  assert.match(captureSource, /\.recall-header \{[\s\S]*cursor: grab;/);
+  assert.match(captureSource, /\.mema-source \{[\s\S]*overflow-wrap: anywhere;/);
+  assert.match(captureSource, /\.mema-source \{[\s\S]*white-space: normal;/);
+  assert.match(captureSource, /\.mema-source \{[\s\S]*max-height: 2\.7em;/);
+  assert.match(captureSource, /\.mema-header \{[\s\S]*cursor: grab;/);
   assert.match(captureSource, /function beginComposerDrag\(event\)/);
   assert.match(captureSource, /function moveComposer\(event\)/);
   assert.match(captureSource, /core\.clampOverlayPosition\(/);
   assert.match(captureSource, /listeners\.listen\(header, "pointerdown", beginComposerDrag\)/);
   assert.match(captureSource, /listeners\.listen\(global, "resize", clampVisibleComposer\)/);
   assert.match(captureSource, /background: #c92f63;/);
+});
+
+
+test("successful inline saves restore focus after the confirmation", () => {
+  assert.match(
+    captureSource,
+    /dismiss\(\{ restoreFocus: true \}\)[\s\S]*SUCCESS_TIMEOUT_MS/,
+  );
 });
 
 
@@ -512,7 +520,7 @@ test("revocation performs complete controller, listener, message, and host clean
   assert.match(disableBlock, /listeners\.clear\(\)/);
   assert.match(disableBlock, /onMessage\?\.removeListener\?\./);
   assert.match(disableBlock, /host\.remove\(\)/);
-  assert.match(disableBlock, /__recallInlineCaptureController = null/);
+  assert.match(disableBlock, /__memaInlineCaptureController = null/);
 });
 
 
@@ -533,7 +541,7 @@ test("pagehide suspends UI and persisted pageshow performs a read-only access ch
   assert.match(suspendBlock, /hideSurface\(\)/);
   assert.doesNotMatch(suspendBlock, /listeners\.clear\(\)/);
   assert.doesNotMatch(suspendBlock, /host\.remove\(\)/);
-  assert.doesNotMatch(suspendBlock, /__recallInlineCaptureController = null/);
+  assert.doesNotMatch(suspendBlock, /__memaInlineCaptureController = null/);
   assert.match(
     captureSource,
     /listeners\.listen\(global, "pagehide", suspendInlineCapture\)/,

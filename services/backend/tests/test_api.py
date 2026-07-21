@@ -9,29 +9,29 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api_models import CaptureCreateRequest, CaptureResponse
-from app.config import REPOSITORY_ROOT, get_settings
-from app.database import database_connection
-from app.enrichment import (
+from mema_backend.api_models import CaptureCreateRequest, CaptureResponse
+from mema_backend.config import REPOSITORY_ROOT, get_settings
+from mema_backend.database import database_connection
+from mema_backend.enrichment import (
     EnrichmentPayload,
     EnrichmentProviderError,
 )
-from app.main import (
+from mema_backend.main import (
     app,
     get_embedding_provider,
     get_enrichment_provider,
     get_ocr_provider,
     get_repository,
 )
-from app.models import CaptureUserUpdate, NewCapture
-from app.ocr import (
+from mema_backend.models import CaptureUserUpdate, NewCapture
+from mema_backend.ocr import (
     InvalidOCROutputError,
     OCRFailure,
     OCRRefusalError,
     OCRResult,
     OCRTextTooLongError,
 )
-from app.repository import CaptureRepository
+from mema_backend.repository import CaptureRepository
 
 
 @pytest.fixture
@@ -39,12 +39,12 @@ def api_client(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> Iterator[tuple[TestClient, Path]]:
-    database_path = tmp_path / "recall.db"
+    database_path = tmp_path / "mema.db"
     # Environment variables override the repository-root .env.  An explicit
     # empty value keeps this fixture deterministic on developer machines that
     # have configured a real provider key.
     monkeypatch.setenv("OPENAI_API_KEY", "")
-    monkeypatch.setenv("RECALL_DATABASE_PATH", str(database_path))
+    monkeypatch.setenv("MEMA_DATABASE_PATH", str(database_path))
     get_settings.cache_clear()
     with TestClient(app) as client:
         yield client, database_path
@@ -404,7 +404,8 @@ def test_duplicate_client_capture_id_is_idempotent(
     payload = fixture_request()
 
     first = client.post("/v1/captures", json=payload)
-    second = client.post("/v1/captures", json=payload)
+    uppercase_payload = {**payload, "client_capture_id": str(payload["client_capture_id"]).upper()}
+    second = client.post("/v1/captures", json=uppercase_payload)
 
     assert first.status_code == second.status_code == 202
     assert second.json()["id"] == first.json()["id"]
@@ -647,8 +648,6 @@ def test_unknown_capture_enrichment_returns_404(
     api_client: tuple[TestClient, Path],
 ) -> None:
     client, _ = api_client
-    app.dependency_overrides[get_enrichment_provider] = SuccessfulProvider
-
     response = client.post(f"/v1/captures/{uuid4()}/enrich")
 
     assert response.status_code == 404
@@ -919,6 +918,7 @@ def test_selected_text_at_exact_limit_succeeds(
     [
         ("client_capture_id", "not-a-uuid"),
         ("source_url", "not a uri"),
+        ("source_url", "javascript:alert(1)"),
         ("captured_at", "2026-07-18T19:00:00"),
         ("captured_at", "0"),
     ],
@@ -933,6 +933,21 @@ def test_invalid_formatted_fields_fail(
     payload[field] = value
 
     assert_validation_error(client.post("/v1/captures", json=payload))
+
+
+def test_capture_edit_rejects_non_web_source_url(
+    api_client: tuple[TestClient, Path],
+) -> None:
+    client, _ = api_client
+    app.dependency_overrides[get_enrichment_provider] = SuccessfulProvider
+    created = client.post("/v1/captures", json=fixture_request()).json()
+
+    response = client.patch(
+        f"/v1/captures/{created['id']}",
+        json={"source_url": "javascript:alert(1)"},
+    )
+
+    assert_validation_error(response)
 
 
 @pytest.mark.parametrize("value", [1, "false"])
@@ -1054,7 +1069,7 @@ def test_unexpected_api_failure_uses_internal_error_envelope(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    monkeypatch.setenv("RECALL_DATABASE_PATH", str(tmp_path / "recall.db"))
+    monkeypatch.setenv("MEMA_DATABASE_PATH", str(tmp_path / "mema.db"))
     get_settings.cache_clear()
 
     def fail_repository() -> CaptureRepository:

@@ -5,9 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
-import app.ocr as ocr_module
-from app.limits import OCR_TEXT_MAX_LENGTH, SCREENSHOT_MAX_BYTES
-from app.ocr import (
+import mema_backend.ocr as ocr_module
+from mema_backend.limits import OCR_TEXT_MAX_LENGTH, SCREENSHOT_MAX_BYTES
+from mema_backend.ocr import (
     OCR_INSTRUCTIONS,
     OCR_MAX_RETRIES,
     OCR_TIMEOUT_SECONDS,
@@ -91,6 +91,7 @@ def test_provider_sends_one_high_detail_image_request_and_returns_exact_text() -
     assert len(responses.calls) == 1
     request = responses.calls[0]
     assert request["model"] == "gpt-5.6"
+    assert request["store"] is False
     content = request["input"][0]["content"]  # type: ignore[index]
     assert content[0] == {"type": "input_text", "text": OCR_INSTRUCTIONS}
     assert content[1]["type"] == "input_image"

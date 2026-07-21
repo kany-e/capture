@@ -1,7 +1,7 @@
-(function installRecallInlineCore(global) {
+(function installMemaInlineCore(global) {
   "use strict";
 
-  if (global.RecallInlineCore) {
+  if (global.MemaInlineCore) {
     return;
   }
 
@@ -221,7 +221,7 @@
       return false;
     }
 
-    // Deliberately do not prevent or stop the event. Recall may close its own
+    // Deliberately do not prevent or stop the event. Mema may close its own
     // surface, but the host page must retain its normal Escape behavior.
     return dismiss({ restoreFocus: state !== STATES.pill });
   }
@@ -321,7 +321,7 @@
     });
   }
 
-  global.RecallInlineCore = Object.freeze({
+  global.MemaInlineCore = Object.freeze({
     STATES,
     clampOverlayPosition,
     createLatestTaskGate,

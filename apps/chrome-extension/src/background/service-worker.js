@@ -68,7 +68,7 @@ function statusFailureResponse() {
   return {
     ok: false,
     enabled: false,
-    error: "Recall could not verify inline capture access.",
+    error: "Mema could not verify inline capture access.",
   };
 }
 
@@ -129,7 +129,7 @@ export function createServiceWorkerMessageHandler({
       if (!hasExactKeys(message, ["type"]) || !reconcileInlineCapture) {
         sendResponse({
           ok: false,
-          error: "Recall could not update inline capture access.",
+          error: "Mema could not update inline capture access.",
         });
         return false;
       }
@@ -137,7 +137,7 @@ export function createServiceWorkerMessageHandler({
         .then((enabled) => sendResponse({ ok: true, enabled }))
         .catch(() => sendResponse({
           ok: false,
-          error: "Recall could not update inline capture access.",
+          error: "Mema could not update inline capture access.",
         }));
       return true;
     }
@@ -166,7 +166,7 @@ export function installServiceWorker(
 
   const reportRegistrationError = (error) => {
     console.warn(
-      "Recall inline capture registration failed.",
+      "Mema inline capture registration failed.",
       error?.message || error,
     );
   };

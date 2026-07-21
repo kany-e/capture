@@ -1,6 +1,6 @@
-name: Recall
+name: Mema
 options:
-  bundleIdPrefix: com.recall
+  bundleIdPrefix: com.camarow
   createIntermediateGroups: true
   deploymentTarget:
     macOS: "14.0"
@@ -10,25 +10,25 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ENABLE_HARDENED_RUNTIME: YES
     CURRENT_PROJECT_VERSION: 1
-    MARKETING_VERSION: 0.1.0
+    MARKETING_VERSION: 1.0.0
 targets:
-  Recall:
+  Mema:
     type: application
     platform: macOS
     sources:
-      - path: Recall
+      - path: Mema
         excludes:
           - Resources/Info.plist
     resources:
-      - path: Recall/Resources/Assets.xcassets
+      - path: Mema/Resources/Assets.xcassets
     configFiles:
       Debug: Config/Signing.xcconfig
       Release: Config/Signing.xcconfig
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.recall.macos
-        PRODUCT_NAME: Recall
-        INFOPLIST_FILE: Recall/Resources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.camarow.mema
+        PRODUCT_NAME: Mema
+        INFOPLIST_FILE: Mema/Resources/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         GENERATE_INFOPLIST_FILE: NO
@@ -36,20 +36,20 @@ targets:
         SWIFT_STRICT_CONCURRENCY: complete
     scheme:
       testTargets:
-        - RecallTests
+        - MemaTests
       gatherCoverageData: true
-  RecallTests:
+  MemaTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: RecallTests
+      - path: MemaTests
     dependencies:
-      - target: Recall
+      - target: Mema
     configFiles:
       Debug: Config/Signing.xcconfig
       Release: Config/Signing.xcconfig
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.recall.macos.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.camarow.mema.tests
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_STRICT_CONCURRENCY: minimal

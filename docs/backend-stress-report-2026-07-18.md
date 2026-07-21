@@ -1,5 +1,8 @@
 # Backend stress report — 2026-07-18
 
+> Historical hardening snapshot. For current setup and verification commands,
+> use the root README and `services/backend/README.md`.
+
 Status: completed against the local integrated Developer B runtime
 
 Branch: `test/backend-stress`

@@ -1,10 +1,10 @@
 import {
-  RecallApiError,
-  RecallCaptureValidationError,
-  RecallUnavailableError,
+  MemaApiError,
+  MemaCaptureValidationError,
+  MemaUnavailableError,
   buildCaptureRequest,
   createCapture,
-} from "../api/recall.js";
+} from "../api/mema.js";
 
 
 const UUID_PATTERN =
@@ -91,15 +91,15 @@ function retryableApiError(error) {
 
 
 export function mapCaptureError(error) {
-  if (error instanceof RecallUnavailableError) {
+  if (error instanceof MemaUnavailableError) {
     return {
-      code: "recall_unavailable",
-      title: "Recall is not running.",
-      detail: "Open the Recall app and try again.",
+      code: "mema_unavailable",
+      title: "Mema’s backend is not running.",
+      detail: "Start the local Mema backend and try again.",
       retryable: true,
     };
   }
-  if (error instanceof RecallCaptureValidationError) {
+  if (error instanceof MemaCaptureValidationError) {
     return {
       code: "capture_validation_error",
       title: "This Capture cannot be saved.",
@@ -107,7 +107,7 @@ export function mapCaptureError(error) {
       retryable: false,
     };
   }
-  if (error instanceof RecallApiError) {
+  if (error instanceof MemaApiError) {
     return {
       code: error.code,
       title: "Couldn’t save this Capture.",

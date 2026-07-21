@@ -74,7 +74,7 @@ async function setInlinePermission(enabled) {
     inlineToggle.checked = await inlinePermissionController.currentEnabled()
       .catch(() => !enabled);
     showInlinePermissionStatus(
-      "Recall could not update website access.",
+      "Mema could not update website access.",
       "error",
     );
   } finally {

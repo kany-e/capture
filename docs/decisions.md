@@ -1,4 +1,4 @@
-# Recall decision log
+# Mema decision log
 
 This file records important architectural decisions and every clarification or
 addition made beyond [`product-plan.md`](product-plan.md).
@@ -25,7 +25,7 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-009 | Allow page-context capture without a text selection | Clarification | Accepted |
 | D-010 | Standard-library virtual environment for the backend | Addition | Accepted |
 | D-011 | Numbered SQL migrations with the Python standard library | Addition | Accepted |
-| D-012 | Local live build-checklist dashboard | Addition | Accepted |
+| D-012 | Local live build-checklist dashboard | Addition | Superseded; removed before submission |
 | D-013 | Proceed past Layer 3 with a documented macOS integration holder | Addition | Accepted; gate closed |
 | D-014 | In-process enrichment tasks with an explicit retry endpoint | Clarification | Accepted |
 | D-015 | Trigger-synchronized FTS5 with normalized keyword-only scoring | Clarification | Accepted |
@@ -154,7 +154,7 @@ in the checked-in schema.
 - Ownership impact: Shared between Developers A and B
 
 After the complete OpenAI capture, enrichment, storage, and hybrid-retrieval
-workflow is stable, Recall may add an optional Apple on-device provider using
+workflow is stable, Mema may add an optional Apple on-device provider using
 the Foundation Models framework. The provider must emit the same enrichment
 contract and may not change the source or user-note fields.
 
@@ -238,20 +238,14 @@ new data constraint.
 ## D-012 — Local live build-checklist dashboard
 
 - Classification: Addition
-- Status: Accepted
+- Status: Superseded; removed before submission
 - Product impact: None; developer visibility only
 - Schedule impact: Low
 
-The loopback backend exposes a developer-only HTML dashboard at
-`/dev/checklist` and a read-only JSON view at `/dev/checklist.json`. The JSON is
-regenerated from `docs/developer-b-checklist.md` on every request, and the page
-polls it every two seconds. Markdown remains the single source of truth, so
-there is no second checklist to drift out of date.
-
-The dashboard has no write endpoint, remote deployment, browser persistence,
-or external JavaScript dependency. It stays behind the existing localhost-only
-backend boundary and may be removed from a submission build without affecting
-Recall product behavior.
+The loopback backend temporarily exposed a developer-only dashboard generated
+from the implementation checklist. It was useful during parallel development,
+but both the endpoint and historical checklist were removed before submission:
+they were not product behavior and had become a second, stale status surface.
 
 ## D-013 — Proceed past Layer 3 with a documented macOS integration holder
 
@@ -410,10 +404,10 @@ sibling deltas from Layer 5. Their validated combined state is retained on
 the shared backend bootstrap and README. Developer A's existing macOS branch is
 unchanged.
 
-The exact branch tips and definition of central files were recorded in
-[`branch-layout.md`](branch-layout.md). During this temporary exception, that
-layout superseded the product-plan workflow rule that `main` stay runnable. It
-did not waive the Layer 8 or final demo integration gates.
+The exact branch tips and definition of central files were recorded in Git
+history during this temporary exception. That layout superseded the product-plan
+workflow rule that `main` stay runnable. D-023 later restored the integrated
+tree, and the obsolete handoff file was removed before submission.
 
 D-023 ends this exception. The branch checkpoints remain in history, while
 `main` again carries the backend, Chrome extension, macOS application,
@@ -506,7 +500,7 @@ local results.
 
 - Classification: Addition / repository workflow restoration
 - Status: Accepted 2026-07-19; deterministic and live verification complete
-- Product impact: `main` again contains the complete runnable Recall product
+- Product impact: `main` again contains the complete runnable Mema product
 - Schedule impact: Removes the repository-layout blocker before final demo work
 
 The temporary D-019 documentation-only arrangement is retired. The canonical
@@ -541,8 +535,8 @@ hide a partial identifier elsewhere. Rows are deduped under the existing
 candidate cap; FTS-ranked rows retain priority. The pass never interprets
 punctuation as SQL or FTS syntax.
 
-This closes the observed cases where `RecallSearchSmokeTest` could not be found
-with `Recall`, or a Chinese memory could not be found with a literal character
+This closes the observed cases where `MemaSearchSmokeTest` could not be found
+with `Mema`, or a Chinese memory could not be found with a literal character
 fragment. Semantic retrieval remains independent and may add candidates when a
 real embedding provider is configured.
 
@@ -598,7 +592,7 @@ runner completes normally.
 The product plan defers general OCR, image memories, and chart understanding.
 This user-directed addition is intentionally narrower: the macOS app captures a
 selected screen region, displays it temporarily, and extracts visible text only
-after an explicit user action. The image is not written to Recall's database and
+after an explicit user action. The image is not written to Mema's database and
 its in-memory preview is cleared when the capture draft is dismissed. The macOS
 selection command uses a random OS temporary PNG that is removed after the
 normal selection flow.
@@ -650,7 +644,7 @@ interactive operating-system flows retain their documented manual gates.
 
 After a user explicitly enables optional HTTP/HTTPS website access, the Chrome
 extension may observe a completed selection locally and show a transient
-**Add to Recall** action beside it. Selecting text alone must not persist, log,
+**Add to Mema** action beside it. Selecting text alone must not persist, log,
 or transmit source content. As originally merged, the selected source, bounded
 surrounding context, page title, URL, and optional user note entered the existing
 `POST /v1/captures` pipeline only after the user chose Save. D-030 hardens this
@@ -771,10 +765,10 @@ aggregate Required checks job before merging into `main` at `0c1083e`.
 - Status: Implemented, merged, and real-device verified; stable TCC behavior is
   verified under D-032 and B-014 is closed
 - Product impact: Makes screenshot and clipboard Quick Capture available while
-  Recall is running even if its main window is closed
+  Mema is running even if its main window is closed
 - Schedule impact: Completed native priority; Accessibility selection remains next
 
-Recall remains a normal Dock application and keeps its existing
+Mema remains a normal Dock application and keeps its existing
 `MenuBarExtra`. It does not become an agent-only or hidden menu-bar process. The
 app must be running for global capture to work; launch at login is a separate
 future opt-in. Closing the main window does not end the app-level capture
@@ -788,7 +782,7 @@ Command, Option, Control, and Shift, requires at least two modifiers for each
 action, and rejects a duplicate combination across the two actions. Each action
 can be disabled, and **Restore Defaults** restores the defined pair.
 
-Registration changes are transactional. Recall validates and encodes the whole
+Registration changes are transactional. Mema validates and encodes the whole
 proposal, unregisters the old set, and attempts the complete new set. A failure
 removes any partially installed registrations and attempts to restore the
 previous working set; the new configuration is persisted only after successful
@@ -808,7 +802,7 @@ also moved off the main actor. Task cancellation terminates a running selection;
 success, cancellation, launch failure, and empty-image paths all remove the
 random temporary PNG. Rapid repeated screenshot requests share one pending task
 and start only one selector. If any Quick Capture draft already exists, another
-trigger does not overwrite it: Recall re-presents the draft and explains that
+trigger does not overwrite it: Mema re-presents the draft and explains that
 it must be finished or cancelled first. Ambiguous-save retry protection remains
 unchanged.
 
@@ -829,7 +823,7 @@ The temporary ad-hoc test build did not match the Screen Recording permission
 record. It showed the explicit permission error and the verification
 deliberately did not change that permission. D-032 later verified the stable TCC
 identity, authorization, same-signer rebuild persistence, and selector
-cancellation. B-014 later passed the physical screenshot shortcut with Recall's
+cancellation. B-014 later passed the physical screenshot shortcut with Mema's
 main window closed and another app focused, completed a non-empty region, and
 confirmed that the clipboard shortcut opened Capture after text was copied.
 
@@ -843,10 +837,10 @@ confirmed that the clipboard shortcut opened Capture after text was copied.
 - Schedule impact: Bounded correction to the D-031 manual acceptance gate
 
 macOS privacy authorization matches an application's designated code
-requirement, not only its display name or `com.recall.macos` bundle identifier.
+requirement, not only its display name or `com.camarow.mema` bundle identifier.
 The affected Debug app was ad-hoc signed with no Team ID and a designated
 requirement tied only to that build's CDHash. Rebuilding changed the CDHash and
-therefore its privacy identity. System Settings could retain an enabled Recall
+therefore its privacy identity. System Settings could retain an enabled Mema
 row for the preceding build while `CGPreflightScreenCaptureAccess()` returned
 false for the currently running process.
 
@@ -866,21 +860,21 @@ developer a direct stable-signing and one-time-reset instruction instead of
 implying that an enabled stale System Settings row authorizes the current
 process. No Screen Recording entitlement is added.
 
-Live verification quit every Recall process, reset only `ScreenCapture` for
-`com.recall.macos`, requested permission from the stable build, changed Recall's
+Live verification quit every Mema process, reset only `ScreenCapture` for
+`com.camarow.mema`, requested permission from the stable build, changed Mema's
 System Settings switch from off to on, and used **Quit & Reopen**. After
 authorization, a same-signer build with `CURRENT_PROJECT_VERSION=2` changed the
 executable CDHash from `143035…` to `5a1b00…` while retaining its Team ID and
 signer-based designated requirement. The rebuilt process launched
-`/usr/sbin/screencapture`, displayed the region overlay, and returned to Recall
+`/usr/sbin/screencapture`, displayed the region overlay, and returned to Mema
 without a permission error after Escape. The verifier also rejects the old
 ad-hoc build, and the complete macOS suite passes 70/70.
 
 `CODE_SIGNING_ALLOWED=NO` remains appropriate for the deterministic macOS test
 runner and CI, but such a build cannot prove TCC authorization. Interactive
 acceptance must use the stably signed app. Migration from an existing ad-hoc
-entry is deliberately explicit: quit every Recall process, verify the intended
-app bundle, run `tccutil reset ScreenCapture com.recall.macos`, launch that exact
+entry is deliberately explicit: quit every Mema process, verify the intended
+app bundle, run `tccutil reset ScreenCapture com.camarow.mema`, launch that exact
 build, authorize it once, quit, relaunch, and then exercise completed plus
 cancelled region selections. Rebuild persistence is accepted only when the new
 executable CDHash changes while its signer-based designated requirement and
@@ -933,9 +927,9 @@ visible and reachable; verification did not submit a Capture.
   and opens the existing review UI near the selection
 - Schedule impact: Primary-path and D-035/B-016 compatibility gates closed
 
-Recall will add a third configurable global action, **Capture Selection**, with
+Mema will add a third configurable global action, **Capture Selection**, with
 `Option+Shift+Command+S` as its default. Only after the user invokes that action
-does Recall ask macOS Accessibility for the focused external application's
+does Mema ask macOS Accessibility for the focused external application's
 selected text, selected range, and—when the application supports it—the range's
 screen bounds. It reads no window title or surrounding context, never simulates
 copy, and does not modify the clipboard. Bounds are transient presentation data
@@ -979,7 +973,7 @@ it and invokes Capture Selection, the AX reader may issue a fallback ticket for
 the exact frontmost application whose selected-text lookup failed. A stable AX
 focused element is retained when available with complete safety evidence; a
 custom-drawn app that omits that element uses an application-scoped ticket.
-Missing permission, Recall itself, known secure/protected content, whitespace,
+Missing permission, Mema itself, known secure/protected content, whitespace,
 and oversized input never enter this fallback.
 
 The transaction waits for the global shortcut modifiers to be released and
@@ -988,13 +982,13 @@ injection. Any unmaterializable item, more than 100 items, more than 128 types
 per item, more than 64 MiB total data, or an observed pasteboard race aborts.
 The full AX/pasteboard transaction runs on a serial actor outside `MainActor`,
 so lazy-provider materialization and bounded cross-process AX waits do not block
-the app UI. Immediately before each event sequence, Recall revalidates the ticket's
+the app UI. Immediately before each event sequence, Mema revalidates the ticket's
 frontmost PID, exact AX focused element when available, all exposed safety
 attributes, event-posting access, and Secure Event Input. The backup is never logged, persisted, attached to a
 draft, or sent to the backend.
 
 One `NSPasteboard.changeCount` advance cannot identify who wrote the clipboard.
-Recall therefore sends Copy twice and accepts text only when both attempts
+Mema therefore sends Copy twice and accepts text only when both attempts
 produce the exact next counts, the same complete materialized payload, the same
 text, and the same verified focus ticket. It attempts restoration from newly
 constructed pasteboard items only after that confirmation and only while the
@@ -1006,7 +1000,7 @@ saves through the existing clipboard-text API contract.
 This mode cannot guarantee restoration or invisibility. macOS exposes neither
 pasteboard-writer identity nor an atomic compare-and-restore operation, so a
 sufficiently narrow external-writer race can still be overwritten and a source
-app that processes Copy after Recall's bounded wait can still replace the prior
+app that processes Copy after Mema's bounded wait can still replace the prior
 clipboard. A crash, lazy representation that cannot be materialized, or write
 failure can also prevent full restoration. Clipboard history applications,
 Universal Clipboard, or other observers may record either temporary Copy.
@@ -1014,7 +1008,7 @@ Settings and fallback review UI disclose this best-effort boundary; it must not
 be described as lossless, guaranteed, or private from clipboard observers.
 Application-scoped fallback also cannot prove per-control safety when a
 custom-drawn app omits those attributes; it remains opt-in and equivalent to the
-user explicitly asking Recall to perform Copy in that verified frontmost app.
+user explicitly asking Mema to perform Copy in that verified frontmost app.
 
 ## D-037 — Persisted image notes with opt-in background visual indexing
 
@@ -1048,7 +1042,7 @@ entities, tags, caveats, and search aliases use the existing AI fields. This
 preserves original/user/AI separation and lets FTS and semantic retrieval index
 both visible words and non-text visual meaning without a second search system.
 AI output is derived metadata only and never replaces the image. The Responses
-request explicitly uses `store: false`; this avoids Recall creating reusable
+request explicitly uses `store: false`; this avoids Mema creating reusable
 server-side response state but does not supersede the provider's data policies.
 
 The attachment API returns an opaque loopback content path, never a filesystem
@@ -1092,7 +1086,7 @@ relevance order. Static minute-level list timestamps replace continuously
 updating relative seconds.
 
 Changing effective selected content, source metadata, or the user note marks
-the current AI interpretation stale and hides it. Recall does not silently call
+the current AI interpretation stale and hides it. Mema does not silently call
 the provider after an edit: that would spend quota, transmit changed content,
 and replace context without a new explicit user action. The detail view instead
 offers **Refresh AI**, which uses the effective corrected source and current note,
@@ -1125,7 +1119,7 @@ composer geometry.
 - Schedule impact: Bounded first slice before image attachments or a full rich-
   text viewer
 
-Recall's current Capture contract, JSON transport, SQLite `TEXT` column, and
+Mema's current Capture contract, JSON transport, SQLite `TEXT` column, and
 SwiftUI `Text` views already preserve newline characters. The first observed
 loss therefore belongs at the native intake boundary: Clipboard Capture
 currently asks `NSPasteboard` only for `.string`, while some rich source
@@ -1153,13 +1147,13 @@ draft beyond the resolved text.
 Multiple pasteboard items are resolved independently and joined with newlines,
 matching macOS's plain-text behavior without allowing one item's HTML/RTF to
 reshape another item's text. If the explicit clipboard exceeds its bounded item
-or type inspection limits, Recall falls back to the system plain-text value
+or type inspection limits, Mema falls back to the system plain-text value
 rather than partially returning rich data.
 
-Accessibility selection remains an explicitly weaker source. Recall can retain
+Accessibility selection remains an explicitly weaker source. Mema can retain
 the exact string or attributed string returned by `AXSelectedText`, but rendered
 MathJax/KaTeX and other custom content may omit original Markdown or TeX syntax
-from the Accessibility tree. Recall must not reverse-engineer or invent source
+from the Accessibility tree. Mema must not reverse-engineer or invent source
 markup that the target application did not expose. Clipboard capture and the
 browser client remain the honest compatibility paths for those sources.
 
@@ -1173,11 +1167,11 @@ privacy decision. Image attachments remain a separate storage design.
 - Classification: UI/UX addition approved by user direction
 - Status: Implemented and real-Chrome verified on
   `codex/note-editing-ui-polish`; 70/70 extension tests pass
-- Product impact: Makes browser capture visually consistent with Recall, moves
+- Product impact: Makes browser capture visually consistent with Mema, moves
   browser preferences out of the transient popup, and keeps long content usable
 - Schedule impact: Bounded Chrome-extension slice; no backend or data migration
 
-The toolbar popup, inline selection pill, and inline composer reuse Recall's
+The toolbar popup, inline selection pill, and inline composer reuse Mema's
 checked-in pink icon and palette. The toolbar popup retains D-033's deterministic
 root-sizing rule at a roomier 380 × 560 pixels: its selected-text preview is
 vertically scrollable and resizable, while the Save button has a fixed 40-pixel
@@ -1186,7 +1180,7 @@ height and cannot stretch with the note field.
 A dedicated Manifest V3 options page owns browser preferences. It shows the
 currently assigned `_execute_action` shortcut and links to Chrome's extension
 shortcut manager because the browser does not permit an extension to rewrite
-its command binding programmatically. The existing **Show Add to Recall when I
+its command binding programmatically. The existing **Show Add to Mema when I
 select text** control moves from the popup to this page without changing its
 optional-permission, revocation, or off-by-default behavior.
 
@@ -1221,11 +1215,11 @@ maintained as separate artwork. The action popup's Page title and URL no longer
 use ellipsis: they wrap within a bounded, keyboard-focusable region that scrolls
 independently when either value is unusually long.
 
-The macOS asset catalog adds one transparent vector `RecallMarkTemplate` that
-uses the Recall logo's ring, satellite circle, and center dot as monochrome
+The macOS asset catalog adds one transparent vector `MemaMarkTemplate` that
+uses the Mema logo's ring, satellite circle, and center dot as monochrome
 geometry. `MenuBarExtra` renders it as a template so macOS supplies the correct
 light/dark and selected-state color. The shared Quick Capture header uses the
-same vector with Recall's accent color, including the screenshot-note save
+same vector with Mema's accent color, including the screenshot-note save
 window. The colored square AppIcon remains the application and Dock icon.
 
 Xcode compiled the vector asset and the host suite passed all 189 tests,

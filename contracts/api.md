@@ -1,4 +1,4 @@
-# Recall localhost API contract
+# Mema localhost API contract
 
 Status: Layer 0 contract
 
@@ -38,7 +38,8 @@ persisted image attachment and may begin with empty `selected_text`.
 
 - `source_app`: at most 200 Unicode characters.
 - `source_title`: at most 500 Unicode characters.
-- `source_url`: at most 2,048 Unicode characters.
+- `source_url`: an absolute `http://` or `https://` URL with a host, at most
+  2,048 Unicode characters.
 - `selected_text`: at most 12,000 Unicode characters.
 - `surrounding_context`: at most 20,000 Unicode characters.
 - `user_note`: at most 4,000 Unicode characters.
@@ -202,7 +203,7 @@ Structured Outputs.
 
 For opted-in image notes, the backend sends the persisted image plus the user
 note to one multimodal Responses API request and validates OCR plus visual
-memory fields against `services/backend/app/schemas/image_enrichment.schema.json`.
+memory fields against `services/backend/mema_backend/schemas/image_enrichment.schema.json`.
 The raw image stays local when analysis is disabled.
 
 The backend maps model fields as follows:
@@ -422,7 +423,8 @@ user-visible blank.
 
 ### `GET /v1/attachments/{id}/content`
 
-- Success: `200 OK` with the immutable PNG/JPEG bytes and `nosniff`
+- Success: `200 OK` with the PNG/JPEG bytes, `Cache-Control: no-store`, and
+  `X-Content-Type-Options: nosniff`
 - Unknown attachment or missing backing file: `404 Not Found`
 - The route is loopback-only like the rest of the API; clients use the
   attachment's returned `content_path` rather than constructing a filesystem
@@ -446,7 +448,7 @@ Queues or starts a new enrichment attempt without changing original fields.
 
 An explicit refresh uses the effective corrected source and current user note.
 It replaces only the AI layer, clears the stale/hidden flags when the attempt
-finishes, and keeps user title/detail/tag overrides intact. Recall never queues
+finishes, and keeps user title/detail/tag overrides intact. Mema never queues
 this refresh automatically after an edit.
 
 ### Enrichment polling
@@ -539,7 +541,7 @@ Initial error codes:
 
 Development may allow configured localhost and unpacked-extension origins.
 The submitted build must not use an unrestricted `*` origin. The final Chrome
-extension origin is configured through `RECALL_CORS_ORIGINS`. The backend
+extension origin is configured through `MEMA_CORS_ORIGINS`. The backend
 rejects wildcards, public web origins, malformed extension IDs, credentials,
 paths, queries, and fragments; allowed methods are limited to `GET`, `POST`, and
 `DELETE`.

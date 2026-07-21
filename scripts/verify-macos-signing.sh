@@ -3,13 +3,13 @@
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
-  echo "Usage: $0 /path/to/Recall.app" >&2
+  echo "Usage: $0 /path/to/Mema.app" >&2
   exit 64
 fi
 
 app_path="$1"
 if [[ ! -d "$app_path" ]]; then
-  echo "Recall app not found: $app_path" >&2
+  echo "Mema app not found: $app_path" >&2
   exit 66
 fi
 
@@ -23,15 +23,15 @@ team_identifier="$(
 designated_requirement="$(codesign -d -r- "$app_path" 2>&1)"
 
 if [[ "$designated_requirement" == *"designated => cdhash "* ]]; then
-  echo "Recall has a version-specific designated requirement." >&2
+  echo "Mema has a version-specific designated requirement." >&2
   exit 1
 fi
 
 if [[ -z "$team_identifier" || "$team_identifier" == "not set" ]]; then
-  echo "Recall is ad-hoc signed; privacy permissions will not survive a rebuild." >&2
+  echo "Mema is ad-hoc signed; privacy permissions will not survive a rebuild." >&2
   exit 1
 fi
 
-echo "Stable Recall signing identity verified."
+echo "Stable Mema signing identity verified."
 echo "TeamIdentifier=$team_identifier"
 echo "Designated requirement is signer-based, not build-specific."

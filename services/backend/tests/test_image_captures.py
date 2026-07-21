@@ -8,15 +8,15 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from app.attachments import AttachmentStorage
-from app.config import get_settings
-from app.image_enrichment import ImageEnrichmentPayload
-from app.main import (
+from mema_backend.attachments import AttachmentStorage
+from mema_backend.config import get_settings
+from mema_backend.image_enrichment import ImageEnrichmentPayload
+from mema_backend.main import (
     app,
     get_embedding_provider,
     get_image_enrichment_provider,
 )
-from app.models import CaptureRecord
+from mema_backend.models import CaptureRecord
 
 
 def png_image(width: int = 3, height: int = 2, suffix: bytes = b"") -> bytes:
@@ -98,11 +98,11 @@ def image_api_client(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> Iterator[tuple[TestClient, Path]]:
-    database_path = tmp_path / "recall.db"
+    database_path = tmp_path / "mema.db"
     attachment_path = tmp_path / "attachments"
     monkeypatch.setenv("OPENAI_API_KEY", "")
-    monkeypatch.setenv("RECALL_DATABASE_PATH", str(database_path))
-    monkeypatch.setenv("RECALL_ATTACHMENTS_PATH", str(attachment_path))
+    monkeypatch.setenv("MEMA_DATABASE_PATH", str(database_path))
+    monkeypatch.setenv("MEMA_ATTACHMENTS_PATH", str(attachment_path))
     get_settings.cache_clear()
     with TestClient(app) as client:
         yield client, attachment_path
@@ -138,6 +138,7 @@ def test_image_note_can_be_saved_without_ai_and_read_back(
     content = client.get(attachment["content_path"])
     assert content.status_code == 200
     assert content.headers["content-type"] == "image/png"
+    assert content.headers["cache-control"] == "no-store"
     assert content.content == image
 
 
@@ -191,7 +192,7 @@ def test_image_note_ai_analysis_populates_searchable_ocr_and_visual_fields(
         raise AssertionError("collection responses must batch attachment metadata")
 
     monkeypatch.setattr(
-        "app.repository.CaptureRepository.list_attachments",
+        "mema_backend.repository.CaptureRepository.list_attachments",
         reject_per_capture_attachment_query,
     )
     library = client.get("/v1/captures")
@@ -268,9 +269,14 @@ def test_image_capture_idempotency_does_not_leave_duplicate_files(
     client, attachment_path = image_api_client
     client_id = str(uuid4())
     metadata = image_metadata(analyze=False, client_id=client_id)
+    uppercase_metadata = image_metadata(analyze=False, client_id=client_id.upper())
 
     first = post_image(client, image=png_image(suffix=b"first"), metadata=metadata)
-    second = post_image(client, image=png_image(suffix=b"second"), metadata=metadata)
+    second = post_image(
+        client,
+        image=png_image(suffix=b"second"),
+        metadata=uppercase_metadata,
+    )
 
     assert first.status_code == second.status_code == 202
     assert first.json()["id"] == second.json()["id"]
@@ -292,7 +298,7 @@ def test_attachment_reconciliation_removes_only_generated_orphans(
     )
     temporary_path.write_bytes(b"interrupted")
     unrelated_path = orphan_path.parent / "keep-me.txt"
-    unrelated_path.write_text("not managed by Recall", encoding="utf-8")
+    unrelated_path.write_text("not managed by Mema", encoding="utf-8")
 
     removed = storage.cleanup_unreferenced({referenced.relative_path})
 
@@ -300,7 +306,7 @@ def test_attachment_reconciliation_removes_only_generated_orphans(
     assert storage.path_for(referenced.relative_path).is_file()
     assert not orphan_path.exists()
     assert not temporary_path.exists()
-    assert unrelated_path.read_text(encoding="utf-8") == "not managed by Recall"
+    assert unrelated_path.read_text(encoding="utf-8") == "not managed by Mema"
 
 
 def test_deleting_image_note_removes_metadata_content_and_file(

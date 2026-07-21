@@ -82,7 +82,7 @@ async function installStandaloneInlineCapture() {
   }
 
   const runtimeListeners = new Set();
-  globalThis.__RECALL_INLINE_TEST__ = true;
+  globalThis.__MEMA_INLINE_TEST__ = true;
   globalThis.chrome = {
     runtime: {
       getURL: (path) => `../../${path}`,
@@ -91,10 +91,10 @@ async function installStandaloneInlineCapture() {
         removeListener: (listener) => runtimeListeners.delete(listener),
       },
       sendMessage: async (message) => {
-        if (message?.type === "recall:inline:status") {
+        if (message?.type === "mema:inline:status") {
           return { ok: true, enabled: true };
         }
-        if (message?.type === "recall:capture:create") {
+        if (message?.type === "mema:capture:create") {
           return {
             ok: true,
             capture: { id: "standalone-fixture", status: "processing" },
@@ -107,10 +107,10 @@ async function installStandaloneInlineCapture() {
 
   await loadScript("../../src/content/inline-core.js");
   await loadScript("../../src/content/inline-capture.js");
-  document.documentElement.dataset.recallStandalone = "ready";
+  document.documentElement.dataset.memaStandalone = "ready";
 }
 
 
 void installStandaloneInlineCapture().catch(() => {
-  document.documentElement.dataset.recallStandalone = "error";
+  document.documentElement.dataset.memaStandalone = "error";
 });

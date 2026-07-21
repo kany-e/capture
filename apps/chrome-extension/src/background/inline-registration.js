@@ -5,7 +5,11 @@ export const INLINE_CAPTURE_ORIGINS = Object.freeze([
   "http://*/*",
   "https://*/*",
 ]);
-export const INLINE_CAPTURE_SCRIPT_ID = "recall-inline-capture";
+export const INLINE_CAPTURE_SCRIPT_ID = "mema-inline-capture";
+// One release-only migration boundary: Chrome persists dynamic registrations
+// across extension updates, so remove the pre-Mema id explicitly.
+export const LEGACY_INLINE_CAPTURE_SCRIPT_ID = "recall-inline-capture";
+export const LEGACY_DISABLE_INLINE_CAPTURE_MESSAGE = "recall:inline:disable";
 export const INLINE_CAPTURE_SCRIPT_FILES = Object.freeze([
   "src/content/inline-core.js",
   "src/content/inline-capture.js",
@@ -53,17 +57,31 @@ export async function syncInlineCaptureRegistration({
 } = {}) {
   const enabled = await inlineCapturePermissionEnabled(permissions);
   const registered = await scripting.getRegisteredContentScripts({
-    ids: [INLINE_CAPTURE_SCRIPT_ID],
+    ids: [INLINE_CAPTURE_SCRIPT_ID, LEGACY_INLINE_CAPTURE_SCRIPT_ID],
   });
-  const exists = Array.isArray(registered) && registered.length > 0;
+  const registrations = Array.isArray(registered) ? registered : [];
+  const exists = registrations.some(({ id }) => id === INLINE_CAPTURE_SCRIPT_ID);
+  const legacyExists = registrations.some(
+    ({ id }) => id === LEGACY_INLINE_CAPTURE_SCRIPT_ID,
+  );
 
   if (!enabled) {
-    if (exists) {
+    const ids = [
+      ...(exists ? [INLINE_CAPTURE_SCRIPT_ID] : []),
+      ...(legacyExists ? [LEGACY_INLINE_CAPTURE_SCRIPT_ID] : []),
+    ];
+    if (ids.length > 0) {
       await scripting.unregisterContentScripts({
-        ids: [INLINE_CAPTURE_SCRIPT_ID],
+        ids,
       });
     }
     return false;
+  }
+
+  if (legacyExists) {
+    await scripting.unregisterContentScripts({
+      ids: [LEGACY_INLINE_CAPTURE_SCRIPT_ID],
+    });
   }
 
   if (exists) {
@@ -102,9 +120,10 @@ export async function disableInlineCaptureInOpenTabs(
   const openTabs = await tabs.query({});
   const notifications = openTabs
     .filter((tab) => Number.isInteger(tab.id))
-    .map((tab) => tabs.sendMessage(tab.id, {
-      type: DISABLE_INLINE_CAPTURE_MESSAGE,
-    }));
+    .flatMap((tab) => [
+      tabs.sendMessage(tab.id, { type: DISABLE_INLINE_CAPTURE_MESSAGE }),
+      tabs.sendMessage(tab.id, { type: LEGACY_DISABLE_INLINE_CAPTURE_MESSAGE }),
+    ]);
   return resultSummary(await Promise.allSettled(notifications));
 }
 
