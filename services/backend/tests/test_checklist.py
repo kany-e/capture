@@ -95,7 +95,24 @@ Status: `[~]` in progress
     second = build_checklist_snapshot(checklist)
 
     assert first["metadata"]["current_phase"] == "First phase"
+    assert first["metadata"]["current_branch"] == "main"
     assert second["metadata"]["current_phase"] == "Second phase"
+
+
+def test_snapshot_accepts_implementation_branch_metadata(tmp_path: Path) -> None:
+    checklist = tmp_path / "checklist.md"
+    checklist.write_text(
+        """Last updated: 2026-07-21
+Current phase: Native global capture
+Implementation branch: `codex/native-global-capture`
+Last verified commit: `dd4a665`
+""",
+        encoding="utf-8",
+    )
+
+    snapshot = build_checklist_snapshot(checklist)
+
+    assert snapshot["metadata"]["current_branch"] == "codex/native-global-capture"
 
 
 def test_dashboard_and_json_endpoints_are_read_only_and_uncached() -> None:

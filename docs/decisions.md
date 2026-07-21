@@ -43,7 +43,8 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-027 | Transient screenshot OCR into the existing Capture pipeline | Addition | Implemented and live-verified in PR #5 |
 | D-028 | Layered GitHub Actions pull-request checks | Reliability safeguard | Accepted by user direction |
 | D-029 | Opt-in inline browser selected-text capture | Addition | Implemented, real-Chrome verified, and merged in PR #8 |
-| D-030 | Omit unsafe browser context and bound native display | Reliability/privacy safeguard | Implemented and UI-verified at the recorded boundaries; 68 extension and 48 macOS tests pass |
+| D-030 | Omit unsafe browser context and bound native display | Reliability/privacy safeguard | Implemented, UI-verified, and merged through PR #9 at `0c1083e` |
+| D-031 | Native global capture through Carbon and one app-level coordinator | Addition | Implemented; 68/68 macOS tests pass; signed-build manual gate pending |
 
 ## D-001 — Localhost monorepo architecture
 
@@ -691,14 +692,14 @@ the pull-request checks and merged the feature into `main` at `71ec387`.
 ## D-030 — Omit unsafe browser context and bound native display
 
 - Classification: Reliability and privacy safeguard approved by user direction
-- Status: Implemented and UI-verified at the boundaries recorded below on
-  `codex/inline-context-ui-fixes`; 68 extension and 48 macOS tests pass, and PR
-  #9 passed all required checks; final review and merge remain pending
+- Status: Implemented and UI-verified at the boundaries recorded below; 68
+  extension and 48 macOS tests pass, and PR #9 merged the change into `main` at
+  `0c1083e`
 - Product impact: Prevents unrelated page regions from entering new Chrome
   Captures and prevents oversized stored context from stalling the native detail
   view
-- Schedule impact: Current browser-hardening priority; native global capture
-  remains next
+- Schedule impact: Browser hardening is complete; D-031 native global capture
+  is current
 
 A real Gemini Capture exposed two coupled failure modes. Its exact selected
 answer was 1,530 characters, while `surrounding_context` reached 19,144
@@ -751,6 +752,76 @@ CSP evidence. The rebuilt macOS app opened the problematic 19,144-character
 record with context collapsed, remained responsive, and expanded only a 60-line
 bounded preview while keeping the full stored value intact. No verification
 Capture or database mutation was left behind.
+
+PR #9 passed Backend tests, Backend stress, Chrome extension, macOS, and the
+aggregate Required checks job before merging into `main` at `0c1083e`.
+
+## D-031 — Native global capture through Carbon and one app-level coordinator
+
+- Classification: Addition approved by user direction
+- Status: Implemented; automated and bounded real-UI verification are complete,
+  while the normally signed-build physical hotkey and real screenshot-region
+  manual gate remains open
+- Product impact: Makes screenshot and clipboard Quick Capture available while
+  Recall is running even if its main window is closed
+- Schedule impact: Current native priority; Accessibility selection remains next
+
+Recall remains a normal Dock application and keeps its existing
+`MenuBarExtra`. It does not become an agent-only or hidden menu-bar process. The
+app must be running for global capture to work; launch at login is a separate
+future opt-in. Closing the main window does not end the app-level capture
+objects, so menu-bar and global entry points are designed to keep working.
+
+Native hotkeys use Carbon `RegisterEventHotKey`, not an event tap. They require
+neither Accessibility nor Input Monitoring permission. Screenshot capture
+defaults to `Option+Shift+Command+4`, and clipboard capture defaults to
+`Option+Shift+Command+C`. Settings allows A–Z or 0–9 with any combination of
+Command, Option, Control, and Shift, requires at least two modifiers for each
+action, and rejects a duplicate combination across the two actions. Each action
+can be disabled, and **Restore Defaults** restores the defined pair.
+
+Registration changes are transactional. Recall validates and encodes the whole
+proposal, unregisters the old set, and attempts the complete new set. A failure
+removes any partially installed registrations and attempts to restore the
+previous working set; the new configuration is persisted only after successful
+registration. The error and rollback result remain visible in Settings, the
+menu, and the menu-bar status icon rather than leaving the user to infer whether
+a shortcut is active.
+
+Every capture entry point in the main window, menu, or Carbon callback routes
+through the app-level `GlobalCaptureCoordinator`. Its presentation request is
+observed by a `CapturePresentationHost` attached to the `MenuBarExtra` label,
+which opens and activates the shared Quick Capture window independently of the
+main-window scene. App termination requests cancellation of pending screenshot
+preparation and deactivates the Carbon registrations.
+
+The system screenshot `Process` is awaited asynchronously, and PNG reading is
+also moved off the main actor. Task cancellation terminates a running selection;
+success, cancellation, launch failure, and empty-image paths all remove the
+random temporary PNG. Rapid repeated screenshot requests share one pending task
+and start only one selector. If any Quick Capture draft already exists, another
+trigger does not overwrite it: Recall re-presents the draft and explains that
+it must be finished or cancelled first. Ambiguous-save retry protection remains
+unchanged.
+
+D-031 does not persist screenshot images. The existing GPT/cloud and Apple
+Vision/on-device disclosure and extraction choices remain visible, and only
+reviewed text enters the Capture pipeline. There is no API, schema, backend,
+database, Chrome-extension, enrichment, retrieval, or image-attachment change.
+
+Twenty new shortcut, coordinator, draft-safety, and screenshot-process tests
+bring the host-verified macOS suite from 48 to 68/68. Real UI verification
+confirmed both defaults, a change to `Option+Shift+Command+5`, persistence after
+restart, restore-defaults, and active Carbon registration. Clipboard Quick
+Capture opened with the exact 32 characters; a repeated trigger kept that draft
+and showed the explanatory notice. The previously problematic
+19,144-character context record still opened collapsed and remained responsive.
+
+The temporary unsigned test build did not have Screen Recording permission. It
+showed the explicit permission error and the verification deliberately did not
+change that permission. Therefore actual physical global key delivery from
+another app and a real screenshot-region selection are not claimed as verified;
+both remain an explicit user acceptance gate in the normally signed build.
 
 ## Pending decisions
 

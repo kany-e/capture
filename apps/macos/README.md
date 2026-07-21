@@ -5,8 +5,9 @@ loopback backend at `http://127.0.0.1:8765`; normal runs do not use an in-proces
 database or mock API client.
 
 The macOS client, hardened backend, and Chrome extension now live in the same
-integration tree. The current target builds and passes all 43 contract,
-networking, Vision, lifecycle, validation, idempotency, and store tests.
+integration tree. The current target builds and passes all 64 contract,
+networking, Vision, global-shortcut, lifecycle, validation, idempotency, and
+store tests.
 
 ## Requirements
 
@@ -111,6 +112,24 @@ Run the build and tests again after regeneration.
 
 ## Current client behavior
 
+- Run as a normal Dock app with the existing `MenuBarExtra`. Closing the main
+  window does not quit Recall, so menu-bar and global capture remain available
+  while the app is running.
+- Register native global screenshot and clipboard shortcuts with Carbon
+  `RegisterEventHotKey`, without Accessibility or Input Monitoring permission.
+  Defaults are `Option+Shift+Command+4` for screenshot capture and
+  `Option+Shift+Command+C` for clipboard capture.
+- Configure either action in Settings with an A–Z or 0–9 key plus Command,
+  Option, Control, and/or Shift; each shortcut requires at least two modifiers,
+  and the two actions cannot use the same combination. Either action can be
+  disabled, and **Restore Defaults** restores both defaults.
+- Apply shortcut changes transactionally. If any new registration fails, Recall
+  restores the previous working registrations and shows the failure in
+  Settings, the menu, and the menu-bar status icon.
+- Route main-window, menu-bar, and hotkey capture through one app-level
+  `GlobalCaptureCoordinator`. Its presentation request is hosted by the
+  `MenuBarExtra` label so Quick Capture can open without relying on the main
+  window's lifetime.
 - Check backend and database health and distinguish connected, degraded, and
   disconnected states.
 - Load the newest durable Captures and show list and detail views from live API
@@ -124,8 +143,10 @@ Run the build and tests again after regeneration.
 - Keep screenshot bytes only for the active draft. Cancel, window close, or
   successful save clears the in-memory preview and invalidates any late OCR
   result; SQLite stores the extracted source text and optional note, not the
-  image. The system screenshot command removes its random temporary PNG after
-  the normal selection flow.
+  image. Waiting for the system screenshot process and reading its PNG are
+  asynchronous. Task cancellation terminates pending selection, app termination
+  requests that cancellation, and the random temporary PNG is removed on
+  success, cancellation, or failure.
 - Keep source, surrounding context, user note, and generated interpretation
   visually separate. Surrounding context is collapsed by default with its
   character count visible; expanding it renders at most the first 2,000
@@ -146,6 +167,9 @@ Run the build and tests again after regeneration.
   duplicate. After an ambiguous network failure, freeze that request and require
   a new draft before edited content can be submitted, preventing silent note
   loss on an idempotent replay.
+- Preserve an existing Quick Capture draft when another global trigger arrives,
+  and show why the new request was not started. Rapid repeated screenshot
+  triggers launch only one region selector.
 - Render valid web source URLs and Chrome-created Captures through the same
   shared model used for clipboard Captures.
 
@@ -155,8 +179,12 @@ Run the build and tests again after regeneration.
   selected-text/no-selection Captures have been verified end to end against the
   macOS client. Keep the credential and machine-specific extension origin only
   in the untracked root `.env`.
-- Clipboard and screenshot source-application detection is best effort. The app does not read
-  active window titles or Accessibility selections and has no global shortcut.
+- Clipboard and screenshot source-application detection is best effort. The app
+  does not read active window titles or Accessibility selections.
+- Global shortcuts work only while Recall is running. Launch at login is a
+  separate future opt-in. Actual physical hotkey delivery and region selection
+  still need final manual acceptance in the normally signed build; the temporary
+  unsigned verification build did not receive Screen Recording permission.
 - Persistence belongs to the backend SQLite database. The app has no offline
   write queue.
 - An abrupt backend exit can interrupt in-process enrichment. On the next
@@ -165,8 +193,8 @@ Run the build and tests again after regeneration.
 - App sandboxing, notarization, and bundling the Python service are outside the
   current P0 Build Week scope.
 
-The current command-line suite executes 47 contract, networking, production
-Vision, lifecycle, validation, retry, polling, and store tests.
+The current command-line suite executes 68 contract, networking, production
+Vision, global-shortcut, lifecycle, validation, retry, polling, and store tests.
 
 ## Manual test matrix
 
@@ -179,6 +207,10 @@ after rerunning them on the current integrated tree.
 | Healthy launch | Start the backend, then launch Recall. | Connection shows **Connected** and live records load. `AI not configured` is acceptable without a key. |
 | Offline recovery | Stop the backend, launch Recall, restart the backend, then choose **Try Again** or **Refresh**. | Recall shows an offline state, reconnects, and reloads the library without losing persisted records. |
 | Clipboard capture | Copy non-empty text in TextEdit, open **Capture Clipboard**, add a note, and save. | The exact text and note are saved separately; the record appears immediately and progresses to a safe terminal state. |
+| Shortcut settings | Confirm the defaults, change screenshot capture to `Option+Shift+Command+5`, relaunch Recall, then choose **Restore Defaults**. Also try one modifier and a duplicate combination. | The valid change persists across restart and defaults restore correctly. Invalid or duplicate combinations are rejected without replacing the active shortcuts. |
+| Registration failure | Choose a combination already owned by macOS or another app and apply it. | Recall restores the preceding active shortcuts and exposes the failure in Settings, the menu, and the menu-bar status icon. |
+| Global clipboard | Close the main window without quitting Recall, focus another app with 32 known clipboard characters, and press `Option+Shift+Command+C` twice. | Quick Capture opens with the exact 32 characters. The second trigger preserves the existing draft and shows an explanatory notice. |
+| Global screenshot | Close the main window without quitting Recall, focus another app, and press `Option+Shift+Command+4`; cancel once and complete a region once. | The selector starts without blocking Recall. Cancellation leaves no draft or temporary PNG; a completed region opens the existing screenshot draft and disclosure UI. |
 | GPT screenshot note | Choose **Capture Screenshot Note**, select a text region, keep **GPT · Cloud**, and choose **Extract source text**. | A preview appears before upload, the UI states the cloud boundary, extracted text fills only the source field, your optional personal note stays separate, and only text is saved. |
 | Local screenshot note | Repeat with **Apple Vision · On device**, disconnect the network after the backend is already running, and extract. | Text extraction succeeds on the Mac, the UI confirms local processing, and no `/v1/ocr` request is made. Saving still uses the localhost Capture API. |
 | Screenshot cancellation/limits | Cancel region selection, close the draft while extraction is running, try a non-text image, and select enough text to exceed 12,000 characters. | Cancellation creates no draft; close clears the image and ignores a late result; no-text and oversized results remain unsaved with actionable errors and no silent truncation. |

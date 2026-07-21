@@ -1,6 +1,6 @@
 # Recall current roadmap
 
-Last updated: 2026-07-20
+Last updated: 2026-07-21
 
 Status: Active execution guide
 
@@ -21,10 +21,12 @@ split; they are no longer assignment gates.
   plus one aggregate **Required checks** result.
 - D-029 opt-in inline selected-text capture passed its real unpacked-Chrome
   acceptance matrix and was merged through PR #8 at `71ec387`.
-- The current `codex/inline-context-ui-fixes` branch implements D-030 browser
-  context and long-detail-view hardening. Chrome temporarily omits surrounding
-  context; existing stored context remains intact and is display-bounded in the
-  macOS detail view.
+- D-030 browser context and long-detail-view hardening was merged through PR #9
+  at `0c1083e`. Chrome temporarily omits surrounding context; existing stored
+  context remains intact and is display-bounded in the macOS detail view.
+- D-031 native global capture is implemented. Its 68/68 macOS tests and bounded
+  real-UI checks pass; physical hotkey delivery and actual region selection
+  remain a manual gate for the normally signed build.
 - The macOS app and Chrome extension are separate clients of the loopback
   FastAPI service. The app does not yet package or start that service.
 
@@ -46,7 +48,7 @@ not approval from a particular historical developer role.
    variants in the macOS asset catalog and the supplied Chrome sizes in the
    extension manifest. Keep the color app icon separate from a monochrome
    menu-bar template image.
-2. **Browser capture reliability and privacy hardening — current.** D-030
+2. **Browser capture reliability and privacy hardening — complete on `main`.** D-030
    temporarily sends no `surrounding_context` from either Chrome entry point,
    keeps normalized selected text unshortened through the 12,000-character
    contract limit, explicitly warns before saving a longer prefix, separates
@@ -55,16 +57,21 @@ not approval from a particular historical developer role.
    keeps the action popup usable on shorter displays. Existing context is
    collapsed and display-bounded in macOS without altering stored data. The real
    Chrome toolbar, standalone production-script inline harness, rebuilt macOS
-   app, and source review are complete. PR #9 passes all required checks; finish
-   final review and merge evidence. Deterministic suites pass 68/68 for Chrome
-   and 48/48 for macOS.
-3. **Native global capture shortcut and menu-bar availability — next.** Add a
-   configurable global screenshot shortcut that reuses the existing region
-   selection and Quick Capture flow, and keep it available from the menu-bar app
-   while the main window is closed. Add clipboard capture through the same
-   shortcut infrastructure. The app must be running; launch-at-login is a
-   separate opt-in improvement.
-4. **Native Accessibility selection.** Read the focused app's selected text and
+   app, and source review are complete. PR #9 passed all required checks and
+   merged at `0c1083e`. Deterministic suites pass 68/68 for Chrome and 48/48 for
+   the D-030 macOS checkpoint.
+3. **Native global capture and menu-bar availability — current; implemented,
+   awaiting the signed-build manual gate.** D-031 registers configurable global
+   screenshot and clipboard shortcuts through Carbon without Accessibility or
+   Input Monitoring permission. A normal Dock app and its existing menu-bar
+   extra share one application-level coordinator, so capture is designed to
+   remain available after the main window closes. Transactional registration,
+   draft preservation, asynchronous screenshot waiting/PNG reads, cancellation,
+   and temporary-file cleanup are implemented. Twenty new tests bring the
+   host-verified macOS suite to 68/68. The app must be running; launch at login
+   remains a separate opt-in improvement. Final acceptance must use the normally
+   signed build for actual physical hotkeys and real screenshot-region selection.
+4. **Native Accessibility selection — next.** Read the focused app's selected text and
    bounds only after a user shortcut, then open capture UI near that selection.
    Keep clipboard capture as the compatibility fallback and avoid passive
    monitoring of every selection.
@@ -135,13 +142,43 @@ The verification backend intentionally had no AI provider configured. Its later
 enrichment `error` did not invalidate the successful Capture: the persist-first
 pipeline retained the original source and note.
 
-### Native global screenshot capture
+### Native global capture — implemented; signed-build gate pending
 
-- The shortcut is configurable and registration failure is visible.
-- Interactive screenshot selection does not block the app's main actor.
-- Cancelling leaves no draft or temporary image behind.
-- The existing GPT/on-device disclosure remains visible before extraction.
-- Closing the main window does not prevent capture while Recall is still running.
+- Recall remains a normal Dock app with its existing `MenuBarExtra`; it must be
+  running, but the main window may be closed.
+- Carbon `RegisterEventHotKey` supplies screenshot
+  `Option+Shift+Command+4` and clipboard `Option+Shift+Command+C` defaults
+  without Accessibility or Input Monitoring permission.
+- Settings accepts A–Z and 0–9 plus Command, Option, Control, and Shift; each
+  action requires at least two modifiers, and the actions cannot share one
+  shortcut. Either can be disabled, and both can be restored to defaults.
+- A configuration change replaces registrations transactionally. Failure rolls
+  back to the prior working set and remains visible in Settings, the menu, and
+  the menu-bar status icon.
+- Main-window, menu-bar, and hotkey entry points converge on the app-level
+  `GlobalCaptureCoordinator`; a presentation host in the `MenuBarExtra` label
+  opens the shared Quick Capture window independently of the main-window scene.
+- Interactive screenshot process waiting and PNG reading are asynchronous.
+  Task cancellation terminates pending work, app termination requests that
+  cancellation, and completed success, cancellation, and failure paths remove
+  the random temporary PNG.
+- Existing drafts are not overwritten. Rapid repeated screenshot triggers start
+  only one selector, while another trigger against an open draft re-presents it
+  with an explanatory notice.
+- Screenshot bytes remain transient, and the existing GPT/cloud versus Apple
+  Vision/on-device disclosure is unchanged. D-031 adds no API, schema, backend,
+  extension, database, or image-persistence change.
+- All 68 macOS tests pass on the host, including 20 new shortcut, coordinator,
+  draft-safety, and asynchronous screenshot tests.
+- Real UI checks confirmed the default settings, a persisted change to
+  `Option+Shift+Command+5`, restart persistence, restore-defaults, active Carbon
+  registration, an exact 32-character clipboard Quick Capture, repeated-trigger
+  draft preservation, and a responsive collapsed 19,144-character context
+  record. The unsigned test build also showed the explicit Screen Recording
+  permission error without changing that permission.
+- Remaining manual gate: in the normally signed build, verify physical global
+  key delivery from another app with the main window closed, then grant or
+  confirm Screen Recording permission and complete a real screenshot region.
 
 ## Deliberately deferred
 

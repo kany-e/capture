@@ -26,17 +26,21 @@ STATUS_BY_MARK = {
 
 def _metadata(markdown: str) -> dict[str, str]:
     fields = {
-        "current_phase": "Current phase",
-        "current_branch": "Current branch",
-        "last_verified_commit": "Last verified commit",
-        "last_updated": "Last updated",
+        "current_phase": ("Current phase",),
+        "current_branch": ("Implementation branch", "Current branch"),
+        "last_verified_commit": ("Last verified commit",),
+        "last_updated": ("Last updated",),
     }
     metadata: dict[str, str] = {}
-    for key, label in fields.items():
-        match = re.search(
-            rf"^{re.escape(label)}: (?P<value>.+)$", markdown, re.MULTILINE
-        )
-        metadata[key] = "unknown" if match is None else match.group("value").strip("`")
+    for key, labels in fields.items():
+        metadata[key] = "unknown"
+        for label in labels:
+            match = re.search(
+                rf"^{re.escape(label)}: (?P<value>.+)$", markdown, re.MULTILINE
+            )
+            if match is not None:
+                metadata[key] = match.group("value").strip("`")
+                break
     return metadata
 
 

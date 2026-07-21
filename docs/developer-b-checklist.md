@@ -4,25 +4,27 @@ Historical owner: Developer B — Intelligence and Data
 
 Project: Recall
 
-Last updated: 2026-07-20
+Last updated: 2026-07-21
 
-Current phase: D-030 browser context and long-detail-view hardening
+Current phase: D-031 native global capture; signed-build manual gate pending
 
-Current branch: `codex/inline-context-ui-fixes`
+Implementation branch: `codex/native-global-capture`
 
-Branch base: `71ec387` (PR #8 merge commit)
+Branch base: `0c1083e` (PR #9 merge commit)
 
 Canonical target: `main`
 
 The canonical `main` tree combines the hardened backend, Chrome extension,
-macOS client, screenshot OCR, shared contracts, and layered CI. It includes the
-D-029 inline browser feature merged through PR #8 at `71ec387`. Baseline backend
-and stress evidence remains 214 tests and 44/44 scenarios.
+macOS client, screenshot OCR, shared contracts, and layered CI. It includes
+D-029 merged through PR #8 at `71ec387` and D-030 merged through PR #9 at
+`0c1083e`.
 
-The current D-030 branch keeps the dependency-free extension suite at 68 tests
-and adds five bounded macOS context-projection tests. The current working tree
-passes 68/68 extension tests and 48/48 macOS tests; the detail behavior is
-covered by the real-app evidence recorded below.
+The D-031 working tree adds 20 macOS shortcut, coordinator, draft-safety, and
+asynchronous screenshot tests. Final regression passes 215 backend tests, 44/44
+stress scenarios, 68/68 Chrome-extension tests, and 68/68 macOS tests on the
+host. Bounded real-app evidence is recorded below. Actual physical global key
+delivery and real screenshot-region selection remain the normally signed-build
+manual gate.
 
 Last baseline cross-check: 2026-07-18 against all sections of
 `docs/product-plan.md`
@@ -70,7 +72,8 @@ Update protocol:
 | 10 | Final freeze and submission | Pending | Not started |
 | Addition | Screenshot-to-notes OCR | Complete and verified | PR #5 supersedes draft PR #4; 214 backend, 44/44 stress, 16 extension, and 43 macOS tests pass; live GPT, Apple Vision, permission, cancellation, and dismissal flows pass |
 | Addition | Opt-in inline browser capture | Complete, real-Chrome verified, and merged | PR #8 merged D-029 at `71ec387`; 68/68 extension tests and enable/save/retry/revoke/BFCache/toolbar-fallback evidence passed before merge |
-| Addition | Browser context and detail-view hardening | Implementation, bounded UI review, and CI complete / merge pending | D-030 disables unsafe Chrome context, bounds native display, fixes inline count/scroll, and compacts the popup; PR #9 passes all required checks |
+| Addition | Browser context and detail-view hardening | Complete, UI-reviewed, and merged | D-030 disables unsafe Chrome context, bounds native display, fixes inline count/scroll, and compacts the popup; PR #9 merged at `0c1083e` after all required checks passed |
+| Addition | Native global capture | Implemented and bounded UI-verified / signed-build manual gate pending | D-031 adds transactional Carbon shortcuts and one app-level capture coordinator; 20 new tests bring the host macOS suite to 68/68; see B-014 |
 
 The D-023 integration closes B-010, the macOS slice closes B-006, and real
 provider plus unpacked-Chrome evidence closes B-007, B-008, and B-009. B-011 is
@@ -175,10 +178,9 @@ verified under D-029; PR #8 merged the change at `71ec387`
 
 ## Active addition — browser context and detail-view hardening
 
-Status: `[~]` D-030 implementation, automated verification, the bounded UI
-verification recorded below, and source review complete on
-`codex/inline-context-ui-fixes`; PR #9 passes all required checks, while final
-review and merge evidence remain pending
+Status: `[x]` D-030 implementation, automated verification, bounded UI
+verification, source review, and CI complete; PR #9 merged into `main` at
+`0c1083e`
 
 - [x] Record the real Gemini failure without storing its content in this log:
   selected text was 1,530 characters, context was 19,144 characters, and that
@@ -213,7 +215,66 @@ review and merge evidence remain pending
   mocked runtime and open Shadow DOM, so it is not injection or CSP evidence.
 - [x] Complete CI evidence. PR #9 passes Backend tests, Backend stress, Chrome
   extension, macOS, and the aggregate Required checks job.
-- [ ] Complete final review and merge evidence.
+- [x] Complete final review and merge evidence. PR #9 merged into `main` at
+  merge commit `0c1083e` on 2026-07-21.
+
+## Active addition — native global capture
+
+Status: `[~]` D-031 implementation, automated verification, and bounded real-UI
+verification are complete on `codex/native-global-capture`; the normally signed
+build manual gate in B-014 remains open
+
+- [x] Keep Recall as a normal Dock application with the existing
+  `MenuBarExtra`. Global capture requires the app to be running but is owned by
+  app-level state and does not depend on the main window remaining open.
+- [x] Register screenshot and clipboard hotkeys with Carbon
+  `RegisterEventHotKey`, requiring neither Accessibility nor Input Monitoring
+  permission. Defaults are `Option+Shift+Command+4` and
+  `Option+Shift+Command+C`, respectively.
+- [x] Add Settings controls for A–Z and 0–9 plus Command, Option, Control, and
+  Shift; require at least two modifiers per action, reject duplicate action
+  combinations, support enable/disable, and restore both defaults.
+- [x] Make whole-configuration registration transactional. Persist only after
+  all enabled shortcuts register; on failure, remove any partial new set,
+  restore the previous set, and expose the result in Settings, the menu, and the
+  menu-bar status icon.
+- [x] Route main-window, menu-bar, and Carbon callback entry points through the
+  app-level `GlobalCaptureCoordinator`. Host its presentation observer in the
+  `MenuBarExtra` label through `CapturePresentationHost`, so the shared Quick
+  Capture window can open independently of the main-window scene.
+- [x] Await the system screenshot `Process` asynchronously and read its PNG off
+  the main actor. Task cancellation terminates a running selection, app
+  termination requests that cancellation, and the random temporary PNG is
+  removed on success, cancellation, or failure.
+- [x] Preserve any existing or ambiguous-retry Quick Capture draft. Deduplicate
+  rapid repeated screenshot triggers so only one selector starts, and re-present
+  the protected draft with an explanatory notice instead of overwriting it.
+- [x] Preserve the D-027 privacy boundary and provider disclosure: screenshot
+  bytes remain transient, GPT/cloud stays the default, Apple Vision/on-device
+  remains explicit, and only reviewed text can be saved. Add no API, schema,
+  backend, database, Chrome-extension, enrichment, retrieval, or attachment
+  change.
+- [x] Add 20 shortcut, coordinator, draft-safety, and asynchronous screenshot
+  tests and pass all 68/68 macOS tests on the host. Final cross-component
+  regression also passes 215 backend tests, 44/44 stress scenarios, and 68/68
+  Chrome-extension tests.
+- [x] Complete bounded real-UI Settings verification: confirm both defaults,
+  change screenshot capture to `Option+Shift+Command+5`, relaunch and confirm it
+  persisted, restore defaults, and observe active Carbon registration.
+- [x] Exercise clipboard Quick Capture with exactly 32 characters. A repeated
+  trigger preserved the existing draft and displayed its explanatory notice.
+- [x] Reopen the problematic 19,144-character context record and confirm it
+  remains collapsed and responsive under D-030.
+- [x] Exercise the unsigned build's explicit Screen Recording permission error.
+  It did not have permission, and verification deliberately did not change the
+  permission state.
+- [ ] In a normally signed build, focus another app, close Recall's main window
+  without quitting, and verify both physical global key combinations deliver to
+  Recall. Automation cannot synthesize this global-key evidence.
+- [ ] In that normally signed build, grant or confirm Screen Recording
+  permission, invoke the screenshot hotkey, and complete and cancel real region
+  selections. Confirm the completed selection opens the existing disclosure UI
+  and cancellation leaves no draft or temporary PNG.
 
 ## Scope, schedule, and collaboration guardrails
 
@@ -1390,6 +1451,32 @@ Use IDs `B-###`. Never delete an entry; append resolution and date.
   its fresh result; no old preview or late OCR result returned.
 - Does it block build, automated verification, commit, or push? No. The manual
   permission and selection gate is now closed.
+
+## B-014 — Normally signed-build global capture acceptance
+
+- Opened: 2026-07-21
+- Severity: Manual UI/demo evidence / non-blocking for implementation
+- Status: Open
+- Impact: Carbon registration, Settings persistence, rollback behavior,
+  coordinator routing, exact clipboard Quick Capture, repeated-trigger draft
+  preservation, and asynchronous screenshot cancellation are covered by 68/68
+  host tests and bounded UI checks. Automation cannot synthesize a trustworthy
+  system-wide physical hotkey, however, and the temporary unsigned test build
+  did not have Screen Recording permission.
+- Evidence already complete: Settings showed both defaults, persisted a
+  screenshot change to `Option+Shift+Command+5` across restart, restored
+  defaults, and reported active Carbon registration. Clipboard Quick Capture
+  contained the exact 32 characters and preserved its draft on a repeated
+  trigger. The unsigned build exposed the explicit permission error without
+  changing the permission, and the 19,144-character context record remained
+  collapsed and responsive.
+- Resolution needed: In the normally signed build, close only the main window,
+  focus another app, and press both physical global shortcuts. Then grant or
+  confirm Screen Recording permission and complete plus cancel actual screenshot
+  overlays. Verify the existing disclosure UI, draft preservation, and cleanup.
+- Does it block build, deterministic regression, or documentation? No. It blocks
+  claiming complete real-device global capture acceptance and should be closed
+  before using the hotkeys as live demo proof.
 
 # Errors encountered
 

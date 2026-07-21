@@ -3,7 +3,7 @@
 Status: Accepted baseline; current priorities are tracked in
 [`roadmap.md`](roadmap.md)
 
-Last updated: 2026-07-20
+Last updated: 2026-07-21
 
 This document translates the product baseline into system boundaries and
 handoffs. It does not replace [`product-plan.md`](product-plan.md).
@@ -36,7 +36,56 @@ the same draft entirely on device. Both paths produce reviewed source text that
 enters the existing Capture API and storage/retrieval pipeline while the user's
 optional personal note stays independent; neither creates an image store or a
 second notes database. The macOS system selection command briefly uses a random
-OS temporary PNG and removes it after the normal selection flow.
+OS temporary PNG and removes it after success, cancellation, or failure.
+
+## Native global capture boundary
+
+Decision D-031 adds native global screenshot and clipboard entry points without
+changing the Capture pipeline or the app's ordinary lifecycle. Recall remains a
+normal Dock application with its existing `MenuBarExtra`; it must be running,
+but closing the main window does not destroy the app-level capture state.
+
+```text
+main-window controls ─┐
+menu-bar commands ────┼─ GlobalCaptureCoordinator ─ capture preparation
+Carbon hotkeys ───────┘                         └─ presentation request
+                                                       │
+MenuBarExtra label ─ CapturePresentationHost ──────────┘
+                                                       ↓
+                                             shared Quick Capture window
+```
+
+All three entry surfaces call the app-level `GlobalCaptureCoordinator`; views
+do not prepare drafts or own screenshot tasks independently. A
+`CapturePresentationHost` in the `MenuBarExtra` label observes coordinator
+requests and opens the Quick Capture scene, so presentation does not depend on
+the main-window scene being open.
+
+`GlobalShortcutCenter` owns configuration, persistence, active registrations,
+and errors. Its Carbon `RegisterEventHotKey` registrar needs neither
+Accessibility nor Input Monitoring permission. Defaults are
+`Option+Shift+Command+4` for screenshots and `Option+Shift+Command+C` for the
+clipboard. Settings restricts keys to A–Z and 0–9 with Command, Option, Control,
+and Shift, requires at least two modifiers per action, rejects duplicate action
+bindings, supports enable/disable, and restores defaults.
+
+Applying configuration is a whole-set transaction: unregister the old set,
+install the proposed set, persist only on success, and remove any partial new
+set plus restore the prior set on failure. Settings, the menu, and the menu-bar
+label all derive failure visibility from the same shortcut center.
+
+The interactive screenshot `Process` is awaited asynchronously and PNG reading
+also occurs off the main actor. Cancellation terminates a running selection;
+success, cancellation, and failure all remove the random temporary PNG. App
+termination requests cancellation before deactivating hotkeys. One coordinator
+task deduplicates rapid screenshot triggers, and store-level draft guards
+preserve an existing or ambiguous-retry Quick Capture rather than silently
+replacing it.
+
+This boundary changes no API, schema, backend, database, extension, enrichment,
+retrieval, or image-persistence behavior. Screenshot bytes remain limited to the
+active draft, and the GPT/cloud versus Apple Vision/on-device disclosure remains
+unchanged.
 
 ## Browser inline capture boundary
 
@@ -54,8 +103,9 @@ delivery coordinator. The page script never calls the backend directly.
 Revoking access unregisters future injection and immediately asks already-open
 tabs to remove Recall controls and listeners.
 
-Decision D-030 temporarily disables browser-generated surrounding context in
-both entry points. With a selection, Chrome submits up to the shared 12,000-
+Decision D-030, merged through PR #9 at `0c1083e`, temporarily disables
+browser-generated surrounding context in both entry points. With a selection,
+Chrome submits up to the shared 12,000-
 character limit plus title, URL, and optional note; text within that limit uses
 the existing normalization but is not shortened, and a longer selection
 receives an explicit UI warning. Without a selection, the toolbar submits title,
@@ -113,6 +163,8 @@ Owned paths:
 Responsibilities:
 
 - SwiftUI/AppKit application and menu bar
+- Carbon global shortcuts, settings, app-level capture coordination, and
+  Quick Capture presentation
 - Clipboard capture and quick-save window
 - Capture list, detail, search, and processing/error states
 - Demo interaction and visual consistency

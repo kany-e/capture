@@ -2,7 +2,6 @@ import SwiftUI
 
 struct RecallRootView: View {
     @EnvironmentObject private var store: RecallStore
-    @Environment(\.openWindow) private var openWindow
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
@@ -47,16 +46,8 @@ struct RecallRootView: View {
         .onChange(of: store.searchFocusToken) {
             isSearchFocused = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: .openQuickCapture)) { _ in
-            openWindow(id: RecallWindowID.quickCapture)
-            activateApplication()
-        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await store.refresh() }
         }
-    }
-
-    private func activateApplication() {
-        NSApplication.shared.activate(ignoringOtherApps: true)
     }
 }

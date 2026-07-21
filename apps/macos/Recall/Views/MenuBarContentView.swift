@@ -3,6 +3,8 @@ import SwiftUI
 
 struct MenuBarContentView: View {
     @EnvironmentObject private var store: RecallStore
+    @EnvironmentObject private var captureCoordinator: GlobalCaptureCoordinator
+    @EnvironmentObject private var shortcutCenter: GlobalShortcutCenter
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -11,24 +13,19 @@ struct MenuBarContentView: View {
         }
         .keyboardShortcut("o")
 
-        Button("Capture Clipboard", systemImage: "doc.on.clipboard") {
-            _ = store.prepareClipboardCapture()
-            openWindow(id: RecallWindowID.quickCapture)
-            activateApplication()
+        Button(
+            "Capture Clipboard (\(shortcutLabel(for: .clipboard)))",
+            systemImage: "doc.on.clipboard"
+        ) {
+            captureCoordinator.prepareClipboardCapture()
         }
-        .keyboardShortcut("n")
 
-        Button("Capture Screenshot Note", systemImage: "viewfinder") {
-            Task { @MainActor in
-                await Task.yield()
-                let prepared = store.prepareScreenshotCapture()
-                if prepared || store.quickCaptureError != nil {
-                    openWindow(id: RecallWindowID.quickCapture)
-                    activateApplication()
-                }
-            }
+        Button(
+            "Capture Screenshot Note (\(shortcutLabel(for: .screenshot)))",
+            systemImage: "viewfinder"
+        ) {
+            captureCoordinator.prepareScreenshotCapture()
         }
-        .keyboardShortcut("s")
 
         Button("Search", systemImage: "magnifyingglass") {
             openMainWindow()
@@ -55,10 +52,26 @@ struct MenuBarContentView: View {
             }
         }
 
+        if let shortcutError = shortcutCenter.registrationErrorMessage {
+            Divider()
+            Text(shortcutError)
+            Button("Retry Global Shortcuts", systemImage: "arrow.clockwise") {
+                shortcutCenter.retryRegistration()
+            }
+        }
+
+        SettingsLink {
+            Label("Shortcut Settings…", systemImage: "keyboard")
+        }
+
         Divider()
 
         Button("Quit Recall", systemImage: "power") {
-            NSApplication.shared.terminate(nil)
+            Task { @MainActor in
+                await captureCoordinator.cancelPendingCaptureAndWait()
+                shortcutCenter.deactivate()
+                NSApplication.shared.terminate(nil)
+            }
         }
         .keyboardShortcut("q")
     }
@@ -89,5 +102,10 @@ struct MenuBarContentView: View {
 
     private func activateApplication() {
         NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    private func shortcutLabel(for action: GlobalShortcutAction) -> String {
+        let shortcut = shortcutCenter.configuration[action]
+        return shortcut.isEnabled ? shortcut.displayName : "Off"
     }
 }

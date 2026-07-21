@@ -97,6 +97,7 @@ final class RecallStore: ObservableObject {
     @Published var quickCaptureError: String?
     @Published private(set) var screenshotPreviewData: Data?
     @Published var screenshotExtractionMode: ScreenshotExtractionMode = .gpt
+    @Published private(set) var isPreparingScreenshot = false
     @Published private(set) var isExtractingScreenshot = false
     @Published private(set) var screenshotExtractionSummary: String?
     @Published var notice: AppNotice?
@@ -375,6 +376,7 @@ final class RecallStore: ObservableObject {
 
     @discardableResult
     func prepareClipboardCapture() -> Bool {
+        guard !isPreparingScreenshot else { return false }
         guard canPrepareNewQuickCapture() else { return false }
         do {
             let snapshot = try clipboardService.readSnapshot()
@@ -403,10 +405,14 @@ final class RecallStore: ObservableObject {
     }
 
     @discardableResult
-    func prepareScreenshotCapture() -> Bool {
+    func prepareScreenshotCapture() async -> Bool {
+        guard !isPreparingScreenshot else { return false }
         guard canPrepareNewQuickCapture() else { return false }
+        isPreparingScreenshot = true
+        defer { isPreparingScreenshot = false }
         do {
-            let snapshot = try screenshotCaptureService.captureInteractive()
+            let snapshot = try await screenshotCaptureService.captureInteractive()
+            guard !Task.isCancelled else { return false }
             invalidateScreenshotExtraction()
             quickCaptureDraft = QuickCaptureDraft(
                 selectedText: "",
@@ -637,6 +643,12 @@ final class RecallStore: ObservableObject {
             let message = "A previous save may already exist. Reopen this draft and retry it, or cancel it before starting another Capture."
             quickCaptureError = message
             notice = AppNotice(style: .warning, message: message)
+            return false
+        }
+        if quickCaptureDraft != nil {
+            let message = "Finish or cancel the current Capture before starting another one."
+            quickCaptureError = message
+            notice = AppNotice(style: .information, message: message)
             return false
         }
         return true

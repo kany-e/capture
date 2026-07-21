@@ -96,6 +96,13 @@ matrix are in [`apps/macos/README.md`](apps/macos/README.md). Run the complete
 macOS test bundle reliably from the repository root with
 `./scripts/test-macos.sh`.
 
+Recall remains a normal Dock app and also keeps its existing menu-bar extra.
+While the app is running, global screenshot and clipboard capture default to
+`Option+Shift+Command+4` and `Option+Shift+Command+C`; they remain available
+when the main window is closed. Configure, disable, or restore them in
+**Settings > Global capture shortcuts**. The hotkeys use Carbon registration
+and do not require Accessibility or Input Monitoring permission.
+
 ## Load the Chrome extension
 
 Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**,
@@ -134,14 +141,15 @@ stress, Chrome-extension, and macOS/Xcode jobs. A final **Required checks** job
 fails unless every layer passes. The workflow has read-only repository access,
 does not receive `.env` or an OpenAI key, and never performs a real provider
 call. Real GPT, Screen Recording permission, and interactive screenshot flows
-remain explicit manual release gates.
+remain explicit manual release gates. The physical global hotkeys and the
+global screenshot path also require a final run from the normally signed app.
 
 ## Current status
 
 The hardened backend, Chrome extension, and macOS client have been assembled and
 verified in one integration tree. Baseline counts were 190 backend tests,
 all 44 deterministic stress scenarios, 16 extension tests, and 27 macOS tests.
-The screenshot-note hardening tree passes 214 backend tests, 44/44 stress
+The screenshot-note checkpoint passed 214 backend tests, 44/44 stress
 scenarios, 16 extension tests, and 43 macOS tests, including the production
 Apple Vision extractor.
 
@@ -154,15 +162,32 @@ Unicode source/note persistence, offline retry, Escape and editable-page
 compatibility, immediate revocation, BFCache return after revocation, and the
 toolbar fallback; the resulting cards were also verified in the macOS app.
 
-The current D-030 browser-context and display hardening keeps the browser suite
-at 68 tests. Inline capture now shows a separate Unicode-aware selection count
+The D-030 browser-context and display hardening keeps the browser suite at 68
+tests. Inline capture now shows a separate Unicode-aware selection count
 and a keyboard-scrollable selection preview, while the action popup uses a
 smaller, internally scrollable layout. Both Chrome entry points temporarily
 omit surrounding context. Existing stored context is neither migrated nor
 deleted: the macOS detail view hides it by default and, when requested, renders
 at most 2,000 characters and 60 lines while retaining the complete value for
 search and AI processing. This boundary expands the macOS suite from 43 to 48
-tests; the current branch passes all 48 alongside 68/68 extension tests.
+tests. PR #9 merged D-030 into `main` at `0c1083e` after all required checks
+passed.
+
+D-031 adds configurable native global screenshot and clipboard capture without
+changing the API, schemas, backend, extension, or screenshot privacy boundary.
+Registration changes are transactional, failures remain visible in the menu
+bar, its status icon, and Settings, and existing drafts are never silently
+replaced. Screenshot process waiting and PNG reads are asynchronous; selection
+cancellation and temporary-file cleanup are covered, and app termination
+requests cancellation of pending work. Twenty new tests bring the host-verified
+macOS suite to 68/68. Settings
+persistence, restore-defaults, active Carbon registration, clipboard Quick
+Capture, repeated-trigger draft preservation, and the bounded long-context view
+were exercised in the real app. The temporary unsigned build correctly exposed
+the missing Screen Recording permission without changing it, so actual physical
+hotkeys and real region selection remain a signed-build manual gate.
+Final regression also passes 215 backend tests, 44/44 stress scenarios, and
+68/68 Chrome-extension tests.
 
 Live verification covers provider-off keyword fallback, real OpenAI enrichment
 and embeddings, semantic retrieval with a non-null score, and both selected-text

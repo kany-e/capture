@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CaptureListView: View {
     @EnvironmentObject private var store: RecallStore
+    @EnvironmentObject private var captureCoordinator: GlobalCaptureCoordinator
     @FocusState.Binding var isSearchFocused: Bool
 
     var body: some View {
@@ -25,8 +26,7 @@ struct CaptureListView: View {
                 Spacer()
                 Menu {
                     Button("Capture Clipboard", systemImage: "doc.on.clipboard") {
-                        _ = store.prepareClipboardCapture()
-                        NotificationCenter.default.post(name: .openQuickCapture, object: nil)
+                        captureCoordinator.prepareClipboardCapture()
                     }
                     Button("Capture Screenshot Note", systemImage: "viewfinder") {
                         beginScreenshotCapture()
@@ -125,8 +125,7 @@ struct CaptureListView: View {
                     if store.query.nonEmptyTrimmed == nil {
                         HStack {
                             Button("Capture Clipboard") {
-                                _ = store.prepareClipboardCapture()
-                                NotificationCenter.default.post(name: .openQuickCapture, object: nil)
+                                captureCoordinator.prepareClipboardCapture()
                             }
                             Button("Screenshot Note") {
                                 beginScreenshotCapture()
@@ -147,14 +146,6 @@ struct CaptureListView: View {
     }
 
     private func beginScreenshotCapture() {
-        Task { @MainActor in
-            await Task.yield()
-            guard store.prepareScreenshotCapture() else { return }
-            NotificationCenter.default.post(name: .openQuickCapture, object: nil)
-        }
+        captureCoordinator.prepareScreenshotCapture()
     }
-}
-
-extension Notification.Name {
-    static let openQuickCapture = Notification.Name("Recall.openQuickCapture")
 }

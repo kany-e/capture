@@ -5,7 +5,7 @@ import XCTest
 
 @MainActor
 final class RecallStoreTests: XCTestCase {
-    func testPreparingScreenshotCaptureKeepsImageTransientAndDefaultsToGPT() {
+    func testPreparingScreenshotCaptureKeepsImageTransientAndDefaultsToGPT() async {
         let store = RecallStore(
             client: RecordingAPIClient(),
             clipboardService: ClipboardServiceStub(
@@ -22,7 +22,8 @@ final class RecallStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertTrue(store.prepareScreenshotCapture())
+        let prepared = await store.prepareScreenshotCapture()
+        XCTAssertTrue(prepared)
         XCTAssertEqual(store.quickCaptureDraft?.kind, .screenshot)
         XCTAssertEqual(store.quickCaptureDraft?.selectedText, "")
         XCTAssertEqual(store.quickCaptureDraft?.sourceApplication, "Preview")
@@ -47,7 +48,8 @@ final class RecallStoreTests: XCTestCase {
                 )
             )
         )
-        XCTAssertTrue(store.prepareScreenshotCapture())
+        let prepared = await store.prepareScreenshotCapture()
+        XCTAssertTrue(prepared)
 
         let extracted = await store.extractScreenshotText()
 
@@ -78,7 +80,8 @@ final class RecallStoreTests: XCTestCase {
             ),
             localScreenshotExtractor: LocalExtractorStub(result: .success("Local text"))
         )
-        XCTAssertTrue(store.prepareScreenshotCapture())
+        let prepared = await store.prepareScreenshotCapture()
+        XCTAssertTrue(prepared)
         store.screenshotExtractionMode = .appleVision
 
         let extracted = await store.extractScreenshotText()
@@ -115,7 +118,8 @@ final class RecallStoreTests: XCTestCase {
             ),
             localScreenshotExtractor: LocalExtractorStub(result: .success(oversized))
         )
-        XCTAssertTrue(store.prepareScreenshotCapture())
+        let prepared = await store.prepareScreenshotCapture()
+        XCTAssertTrue(prepared)
         store.screenshotExtractionMode = .appleVision
 
         let extracted = await store.extractScreenshotText()
@@ -147,7 +151,8 @@ final class RecallStoreTests: XCTestCase {
             ),
             localScreenshotExtractor: LocalExtractorStub(result: .success(exact))
         )
-        XCTAssertTrue(store.prepareScreenshotCapture())
+        let prepared = await store.prepareScreenshotCapture()
+        XCTAssertTrue(prepared)
         store.screenshotExtractionMode = .appleVision
 
         let extracted = await store.extractScreenshotText()
@@ -177,7 +182,8 @@ final class RecallStoreTests: XCTestCase {
                 )
             )
         )
-        XCTAssertTrue(store.prepareScreenshotCapture())
+        let prepared = await store.prepareScreenshotCapture()
+        XCTAssertTrue(prepared)
         let firstExtraction = await store.extractScreenshotText()
         XCTAssertTrue(firstExtraction)
         store.quickCaptureDraft?.userNote = "My edited note"
@@ -211,7 +217,8 @@ final class RecallStoreTests: XCTestCase {
                 )
             )
         )
-        XCTAssertTrue(store.prepareScreenshotCapture())
+        let prepared = await store.prepareScreenshotCapture()
+        XCTAssertTrue(prepared)
 
         let extractionTask = Task { await store.extractScreenshotText() }
         await waitUntil { store.isExtractingScreenshot }
@@ -245,7 +252,8 @@ final class RecallStoreTests: XCTestCase {
                 )
             )
         )
-        XCTAssertTrue(store.prepareScreenshotCapture())
+        let prepared = await store.prepareScreenshotCapture()
+        XCTAssertTrue(prepared)
         store.quickCaptureDraft?.selectedText = "Older source"
         store.quickCaptureDraft?.userNote = "Independent note"
 
@@ -281,7 +289,8 @@ final class RecallStoreTests: XCTestCase {
                 )
             )
         )
-        XCTAssertTrue(store.prepareScreenshotCapture())
+        let prepared = await store.prepareScreenshotCapture()
+        XCTAssertTrue(prepared)
         let extracted = await store.extractScreenshotText()
         XCTAssertTrue(extracted)
         store.quickCaptureDraft?.userNote = "Use this wording in tomorrow's demo."
@@ -323,7 +332,8 @@ final class RecallStoreTests: XCTestCase {
                 )
             )
         )
-        XCTAssertTrue(store.prepareScreenshotCapture())
+        let prepared = await store.prepareScreenshotCapture()
+        XCTAssertTrue(prepared)
         store.quickCaptureDraft?.selectedText = "Original screenshot source"
         store.quickCaptureDraft?.userNote = "Original personal note"
         XCTAssertNotNil(store.screenshotPreviewData)
@@ -350,7 +360,93 @@ final class RecallStoreTests: XCTestCase {
         XCTAssertEqual(requests[0], requests[1])
     }
 
-    func testScreenshotPermissionDenialHasActionableSystemSettingsMessage() {
+    func testUnsubmittedDraftIsNotReplacedByAnotherCapture() async {
+        let screenshotService = CountingScreenshotService(
+            result: .success(
+                ScreenshotSnapshot(
+                    imageData: Data([21]),
+                    mediaType: "image/png",
+                    sourceApplication: "Preview"
+                )
+            )
+        )
+        let store = RecallStore(
+            client: RecordingAPIClient(),
+            clipboardService: ClipboardServiceStub(
+                result: .success(
+                    ClipboardSnapshot(text: "Keep this draft", sourceApplication: "TextEdit")
+                )
+            ),
+            screenshotCaptureService: screenshotService
+        )
+        XCTAssertTrue(store.prepareClipboardCapture())
+        store.quickCaptureDraft?.userNote = "Do not overwrite"
+        let originalID = store.quickCaptureDraft?.clientCaptureID
+
+        let prepared = await store.prepareScreenshotCapture()
+
+        XCTAssertFalse(prepared)
+        XCTAssertEqual(screenshotService.callCount, 0)
+        XCTAssertEqual(store.quickCaptureDraft?.clientCaptureID, originalID)
+        XCTAssertEqual(store.quickCaptureDraft?.selectedText, "Keep this draft")
+        XCTAssertEqual(store.quickCaptureDraft?.userNote, "Do not overwrite")
+        XCTAssertTrue(store.quickCaptureError?.contains("Finish or cancel") == true)
+    }
+
+    func testConcurrentScreenshotPreparationLaunchesOnlyOneSelector() async {
+        let screenshotService = SuspendedScreenshotService()
+        let store = RecallStore(
+            client: RecordingAPIClient(),
+            clipboardService: ClipboardServiceStub(
+                result: .failure(ClipboardCaptureError.noText)
+            ),
+            screenshotCaptureService: screenshotService
+        )
+
+        let firstPreparation = Task { await store.prepareScreenshotCapture() }
+        await waitUntil { store.isPreparingScreenshot }
+
+        let secondPrepared = await store.prepareScreenshotCapture()
+
+        XCTAssertFalse(secondPrepared)
+        XCTAssertEqual(screenshotService.callCount, 1)
+        screenshotService.complete(
+            with: .success(
+                ScreenshotSnapshot(
+                    imageData: Data([22]),
+                    mediaType: "image/png",
+                    sourceApplication: "Preview"
+                )
+            )
+        )
+        let firstPrepared = await firstPreparation.value
+        XCTAssertTrue(firstPrepared)
+        XCTAssertFalse(store.isPreparingScreenshot)
+    }
+
+    func testGlobalCaptureCoordinatorDoesNotPresentAfterScreenshotCancellation() async {
+        let screenshotService = CountingScreenshotService(
+            result: .failure(ScreenshotCaptureError.cancelled)
+        )
+        let store = RecallStore(
+            client: RecordingAPIClient(),
+            clipboardService: ClipboardServiceStub(
+                result: .failure(ClipboardCaptureError.noText)
+            ),
+            screenshotCaptureService: screenshotService
+        )
+        let coordinator = GlobalCaptureCoordinator(store: store)
+
+        coordinator.prepareScreenshotCapture()
+        await waitUntil { screenshotService.callCount == 1 }
+        await waitUntil { !store.isPreparingScreenshot }
+
+        XCTAssertEqual(coordinator.quickCapturePresentationRequest, 0)
+        XCTAssertNil(store.quickCaptureDraft)
+        XCTAssertNil(store.screenshotPreviewData)
+    }
+
+    func testScreenshotPermissionDenialHasActionableSystemSettingsMessage() async {
         let service = SystemScreenshotCaptureService(
             permissionService: ScreenCapturePermissionStub(
                 authorized: false,
@@ -358,14 +454,17 @@ final class RecallStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertThrowsError(try service.captureInteractive()) { error in
+        do {
+            _ = try await service.captureInteractive()
+            XCTFail("Expected Screen Recording permission denial")
+        } catch {
             XCTAssertEqual(error as? ScreenshotCaptureError, .permissionDenied)
             XCTAssertTrue(error.localizedDescription.contains("System Settings"))
             XCTAssertTrue(error.localizedDescription.contains("Screen"))
         }
     }
 
-    func testScreenshotPermissionErrorIsPublishedForTheUnavailableWindow() {
+    func testScreenshotPermissionErrorIsPublishedForTheUnavailableWindow() async {
         let store = RecallStore(
             client: RecordingAPIClient(),
             clipboardService: ClipboardServiceStub(
@@ -376,7 +475,8 @@ final class RecallStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertFalse(store.prepareScreenshotCapture())
+        let prepared = await store.prepareScreenshotCapture()
+        XCTAssertFalse(prepared)
         XCTAssertNil(store.quickCaptureDraft)
         XCTAssertTrue(store.quickCaptureError?.contains("System Settings") == true)
         XCTAssertTrue(store.notice?.message.contains("System Settings") == true)
@@ -827,8 +927,42 @@ private struct ClipboardServiceStub: ClipboardCaptureServing {
 private struct ScreenshotServiceStub: ScreenshotCaptureServing {
     let result: Result<ScreenshotSnapshot, Error>
 
-    func captureInteractive() throws -> ScreenshotSnapshot {
+    func captureInteractive() async throws -> ScreenshotSnapshot {
         try result.get()
+    }
+}
+
+@MainActor
+private final class CountingScreenshotService: ScreenshotCaptureServing {
+    private let result: Result<ScreenshotSnapshot, Error>
+    private(set) var callCount = 0
+
+    init(result: Result<ScreenshotSnapshot, Error>) {
+        self.result = result
+    }
+
+    func captureInteractive() async throws -> ScreenshotSnapshot {
+        callCount += 1
+        return try result.get()
+    }
+}
+
+@MainActor
+private final class SuspendedScreenshotService: ScreenshotCaptureServing {
+    private var continuation: CheckedContinuation<ScreenshotSnapshot, Error>?
+    private(set) var callCount = 0
+
+    func captureInteractive() async throws -> ScreenshotSnapshot {
+        callCount += 1
+        return try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func complete(with result: Result<ScreenshotSnapshot, Error>) {
+        let continuation = continuation
+        self.continuation = nil
+        continuation?.resume(with: result)
     }
 }
 

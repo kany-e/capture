@@ -33,6 +33,21 @@ presented as stored memories: only reviewed text enters Recall.
 | 84–100 s | Extract `Recall Local Vision 2026`, show **Processed on this Mac**, then cancel the draft and turn Wi-Fi back on. | “Locality is visible and testable, not a hidden implementation detail. Cancel clears the temporary image and saves nothing.” |
 | 100–112 s | Return to the GPT-created memory and its search result. | “GPT remains the primary judged workflow; local intelligence is a privacy-preserving alternative behind the same experience.” |
 
+## Optional D-031 global-capture pickup
+
+Use this only after B-014 is closed in the normally signed build. Before the
+recording, close Recall's main window without quitting, focus another app, and
+physically verify both default shortcuts: `Option+Shift+Command+4` for the
+screenshot selector and `Option+Shift+Command+C` for clipboard Quick Capture.
+Confirm Screen Recording permission and complete one real region selection.
+
+After that gate passes, the 10–24 second step may begin with the screenshot
+shortcut instead of the menu command. Briefly show **Shortcut Settings…** only
+if there is time: the defaults, enable switches, and restore-defaults action are
+more useful than describing Carbon. If either physical shortcut or the system
+overlay is unreliable, keep the menu-bar path in the main walkthrough and do
+not claim the global-key flow was demonstrated.
+
 ## Failure downgrade plan
 
 | Failure | Safe recovery | Truthful narration |
