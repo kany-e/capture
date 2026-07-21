@@ -70,7 +70,7 @@ split; they are no longer assignment gates.
   native-size manifest files, wraps and independently scrolls long Page metadata
   in the popup, and reuses one adaptive vector Recall mark in the macOS menu bar
   and Quick Capture header. The 70/70 extension and 189/189 host macOS suites
-  pass; live appearance acceptance remains.
+  pass, and live user appearance acceptance is complete.
 - The macOS app and Chrome extension are separate clients of the loopback
   FastAPI service. The app does not yet package or start that service.
 
@@ -161,14 +161,14 @@ not approval from a particular historical developer role.
    deletion are integrated. AI-disabled and AI-enabled image saves passed
    real-app acceptance. Keep visual-concept retrieval, restart, retry, and
    physical file deletion in release regression coverage.
-7. **Editable memories and state-driven UI polish — automated-verified; real-app
-   acceptance pending.** D-038 adds migration 005,
+7. **Editable memories and state-driven UI polish — implemented and user-
+   accepted.** D-038 adds migration 005,
    `PATCH /v1/captures/{id}`, explicit user overrides, stale-AI handling,
    creation/edit ordering, fixed minute-level timestamps,
    bounded/state-resolved notices, two Settings tabs, and stable image-note
    toggle layout. The gate passes 243 backend, 44/44 stress, 68/68 Chrome, and
-   189/189 host macOS checks. Complete real-app editing and layout acceptance
-   before merge.
+   189/189 host macOS checks. Real-app editing and layout acceptance passed on
+   2026-07-21.
 8. **Chrome extension UI and settings polish — implemented and real-Chrome
    verified.** D-039 applies Recall's icon and pink palette, moves inline access
    to a dedicated options page, exposes Chrome-owned shortcut management, keeps
@@ -176,11 +176,12 @@ not approval from a particular historical developer role.
    inline page titles, and adds viewport-bounded header dragging. The user's
    inline-access preference stayed off during isolated-harness acceptance; all
    70 extension tests pass.
-9. **Cross-client icon alignment — implemented; live appearance acceptance
-   pending.** D-040 derives Chrome's 16/32/48 assets from the canonical
-   `icon128.png`, makes long popup Page metadata wrap and scroll, and introduces
+9. **Cross-client icon alignment — implemented and user-accepted.** D-040
+   derives Chrome's 16/32/48 assets from the canonical `icon128.png`, makes long
+   popup Page metadata wrap and scroll, and introduces
    a monochrome vector Recall mark for the native menu bar and Quick Capture.
-   All 70 extension and 189 host macOS tests pass.
+   All 70 extension and 189 host macOS tests pass; live appearance acceptance
+   passed on 2026-07-21.
 10. **App-managed local service lifecycle.** Define how a packaged Recall app
    starts, monitors, and stops the backend without assuming a repository checkout
    or terminal command. Keep this separate from browser native messaging.

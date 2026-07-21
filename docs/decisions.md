@@ -51,9 +51,9 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-035 | Opt-in transactional clipboard fallback for native selection | Compatibility/privacy safeguard | Implemented; 149/149 host tests and user WeChat acceptance pass |
 | D-036 | Conservative structured-text line restoration | Capture-correctness addition | Merged in PR #14; live Gemini clipboard payload verified |
 | D-037 | Persisted image notes with opt-in background visual indexing | Addition | Implemented; automated verification and real-app AI-disabled/AI-enabled acceptance pass |
-| D-038 | Editable memories with explicit user overrides and state-driven UI | Addition | Implemented on `codex/note-editing-ui-polish`; 243 backend, 44/44 stress, 68/68 Chrome, and 189/189 macOS checks pass |
+| D-038 | Editable memories with explicit user overrides and state-driven UI | Addition | Implemented and user-accepted on `codex/note-editing-ui-polish`; 243 backend, 44/44 stress, 68/68 Chrome, and 189/189 macOS checks pass |
 | D-039 | Branded Chrome settings and movable capture surfaces | Addition | Implemented and real-Chrome verified on `codex/note-editing-ui-polish`; 70/70 extension tests pass |
-| D-040 | Canonical browser icon and adaptive native brand mark | UI/UX addition | Implemented on `codex/note-editing-ui-polish`; 70/70 extension and 189/189 host macOS tests pass |
+| D-040 | Canonical browser icon and adaptive native brand mark | UI/UX addition | Implemented and user-accepted on `codex/note-editing-ui-polish`; 70/70 extension and 189/189 host macOS tests pass |
 
 ## D-001 — Localhost monorepo architecture
 
@@ -1068,8 +1068,8 @@ structured-clipboard resolver.
 ## D-038 — Editable memories with explicit user overrides and state-driven UI
 
 - Classification: Addition approved by user direction
-- Status: Implemented and automated-verified on
-  `codex/note-editing-ui-polish`; real-app interaction acceptance remains
+- Status: Implemented, automated-verified, and user-accepted on
+  `codex/note-editing-ui-polish`
 - Product impact: Users can correct and organize saved memories without making
   user-authored changes indistinguishable from captured or AI-generated data
 - Schedule impact: Crosses migration, API, FTS, embedding invalidation, macOS
@@ -1111,9 +1111,9 @@ shift nearby content.
 
 The completed automated gate passes 243 backend tests, all 44 deterministic
 stress scenarios, all 68 Chrome-extension tests, and 189/189 host macOS tests,
-including production Apple Vision OCR. Editing, sort ordering, notice
-resolution, Settings tabs, and image-composer geometry remain the focused
-real-app acceptance pass before merge.
+including production Apple Vision OCR. User acceptance on 2026-07-21 covered
+editing, sort ordering, notice resolution, Settings tabs, and stable image-
+composer geometry.
 
 ## D-036 — Conservative structured-text line restoration
 
@@ -1207,8 +1207,8 @@ changing that permission.
 ## D-040 — Canonical browser icon and adaptive native brand mark
 
 - Classification: UI/UX addition approved by user direction
-- Status: Implemented on `codex/note-editing-ui-polish`; 70/70 extension and
-  189/189 host macOS tests pass
+- Status: Implemented and user-accepted on `codex/note-editing-ui-polish`;
+  70/70 extension and 189/189 host macOS tests pass
 - Product impact: Keeps browser and native capture surfaces recognizable while
   preserving platform-appropriate rendering and long Page metadata
 - Schedule impact: Bounded asset and presentation change; no API, storage, or
@@ -1234,6 +1234,8 @@ passed all 70 tests, including new regressions for Page wrapping, independent
 scrolling, and removal of title ellipsis. Live screen inspection was unavailable
 in the verification environment because macOS ScreenCaptureKit could not start;
 asset rendering, compilation, and automated layout evidence remain complete.
+The user subsequently accepted the popup Page metadata, menu-bar logo, and
+Quick Capture logo in the running products on 2026-07-21.
 
 ## Pending decisions
 

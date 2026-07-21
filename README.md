@@ -304,9 +304,9 @@ state-aware lifetimes. Settings is split into Shortcuts and Privacy & Features,
 and the image-note review layout no longer shifts when AI indexing is toggled.
 
 The integrated D-038/D-040 tree passes 243 backend tests, 44/44 stress scenarios,
-189/189 macOS tests, and 70/70 Chrome-extension tests. Real-app acceptance for
-the new edit, sort, notice, Settings, and image-composer interactions remains
-the final pre-merge check.
+189/189 macOS tests, and 70/70 Chrome-extension tests. User acceptance now also
+covers the edit, sort, notice, Settings, image-composer, popup Page metadata,
+menu-bar logo, and Quick Capture logo interactions.
 
 Live verification covers provider-off keyword fallback, real OpenAI enrichment
 and embeddings, semantic retrieval with a non-null score, and both selected-text

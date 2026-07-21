@@ -359,8 +359,9 @@ D-038 adds native memory editing, separate user organization overrides,
 explicit stale-AI refresh, creation/edit sorting, stable minute-level times,
 state-driven notices, separated Settings tabs, and fixed image-note composer
 geometry. The integrated host suite now passes 189/189 tests, including the
-production Apple Vision check. Real-app interaction acceptance remains before
-merge.
+production Apple Vision check. Real-app editing, sorting, notice, Settings,
+image-composer, menu-bar logo, and Quick Capture logo acceptance passed on
+2026-07-21.
 
 ## Manual test matrix
 

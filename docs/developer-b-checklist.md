@@ -6,8 +6,8 @@ Project: Recall
 
 Last updated: 2026-07-21
 
-Current phase: Editable memories and state-driven UI polish implemented;
-automated verification complete and real-app verification pending
+Current phase: Editable memories, extension polish, and cross-client icon work
+implemented; automated and user acceptance verification complete
 
 Implementation branch: `codex/note-editing-ui-polish`
 
@@ -111,9 +111,9 @@ Update protocol:
 | Addition | Clipboard selection compatibility | Complete and real-device accepted | D-035 adds an off-by-default transactional synthetic-Copy fallback with exact-control and application-scoped tickets; 149/149 host tests and B-016 user acceptance pass |
 | Addition | Structured-text capture fidelity | Implemented; live payload verified | D-036 adds a bounded plain/HTML/RTF resolver to explicit Clipboard Capture; the real Gemini payload restores verified boundaries from flattened plain text while retaining TeX |
 | Addition | Persisted image notes and visual indexing | Implemented; primary real-app flow accepted | D-037 adds one bounded local image, separate note, off-by-default AI master switch, existing-search reuse, rendering, retry, and deletion; 235 backend and 184 integrated macOS tests pass |
-| Addition | Editable memories and UI state polish | Implemented; automated verification complete | D-038 adds a separate user-edit layer, migration 005, explicit AI refresh, creation/edit sorting, state-driven notices, Settings tabs, and stable image-note layout; 243 backend, 44/44 stress, 68/68 Chrome, and 189/189 macOS checks pass |
+| Addition | Editable memories and UI state polish | Implemented and user-accepted | D-038 adds a separate user-edit layer, migration 005, explicit AI refresh, creation/edit sorting, state-driven notices, Settings tabs, and stable image-note layout; 243 backend, 44/44 stress, 68/68 Chrome, and 189/189 macOS checks pass |
 | Addition | Chrome extension UI and settings polish | Implemented and real-Chrome verified | D-039 moves inline access to a branded options page, exposes Chrome shortcut management, stabilizes the popup, wraps long titles, and adds viewport-bounded composer dragging; 70/70 extension tests pass |
-| Addition | Cross-client Recall icon alignment | Implemented; live appearance acceptance pending | D-040 derives Chrome's required small icons from `icon128.png`, wraps/scrolls popup Page metadata, and adds one adaptive native vector mark; 70/70 extension and 189/189 host macOS tests pass |
+| Addition | Cross-client Recall icon alignment | Implemented and user-accepted | D-040 derives Chrome's required small icons from `icon128.png`, wraps/scrolls popup Page metadata, and adds one adaptive native vector mark; 70/70 extension and 189/189 host macOS tests pass |
 
 The D-023 integration closes B-010, the macOS slice closes B-006, and real
 provider plus unpacked-Chrome evidence closes B-007, B-008, and B-009. B-011 is
@@ -121,10 +121,10 @@ resolved by the hardening work. Remaining work is the explicit Layer 8 backlog
 and Layer 10 submission/release material, not a missing shared P0 integration
 gate.
 
-## Active addition — editable memories and state-driven UI polish
+## Completed addition — editable memories and state-driven UI polish
 
-Status: `[~]` D-038 implementation and full automated verification complete;
-real-app interaction acceptance remains
+Status: `[x]` D-038 implementation, full automated verification, and user
+acceptance complete
 
 - [x] Add migration 005 with explicit user source/organization overrides and a
   separate `user_edited_at` timestamp while preserving captured and AI columns.
@@ -146,10 +146,10 @@ real-app interaction acceptance remains
 - [x] Run full backend, stress, Chrome, and host macOS suites. Evidence: 243/243
   backend, 44/44 stress, 68/68 Chrome-extension, and 189/189 host macOS tests,
   including production Apple Vision OCR.
-- [ ] Complete real-app edit, sort, notice-resolution, Settings-tab, and stable
-  image-composer layout acceptance before merge.
+- [x] Complete real-app edit, sort, notice-resolution, Settings-tab, and stable
+  image-composer layout acceptance. User acceptance passed on 2026-07-21.
 
-## Active addition — Chrome extension UI and settings polish
+## Completed addition — Chrome extension UI and settings polish
 
 Status: `[x]` D-039 implementation, automated verification, and bounded real-
 Chrome UI acceptance complete
@@ -170,10 +170,10 @@ Chrome UI acceptance complete
 - [x] Pass all 70 dependency-free extension tests, including manifest/options,
   scroll/resize, fixed-button, title-wrap, branding, drag, and clamp regressions.
 
-## Active addition — canonical browser and adaptive native icons
+## Completed addition — canonical browser and adaptive native icons
 
-Status: `[~]` D-040 implementation and automated verification complete; live
-appearance acceptance remains
+Status: `[x]` D-040 implementation, automated verification, and live user
+acceptance complete
 
 - [x] Keep `icon128.png` as the canonical browser logo and regenerate Chrome's
   required 16-, 32-, and 48-pixel native assets from it.
@@ -183,9 +183,9 @@ appearance acceptance remains
   adaptive `MenuBarExtra` template icon and accent-colored Quick Capture icon.
 - [x] Pass all 70 extension tests and all 189 host macOS tests, including
   production Apple Vision OCR.
-- [ ] Confirm the updated popup, menu-bar icon, and Quick Capture header in the
-  user's running Chrome/app. Automated screen inspection was unavailable because
-  macOS ScreenCaptureKit could not start in the verification session.
+- [x] Confirm the updated popup, menu-bar icon, and Quick Capture header in the
+  user's running Chrome/app. User acceptance passed on 2026-07-21 after the
+  automated ScreenCaptureKit session was unavailable.
 
 ## Completed addition — persisted image notes and visual indexing
 
@@ -2677,7 +2677,7 @@ resolved errors.
 ## E-064 — ScreenCaptureKit blocked automated D-040 appearance inspection
 
 - Date: 2026-07-21
-- Status: Open acceptance item; implementation verification complete
+- Status: Resolved by independent user acceptance
 - Symptom: The local UI-control session could not acquire a Chrome or native-app
   screenshot and returned `SCStreamErrorDomain` code `-3811`.
 - Cause: macOS failed to start the requested ScreenCaptureKit stream in the
@@ -2685,7 +2685,7 @@ resolved errors.
   extension UI was inspected.
 - Resolution: Verified the template SVG through a rendered preview, compiled it
   through Xcode, added popup layout regressions, and passed all 70 extension and
-  189 host macOS tests. Retain live appearance inspection as the remaining
-  acceptance item rather than treating the system failure as product evidence.
+  189 host macOS tests. The user then verified and accepted the actual extension
+  popup, menu-bar mark, and Quick Capture mark on 2026-07-21.
 - Project impact: Visual acceptance only; no product build, test, or runtime
   failure was observed.
