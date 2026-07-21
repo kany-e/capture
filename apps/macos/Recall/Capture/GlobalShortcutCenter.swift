@@ -43,14 +43,17 @@ final class GlobalShortcutCenter: ObservableObject {
 
         var initialConfiguration = GlobalShortcutConfiguration.default
         var initialMessage: String?
+        var migratedLegacySelection = false
         if let storedData = userDefaults.data(forKey: Self.userDefaultsKey) {
             do {
+                let needsSelectionMigration = !Self.containsSelectionShortcut(in: storedData)
                 let storedConfiguration = try JSONDecoder().decode(
                     GlobalShortcutConfiguration.self,
                     from: storedData
                 )
                 try storedConfiguration.validate()
                 initialConfiguration = storedConfiguration
+                migratedLegacySelection = needsSelectionMigration
             } catch {
                 initialMessage = "Saved shortcuts were invalid, so Recall restored its defaults."
                 userDefaults.removeObject(forKey: Self.userDefaultsKey)
@@ -64,6 +67,33 @@ final class GlobalShortcutCenter: ObservableObject {
         do {
             registrations = try makeRegistrations(for: initialConfiguration)
             activeActions = Set(registrations.keys)
+            if migratedLegacySelection,
+               let migratedData = try? JSONEncoder().encode(initialConfiguration) {
+                userDefaults.set(migratedData, forKey: Self.userDefaultsKey)
+            }
+        } catch let activationError as ShortcutActivationError
+            where migratedLegacySelection
+                && initialConfiguration.selection.isEnabled
+                && activationError.action == .selection {
+            var fallbackConfiguration = initialConfiguration
+            fallbackConfiguration.selection.isEnabled = false
+            do {
+                registrations = try makeRegistrations(for: fallbackConfiguration)
+                activeActions = Set(registrations.keys)
+                configuration = fallbackConfiguration
+                if let fallbackData = try? JSONEncoder().encode(fallbackConfiguration) {
+                    userDefaults.set(fallbackData, forKey: Self.userDefaultsKey)
+                }
+                errorMessage = "Recall kept your existing shortcuts active, but the new "
+                    + "Selection capture shortcut could not be registered. Choose another "
+                    + "shortcut and enable it in Settings."
+                registrationErrorMessage = nil
+            } catch {
+                registrations = [:]
+                activeActions = []
+                errorMessage = error.localizedDescription
+                registrationErrorMessage = error.localizedDescription
+            }
         } catch {
             registrations = [:]
             activeActions = []
@@ -148,6 +178,14 @@ final class GlobalShortcutCenter: ObservableObject {
         unregisterAll(registrations)
         registrations = [:]
         activeActions = []
+    }
+
+    private static func containsSelectionShortcut(in data: Data) -> Bool {
+        guard let object = try? JSONSerialization.jsonObject(with: data),
+              let dictionary = object as? [String: Any] else {
+            return false
+        }
+        return dictionary["selection"] != nil
     }
 
     private func makeRegistrations(

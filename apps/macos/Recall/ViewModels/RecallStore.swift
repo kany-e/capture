@@ -2,6 +2,7 @@ import Foundation
 
 struct QuickCaptureDraft: Equatable, Sendable {
     enum Kind: Equatable, Sendable {
+        case selection
         case clipboard
         case screenshot
     }
@@ -95,6 +96,8 @@ final class RecallStore: ObservableObject {
     @Published var quickCaptureDraft: QuickCaptureDraft?
     @Published private(set) var isSubmittingCapture = false
     @Published var quickCaptureError: String?
+    @Published private(set) var accessibilitySelectionError: AccessibilitySelectionError?
+    @Published private(set) var isPreparingAccessibilitySelection = false
     @Published private(set) var screenshotPreviewData: Data?
     @Published var screenshotExtractionMode: ScreenshotExtractionMode = .gpt
     @Published private(set) var isPreparingScreenshot = false
@@ -105,6 +108,7 @@ final class RecallStore: ObservableObject {
 
     private let client: any RecallAPIClient
     private let clipboardService: any ClipboardCaptureServing
+    private let accessibilitySelectionService: any AccessibilitySelectionServing
     private let screenshotCaptureService: any ScreenshotCaptureServing
     private let localScreenshotExtractor: any LocalScreenshotTextExtracting
     private var libraryCaptures: [Capture] = []
@@ -125,6 +129,7 @@ final class RecallStore: ObservableObject {
     init(
         client: any RecallAPIClient,
         clipboardService: any ClipboardCaptureServing,
+        accessibilitySelectionService: any AccessibilitySelectionServing = SystemAccessibilitySelectionService(),
         screenshotCaptureService: any ScreenshotCaptureServing = SystemScreenshotCaptureService(),
         localScreenshotExtractor: any LocalScreenshotTextExtracting = AppleVisionScreenshotTextExtractor(),
         foregroundRefreshIntervalNanoseconds: UInt64 = 5_000_000_000,
@@ -134,6 +139,7 @@ final class RecallStore: ObservableObject {
     ) {
         self.client = client
         self.clipboardService = clipboardService
+        self.accessibilitySelectionService = accessibilitySelectionService
         self.screenshotCaptureService = screenshotCaptureService
         self.localScreenshotExtractor = localScreenshotExtractor
         self.foregroundRefreshIntervalNanoseconds = foregroundRefreshIntervalNanoseconds
@@ -146,6 +152,7 @@ final class RecallStore: ObservableObject {
         self.init(
             client: client,
             clipboardService: SystemClipboardCaptureService(),
+            accessibilitySelectionService: SystemAccessibilitySelectionService(),
             screenshotCaptureService: SystemScreenshotCaptureService(),
             localScreenshotExtractor: AppleVisionScreenshotTextExtractor()
         )
@@ -376,7 +383,7 @@ final class RecallStore: ObservableObject {
 
     @discardableResult
     func prepareClipboardCapture() -> Bool {
-        guard !isPreparingScreenshot else { return false }
+        guard !isPreparingScreenshot, !isPreparingAccessibilitySelection else { return false }
         guard canPrepareNewQuickCapture() else { return false }
         do {
             let snapshot = try clipboardService.readSnapshot()
@@ -392,6 +399,7 @@ final class RecallStore: ObservableObject {
             )
             attemptedQuickCaptureRequest = nil
             quickCaptureError = nil
+            accessibilitySelectionError = nil
             screenshotPreviewData = nil
             screenshotExtractionSummary = nil
             screenshotMediaType = "image/png"
@@ -404,9 +412,72 @@ final class RecallStore: ObservableObject {
         }
     }
 
+    func prepareAccessibilitySelectionCapture(
+        promptIfNeeded: Bool = true
+    ) async -> AccessibilitySelectionSnapshot? {
+        guard !isPreparingScreenshot, !isPreparingAccessibilitySelection else { return nil }
+        guard canPrepareNewQuickCapture() else { return nil }
+        isPreparingAccessibilitySelection = true
+        defer { isPreparingAccessibilitySelection = false }
+
+        do {
+            let snapshot = try await accessibilitySelectionService.readSelection(
+                promptIfNeeded: promptIfNeeded
+            )
+            guard !Task.isCancelled else { return nil }
+            let boundedCharacterCount = snapshot.text.unicodeScalars
+                .prefix(Self.maximumSelectedTextLength + 1)
+                .count
+            guard boundedCharacterCount <= Self.maximumSelectedTextLength else {
+                clearQuickCapture()
+                let selectionError = AccessibilitySelectionError.selectionTooLong
+                accessibilitySelectionError = selectionError
+                quickCaptureError = selectionError.localizedDescription
+                notice = AppNotice(
+                    style: .warning,
+                    message: selectionError.localizedDescription
+                )
+                return nil
+            }
+            guard canPrepareNewQuickCapture() else { return nil }
+
+            invalidateScreenshotExtraction()
+            quickCaptureDraft = QuickCaptureDraft(
+                selectedText: snapshot.text,
+                sourceApplication: snapshot.sourceApplication.map {
+                    Self.prefixUnicodeScalars(
+                        $0,
+                        limit: Self.maximumSourceApplicationLength
+                    )
+                },
+                kind: .selection
+            )
+            attemptedQuickCaptureRequest = nil
+            quickCaptureError = nil
+            accessibilitySelectionError = nil
+            screenshotPreviewData = nil
+            screenshotExtractionSummary = nil
+            screenshotMediaType = "image/png"
+            return snapshot
+        } catch {
+            guard !Self.isCancellation(error), !Task.isCancelled else { return nil }
+            clearQuickCapture()
+            let selectionError = error as? AccessibilitySelectionError
+                ?? .selectionUnavailable
+            accessibilitySelectionError = selectionError
+            quickCaptureError = selectionError.localizedDescription
+            notice = AppNotice(style: .warning, message: selectionError.localizedDescription)
+            return nil
+        }
+    }
+
+    func accessibilityAccessIsGranted(promptIfNeeded: Bool = false) async -> Bool {
+        await accessibilitySelectionService.isTrusted(promptIfNeeded: promptIfNeeded)
+    }
+
     @discardableResult
     func prepareScreenshotCapture() async -> Bool {
-        guard !isPreparingScreenshot else { return false }
+        guard !isPreparingScreenshot, !isPreparingAccessibilitySelection else { return false }
         guard canPrepareNewQuickCapture() else { return false }
         isPreparingScreenshot = true
         defer { isPreparingScreenshot = false }
@@ -430,6 +501,7 @@ final class RecallStore: ObservableObject {
             screenshotExtractionSummary = nil
             attemptedQuickCaptureRequest = nil
             quickCaptureError = nil
+            accessibilitySelectionError = nil
             return true
         } catch ScreenshotCaptureError.cancelled {
             clearQuickCapture()
@@ -540,6 +612,14 @@ final class RecallStore: ObservableObject {
         let note = draft.userNote.nonEmptyTrimmed == nil ? nil : draft.userNote
         let currentRequest: CaptureCreateRequest
         switch draft.kind {
+        case .selection:
+            currentRequest = .clipboard(
+                clientCaptureID: draft.clientCaptureID,
+                capturedAt: draft.capturedAt,
+                text: draft.selectedText,
+                sourceApp: draft.sourceApplication,
+                userNote: note
+            )
         case .clipboard:
             currentRequest = .clipboard(
                 clientCaptureID: draft.clientCaptureID,
@@ -617,6 +697,7 @@ final class RecallStore: ObservableObject {
         quickCaptureDraft = nil
         attemptedQuickCaptureRequest = nil
         quickCaptureError = nil
+        accessibilitySelectionError = nil
         screenshotPreviewData = nil
         screenshotExtractionSummary = nil
         screenshotMediaType = "image/png"

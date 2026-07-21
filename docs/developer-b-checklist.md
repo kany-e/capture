@@ -6,12 +6,12 @@ Project: Recall
 
 Last updated: 2026-07-21
 
-Current phase: Chrome action popup sizing correction complete; native
-Accessibility selection next
+Current phase: Native Accessibility selection implemented; real-device
+acceptance and PR review pending
 
-Implementation branch: `codex/fix-chrome-popup-sizing`
+Implementation branch: `codex/native-accessibility-selection`
 
-Branch base: `b028e83` (PR #11 merge commit)
+Branch base: `42f565a` (PR #12 merge commit)
 
 Canonical target: `main`
 
@@ -31,6 +31,14 @@ with Recall's main window closed, and the clipboard shortcut opened Capture
 after copied text. D-033 also restores the Chrome action popup's full 344 × 510
 layout after a viewport-relative sizing regression; 68/68 tests and selected
 plus metadata-only real-Chrome checks pass.
+
+D-034 now adds explicit native selection capture through a third configurable
+shortcut, background AX reading, secure/protected-content rejection, transient
+selection bounds, anchored Quick Capture, and backward-compatible shortcut
+migration. The host macOS suite passes 108/108. B-015 remains open for the
+physical shortcut, real Accessibility permission, cross-app selection, and
+screen-edge placement matrix; the PR must not merge before the user completes
+that acceptance.
 
 Last baseline cross-check: 2026-07-18 against all sections of
 `docs/product-plan.md`
@@ -82,6 +90,7 @@ Update protocol:
 | Addition | Native global capture | Complete and real-device verified | D-031 adds transactional Carbon shortcuts and one app-level capture coordinator; PR #10 merged at `0ab687b`; B-014 is closed |
 | Safeguard | Stable Screen Recording identity | Complete and live-verified | D-032 passes 70/70 macOS tests; app-specific reset, authorization, rebuild persistence, selector launch, and cancellation pass |
 | Safeguard | Chrome action popup sizing | Complete and real-Chrome verified | D-033 uses a 344 × 510 root without viewport-height feedback; 68/68 tests and selected/metadata layouts pass |
+| Addition | Native Accessibility selection | Implemented; real-device acceptance pending | D-034 adds explicit `Option+Shift+Command+S`, fail-closed AX reading, anchored review, safe v1 shortcut migration, and 108/108 macOS tests; B-015 is open |
 
 The D-023 integration closes B-010, the macOS slice closes B-006, and real
 provider plus unpacked-Chrome evidence closes B-007, B-008, and B-009. B-011 is
@@ -305,6 +314,44 @@ complete
   press `Option+Shift+Command+4`, and complete one non-empty region. After
   copying text, physically press `Option+Shift+Command+C` and confirm that
   Capture opens. The user completed both real-device checks on 2026-07-21.
+
+## Active addition — native Accessibility selection
+
+Status: `[~]` D-034 implementation and 108/108 host tests complete on
+`codex/native-accessibility-selection`; B-015 real-device acceptance and PR
+review remain open
+
+- [x] Add a third configurable **Selection capture** action with default
+  `Option+Shift+Command+S`, generic three-way duplicate validation, and the
+  existing whole-set registration transaction.
+- [x] Migrate stored two-action `globalShortcutConfiguration.v1` values without
+  losing customized screenshot/clipboard choices. Persist the additive field;
+  if only the new default is externally occupied, disable it while preserving
+  the two established registrations.
+- [x] Read only after an explicit shortcut/menu command. Check Accessibility
+  trust before attributes; reject Recall itself, secure text fields, protected
+  content, missing/empty/unsupported selections, and input over 12,000
+  characters. Do not simulate copy, inspect a window title, or read surrounding
+  content.
+- [x] Run cross-process AX work outside the main actor with bounded messaging
+  timeouts and cancellation propagation. Treat range/bounds as optional so
+  readable text still opens review when positioning metadata is unavailable.
+- [x] Reuse the existing Quick Capture and idempotent save pipeline. Distinguish
+  the native `.selection` draft in UI while mapping Save to the existing
+  clipboard-text contract. Submit no URL, title, surrounding context, range, or
+  screen bounds.
+- [x] Convert AX global coordinates against the current primary-screen layout,
+  choose the display with the greatest selection intersection, position after
+  SwiftUI layout, and clamp the 500-point review window to `visibleFrame`.
+  Invalid/offscreen bounds center on the current mouse screen.
+- [x] Add permission status/request UI, an explicit System Settings route,
+  honest current-clipboard recovery, and menu-bar Selection capture.
+- [x] Pass 108/108 host tests covering AX ordering/privacy, exact Unicode,
+  contract mapping, cancellation/late results, oversize rejection, source-app
+  bounds, shortcut migration/conflict rollback, and window geometry/request
+  gating.
+- [ ] Open a non-auto-merged PR for user testing, complete B-015 on the stably
+  signed real app, then update evidence before any merge.
 
 ## Active reliability correction — stable Screen Recording identity
 
@@ -1548,8 +1595,27 @@ Use IDs `B-###`. Never delete an entry; append resolution and date.
   through the existing capture flow. After copying text, the user physically
   pressed `Option+Shift+Command+C` and Capture opened as expected.
 - Does it block build, deterministic regression, documentation, or live demo
-  proof? No. The real-device global capture acceptance gate is closed; future
-  release candidates should repeat the interaction check.
+proof? No. The real-device global capture acceptance gate is closed; future
+release candidates should repeat the interaction check.
+
+## B-015 — Native Accessibility selection acceptance
+
+- Opened: 2026-07-21
+- Severity: Manual UI/privacy/compatibility gate
+- Status: Open; required before merging D-034
+- Automated evidence: The host macOS suite passes 108/108. It covers permission
+  fail-closed ordering, self/secure/protected-content rejection, exact text,
+  optional bounds, no-context contract mapping, 12,000-character protection,
+  cancellation, v1 shortcut migration and conflicts, and placement geometry.
+- Manual evidence still needed: Run exactly one stably signed Recall copy;
+  authorize it under **Privacy & Security > Accessibility**; physically trigger
+  `Option+Shift+Command+S` from TextEdit Chinese/emoji/multiline text; check
+  browser and selectable Preview PDF behavior; verify no-selection,
+  secure/unsupported, and current-clipboard recovery states; confirm placement
+  near every screen edge (and a second display when available); then recheck the
+  existing screenshot and clipboard shortcuts.
+- Merge rule: The PR may be opened for user testing but must remain unmerged
+  until the user reports this matrix and any discovered regression is resolved.
 
 # Errors encountered
 

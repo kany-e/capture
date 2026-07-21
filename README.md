@@ -8,8 +8,8 @@ interpretation as separate, searchable layers.
 
 This repository now contains the complete integrated product tree:
 
-- `apps/macos/` — SwiftUI/AppKit clipboard and screenshot-note capture,
-  library, detail, lifecycle, and search client;
+- `apps/macos/` — SwiftUI/AppKit Accessibility selection, clipboard, and
+  screenshot-note capture, library, detail, lifecycle, and search client;
 - `apps/chrome-extension/` — build-free Manifest V3 web capture extension;
 - `services/backend/` — loopback FastAPI API, SQLite/FTS5 storage, OpenAI
   enrichment, embeddings, and hybrid retrieval;
@@ -106,11 +106,15 @@ prove Screen Recording authorization. The macOS README documents the one-time
 reset and reauthorization needed when migrating from an earlier ad-hoc build.
 
 Recall remains a normal Dock app and also keeps its existing menu-bar extra.
-While the app is running, global screenshot and clipboard capture default to
-`Option+Shift+Command+4` and `Option+Shift+Command+C`; they remain available
-when the main window is closed. Configure, disable, or restore them in
-**Settings > Global capture shortcuts**. The hotkeys use Carbon registration
-and do not require Accessibility or Input Monitoring permission.
+While the app is running, global selection, screenshot, and clipboard capture
+default to `Option+Shift+Command+S`, `Option+Shift+Command+4`, and
+`Option+Shift+Command+C`; they remain available when the main window is closed.
+Capture Selection reads the focused external app's selected text only after the
+shortcut, then opens the existing review window near that selection. It requires
+macOS Accessibility access. Carbon hotkey registration itself, clipboard
+capture, and screenshot capture do not require Accessibility or Input Monitoring
+permission. Configure, disable, or restore all three actions in **Settings >
+Global capture shortcuts**.
 
 ## Load the Chrome extension
 
@@ -213,6 +217,17 @@ a permission error. The macOS suite passes 70/70. B-014 is closed: with Recall's
 main window closed and another app focused, the physical screenshot shortcut
 completed a non-empty region, and the clipboard shortcut opened Capture after
 text was copied.
+
+D-034 adds user-triggered native Accessibility selection capture without
+changing the backend contract or saving surrounding context. The native draft
+is labeled as a selection but submits through the existing text/clipboard source
+contract; selection bounds are used only to position Quick Capture and are never
+persisted. The host suite passes 108/108 tests, including permission and secure-
+field fail-closed behavior, exact Unicode preservation, old shortcut migration,
+cancellation, oversized-source rejection, and multi-screen placement geometry.
+Real-app permission, TextEdit/browser/PDF compatibility, and physical shortcut
+acceptance remain the manual gate before this branch may merge.
+
 Final regression also passes 215 backend tests, 44/44 stress scenarios, and
 68/68 Chrome-extension tests.
 

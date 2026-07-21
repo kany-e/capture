@@ -3,6 +3,7 @@ import SwiftUI
 
 struct QuickCaptureView: View {
     @EnvironmentObject private var store: RecallStore
+    @EnvironmentObject private var captureCoordinator: GlobalCaptureCoordinator
     @Environment(\.dismissWindow) private var dismissWindow
     @FocusState private var noteIsFocused: Bool
     @State private var screenshotExtractionTask: Task<Void, Never>?
@@ -17,8 +18,15 @@ struct QuickCaptureView: View {
         }
         .frame(width: 500)
         .background(.regularMaterial)
+        .background {
+            QuickCaptureWindowAccessor(
+                requestID: captureCoordinator.quickCapturePresentationRequest,
+                context: captureCoordinator.quickCapturePresentationContext
+            )
+            .frame(width: 0, height: 0)
+        }
         .onAppear {
-            noteIsFocused = store.quickCaptureDraft?.kind == .clipboard
+            noteIsFocused = store.quickCaptureDraft?.kind != .screenshot
         }
         .onExitCommand {
             cancel()
@@ -34,9 +42,12 @@ struct QuickCaptureView: View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(draft.kind == .screenshot ? "Capture Screenshot Note" : "Capture Clipboard")
+                    Text(captureTitle(for: draft.kind))
                         .font(.title2.weight(.bold))
-                    Label(draft.sourceApplication ?? "Clipboard", systemImage: "app.dashed")
+                    Label(
+                        draft.sourceApplication ?? sourceFallback(for: draft.kind),
+                        systemImage: "app.dashed"
+                    )
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -126,11 +137,7 @@ struct QuickCaptureView: View {
             }
 
             HStack {
-                Text(
-                    draft.kind == .screenshot
-                        ? "Recall saves only the extracted source text and your optional note; closing clears the temporary image."
-                        : "Your source is saved before AI processing begins."
-                )
+                Text(captureFooter(for: draft.kind))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -245,11 +252,59 @@ struct QuickCaptureView: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 340)
-            Button("Close", action: cancel)
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
+            HStack {
+                if store.accessibilitySelectionError == .permissionRequired {
+                    Button("Open Accessibility Settings") {
+                        openAccessibilitySettings()
+                    }
+                }
+                if store.accessibilitySelectionError != nil {
+                    Button("Capture Current Clipboard") {
+                        captureCoordinator.prepareClipboardCapture()
+                    }
+                }
+                Button("Close", action: cancel)
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            }
         }
         .padding(36)
+    }
+
+    private func captureTitle(for kind: QuickCaptureDraft.Kind) -> String {
+        switch kind {
+        case .selection: "Capture Selection"
+        case .clipboard: "Capture Clipboard"
+        case .screenshot: "Capture Screenshot Note"
+        }
+    }
+
+    private func sourceFallback(for kind: QuickCaptureDraft.Kind) -> String {
+        switch kind {
+        case .selection: "Selected text"
+        case .clipboard: "Clipboard"
+        case .screenshot: "Screenshot"
+        }
+    }
+
+    private func captureFooter(for kind: QuickCaptureDraft.Kind) -> String {
+        switch kind {
+        case .selection:
+            "Recall saves only this source selection and your optional note before AI processing begins."
+        case .clipboard:
+            "Your clipboard text and optional note are saved before AI processing begins."
+        case .screenshot:
+            "Recall saves only the extracted source text and your optional note; closing clears the temporary image."
+        }
+    }
+
+    private func openAccessibilitySettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        ) else {
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
 
     private var noteBinding: Binding<String> {

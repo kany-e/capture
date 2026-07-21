@@ -41,9 +41,10 @@ OS temporary PNG and removes it after success, cancellation, or failure.
 ## Native global capture boundary
 
 Decision D-031 adds native global screenshot and clipboard entry points without
-changing the Capture pipeline or the app's ordinary lifecycle. Recall remains a
-normal Dock application with its existing `MenuBarExtra`; it must be running,
-but closing the main window does not destroy the app-level capture state.
+changing the Capture pipeline or the app's ordinary lifecycle. D-034 extends
+the same coordinator with explicit Accessibility selection capture. Recall
+remains a normal Dock application with its existing `MenuBarExtra`; it must be
+running, but closing the main window does not destroy app-level capture state.
 
 ```text
 main-window controls ─┐
@@ -55,7 +56,7 @@ MenuBarExtra label ─ CapturePresentationHost ──────────┘
                                              shared Quick Capture window
 ```
 
-All three entry surfaces call the app-level `GlobalCaptureCoordinator`; views
+All entry surfaces call the app-level `GlobalCaptureCoordinator`; views
 do not prepare drafts or own screenshot tasks independently. A
 `CapturePresentationHost` in the `MenuBarExtra` label observes coordinator
 requests and opens the Quick Capture scene, so presentation does not depend on
@@ -64,10 +65,12 @@ the main-window scene being open.
 `GlobalShortcutCenter` owns configuration, persistence, active registrations,
 and errors. Its Carbon `RegisterEventHotKey` registrar needs neither
 Accessibility nor Input Monitoring permission. Defaults are
-`Option+Shift+Command+4` for screenshots and `Option+Shift+Command+C` for the
-clipboard. Settings restricts keys to A–Z and 0–9 with Command, Option, Control,
-and Shift, requires at least two modifiers per action, rejects duplicate action
-bindings, supports enable/disable, and restores defaults.
+`Option+Shift+Command+S` for selection, `Option+Shift+Command+4` for screenshots,
+and `Option+Shift+Command+C` for the clipboard. Selection reading—not Carbon
+registration—requires Accessibility permission. Settings restricts keys to A–Z
+and 0–9 with Command, Option, Control, and Shift, requires at least two modifiers
+per action, rejects duplicate action bindings, supports enable/disable, and
+restores defaults.
 
 Applying configuration is a whole-set transaction: unregister the old set,
 install the proposed set, persist only on success, and remove any partial new
@@ -86,6 +89,57 @@ This boundary changes no API, schema, backend, database, extension, enrichment,
 retrieval, or image-persistence behavior. Screenshot bytes remain limited to the
 active draft, and the GPT/cloud versus Apple Vision/on-device disclosure remains
 unchanged.
+
+## Native Accessibility selection boundary
+
+Decision D-034 adds a user-triggered, one-shot AX reader; it does not install a
+system-wide selection observer or poll other applications.
+
+```text
+Carbon Selection hotkey / menu command
+                 │
+                 ▼
+       GlobalCaptureCoordinator
+                 │ before Recall activation
+                 ▼
+ AccessibilitySelectionService ─ permission / focused external app
+                 │                secure + protected-content checks
+                 ├─ AXSelectedText ────────────────┐
+                 └─ AXSelectedTextRange            │
+                            │                       │
+                      AXBoundsForRange              │
+                            │                       │
+                            ▼                       ▼
+              transient presentation anchor   selection draft
+                            │                       │
+                            └──── Quick Capture ────┘
+                                      │ explicit Save
+                                      ▼
+                         existing clipboard-text request
+```
+
+Cross-process AX calls run outside the main actor and use a bounded messaging
+timeout. Permission is checked before any focused-element attribute. Recall and
+same-bundle processes, secure text fields, protected content, missing/empty
+selection, and sources longer than 12,000 Unicode scalars fail closed. Bounds are
+best effort: lack of `AXBoundsForRange` centers the review window on the current
+screen but does not invalidate readable text. Valid bounds are converted from AX
+top-left global coordinates into the current `NSScreen` layout and clamped to
+that screen's `visibleFrame`.
+
+The native UI distinguishes `.selection` from `.clipboard`, but Save maps both
+to the existing `source_type: clipboard` request. Only exact selected text,
+bounded source-app name, and the optional note enter that request. Window title,
+URL, surrounding context, selected range, and screen bounds are never submitted
+or persisted. Accessibility failures never silently substitute clipboard data;
+the user may explicitly review the current clipboard or use the established
+clipboard shortcut.
+
+Legacy `globalShortcutConfiguration.v1` data decodes the new selection field
+additively and is rewritten without losing screenshot/clipboard choices. If the
+new default cannot register during migration, Recall disables only that new
+action and keeps the two existing registrations active. Passive selection
+notifications and a non-activating inline pill remain a separate opt-in design.
 
 ## macOS privacy identity boundary
 

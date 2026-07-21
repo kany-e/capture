@@ -1,13 +1,19 @@
+import AppKit
 import SwiftUI
 
 struct ShortcutSettingsView: View {
     @EnvironmentObject private var shortcutCenter: GlobalShortcutCenter
+    @EnvironmentObject private var store: RecallStore
     @State private var draft = GlobalShortcutConfiguration.default
     @State private var didApply = false
+    @State private var accessibilityAccessIsGranted = false
+    @State private var isCheckingAccessibilityAccess = false
 
     var body: some View {
         Form {
             Section {
+                shortcutEditor(for: .selection)
+                Divider()
                 shortcutEditor(for: .screenshot)
                 Divider()
                 shortcutEditor(for: .clipboard)
@@ -18,6 +24,36 @@ struct ShortcutSettingsView: View {
                     "Shortcuts work while Recall is running, even when its main window "
                         + "is closed. Each enabled shortcut needs at least two modifier keys. "
                         + "Letter and number choices use their physical U.S. keyboard positions."
+                )
+            }
+
+            Section {
+                HStack {
+                    Label(
+                        accessibilityAccessIsGranted
+                            ? "Accessibility access is enabled"
+                            : "Accessibility access is not enabled",
+                        systemImage: accessibilityAccessIsGranted
+                            ? "checkmark.shield.fill"
+                            : "hand.raised.fill"
+                    )
+                    .foregroundStyle(accessibilityAccessIsGranted ? .green : .orange)
+                    Spacer()
+                    if isCheckingAccessibilityAccess {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else if !accessibilityAccessIsGranted {
+                        Button("Request Access") {
+                            requestAccessibilityAccess()
+                        }
+                    }
+                }
+            } header: {
+                Text("Selection access")
+            } footer: {
+                Text(
+                    "Recall reads selected text only when you use Capture Selection. "
+                        + "Clipboard and screenshot capture do not use Accessibility access."
                 )
             }
 
@@ -57,9 +93,35 @@ struct ShortcutSettingsView: View {
         .padding(.vertical, 8)
         .onAppear {
             draft = shortcutCenter.configuration
+            refreshAccessibilityAccess()
         }
         .onChange(of: shortcutCenter.configuration) {
             draft = shortcutCenter.configuration
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+        ) { _ in
+            refreshAccessibilityAccess()
+        }
+    }
+
+    private func refreshAccessibilityAccess() {
+        guard !isCheckingAccessibilityAccess else { return }
+        isCheckingAccessibilityAccess = true
+        Task { @MainActor in
+            accessibilityAccessIsGranted = await store.accessibilityAccessIsGranted()
+            isCheckingAccessibilityAccess = false
+        }
+    }
+
+    private func requestAccessibilityAccess() {
+        guard !isCheckingAccessibilityAccess else { return }
+        isCheckingAccessibilityAccess = true
+        Task { @MainActor in
+            accessibilityAccessIsGranted = await store.accessibilityAccessIsGranted(
+                promptIfNeeded: true
+            )
+            isCheckingAccessibilityAccess = false
         }
     }
 

@@ -14,6 +14,13 @@ struct MenuBarContentView: View {
         .keyboardShortcut("o")
 
         Button(
+            "Capture Selection (\(shortcutLabel(for: .selection)))",
+            systemImage: "text.cursor"
+        ) {
+            captureCoordinator.prepareAccessibilitySelectionCapture()
+        }
+
+        Button(
             "Capture Clipboard (\(shortcutLabel(for: .clipboard)))",
             systemImage: "doc.on.clipboard"
         ) {

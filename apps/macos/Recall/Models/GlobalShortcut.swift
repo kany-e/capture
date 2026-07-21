@@ -1,11 +1,14 @@
 import Foundation
 
 enum GlobalShortcutAction: String, CaseIterable, Codable, Hashable, Sendable {
+    case selection
     case clipboard
     case screenshot
 
     var displayName: String {
         switch self {
+        case .selection:
+            return "Selection capture"
         case .clipboard:
             return "Clipboard capture"
         case .screenshot:
@@ -173,6 +176,22 @@ struct GlobalShortcut: Codable, Equatable, Hashable, Sendable {
 struct GlobalShortcutConfiguration: Codable, Equatable, Sendable {
     var clipboard: GlobalShortcut
     var screenshot: GlobalShortcut
+    var selection: GlobalShortcut
+
+    static let defaultSelection = GlobalShortcut(
+        key: .s,
+        modifiers: [.option, .shift, .command]
+    )
+
+    init(
+        clipboard: GlobalShortcut,
+        screenshot: GlobalShortcut,
+        selection: GlobalShortcut = Self.defaultSelection
+    ) {
+        self.clipboard = clipboard
+        self.screenshot = screenshot
+        self.selection = selection
+    }
 
     static let `default` = GlobalShortcutConfiguration(
         clipboard: GlobalShortcut(
@@ -182,18 +201,57 @@ struct GlobalShortcutConfiguration: Codable, Equatable, Sendable {
         screenshot: GlobalShortcut(
             key: .digit4,
             modifiers: [.option, .shift, .command]
-        )
+        ),
+        selection: defaultSelection
     )
+
+    private enum CodingKeys: String, CodingKey {
+        case clipboard
+        case screenshot
+        case selection
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        clipboard = try container.decode(GlobalShortcut.self, forKey: .clipboard)
+        screenshot = try container.decode(GlobalShortcut.self, forKey: .screenshot)
+
+        if let storedSelection = try container.decodeIfPresent(
+            GlobalShortcut.self,
+            forKey: .selection
+        ) {
+            selection = storedSelection
+        } else {
+            var migratedSelection = Self.defaultSelection
+            let existingEnabledShortcuts = [clipboard, screenshot].filter(\.isEnabled)
+            if existingEnabledShortcuts.contains(where: {
+                $0.key == migratedSelection.key
+                    && $0.modifiers == migratedSelection.modifiers
+            }) {
+                migratedSelection.isEnabled = false
+            }
+            selection = migratedSelection
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(clipboard, forKey: .clipboard)
+        try container.encode(screenshot, forKey: .screenshot)
+        try container.encode(selection, forKey: .selection)
+    }
 
     subscript(action: GlobalShortcutAction) -> GlobalShortcut {
         get {
             switch action {
+            case .selection: return selection
             case .clipboard: return clipboard
             case .screenshot: return screenshot
             }
         }
         set {
             switch action {
+            case .selection: selection = newValue
             case .clipboard: clipboard = newValue
             case .screenshot: screenshot = newValue
             }
@@ -201,19 +259,16 @@ struct GlobalShortcutConfiguration: Codable, Equatable, Sendable {
     }
 
     func validate() throws {
+        var enabledShortcuts = Set<GlobalShortcut>()
         for action in GlobalShortcutAction.allCases {
             let shortcut = self[action]
             guard shortcut.isEnabled else { continue }
             guard shortcut.modifiers.count >= 2 else {
                 throw GlobalShortcutValidationError.notEnoughModifiers(action: action)
             }
-        }
-
-        guard !clipboard.isEnabled
-                || !screenshot.isEnabled
-                || clipboard.key != screenshot.key
-                || clipboard.modifiers != screenshot.modifiers else {
-            throw GlobalShortcutValidationError.duplicateShortcut
+            guard enabledShortcuts.insert(shortcut).inserted else {
+                throw GlobalShortcutValidationError.duplicateShortcut
+            }
         }
     }
 }
@@ -227,7 +282,7 @@ enum GlobalShortcutValidationError: Error, Equatable, LocalizedError {
         case .notEnoughModifiers(let action):
             return "\(action.displayName) needs at least two modifier keys."
         case .duplicateShortcut:
-            return "Clipboard and screenshot capture cannot use the same shortcut."
+            return "Capture actions cannot use the same shortcut."
         }
     }
 }

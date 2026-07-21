@@ -21,6 +21,8 @@ struct RecallApp: App {
         _shortcutCenter = StateObject(
             wrappedValue: GlobalShortcutCenter { [weak captureCoordinator] action in
                 switch action {
+                case .selection:
+                    captureCoordinator?.handle(.selection)
                 case .clipboard:
                     captureCoordinator?.handle(.clipboard)
                 case .screenshot:
@@ -61,6 +63,7 @@ struct RecallApp: App {
         Settings {
             ShortcutSettingsView()
                 .environmentObject(shortcutCenter)
+                .environmentObject(store)
         }
     }
 }

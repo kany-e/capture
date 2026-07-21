@@ -5,9 +5,9 @@ loopback backend at `http://127.0.0.1:8765`; normal runs do not use an in-proces
 database or mock API client.
 
 The macOS client, hardened backend, and Chrome extension now live in the same
-integration tree. The current D-032 target passes all 70 contract, networking,
-Vision, global-shortcut, lifecycle, validation, idempotency, store, and
-code-signing identity tests.
+integration tree. The current D-034 branch passes all 108 Accessibility,
+contract, networking, Vision, global-shortcut, lifecycle, validation,
+idempotency, store, window-placement, and code-signing identity tests.
 
 ## Requirements
 
@@ -141,6 +141,18 @@ build at CDHash `143035…`, rebuilding with the same signer and
 signer-based requirement. The rebuilt process launched `/usr/sbin/screencapture`,
 showed the region overlay, and returned without a permission error after Escape.
 
+### Accessibility permission for Capture Selection
+
+Accessibility is independent of Screen Recording. Recall requests it only when
+the user chooses **Request Access** in Settings or invokes Capture Selection
+without authorization. Enable the exact Recall build under **System Settings >
+Privacy & Security > Accessibility**, return to the source app, select the text
+again, and retry the shortcut; the initial permission call cannot read the
+selection retroactively. Clipboard and screenshot capture continue to work when
+Accessibility is disabled. Use one stably signed Recall copy during acceptance
+so the permission row, running process, and shortcut owner all refer to the same
+application identity.
+
 ## Build and test from the command line
 
 Run from the repository root. The explicit Derived Data path keeps generated
@@ -204,14 +216,18 @@ Run the build and tests again after regeneration.
 - Run as a normal Dock app with the existing `MenuBarExtra`. Closing the main
   window does not quit Recall, so menu-bar and global capture remain available
   while the app is running.
-- Register native global screenshot and clipboard shortcuts with Carbon
-  `RegisterEventHotKey`, without Accessibility or Input Monitoring permission.
-  Defaults are `Option+Shift+Command+4` for screenshot capture and
-  `Option+Shift+Command+C` for clipboard capture.
-- Configure either action in Settings with an A–Z or 0–9 key plus Command,
-  Option, Control, and/or Shift; each shortcut requires at least two modifiers,
-  and the two actions cannot use the same combination. Either action can be
-  disabled, and **Restore Defaults** restores both defaults.
+- Register native global selection, screenshot, and clipboard shortcuts with
+  Carbon `RegisterEventHotKey`. Defaults are `Option+Shift+Command+S`,
+  `Option+Shift+Command+4`, and `Option+Shift+Command+C`, respectively. Carbon
+  registration itself, screenshot capture, and clipboard capture need no
+  Accessibility or Input Monitoring permission; reading another app's selected
+  text requires Accessibility access.
+- Configure any action in Settings with an A–Z or 0–9 key plus Command, Option,
+  Control, and/or Shift; each shortcut requires at least two modifiers, and no
+  enabled actions can share a combination. Any action can be disabled, and
+  **Restore Defaults** restores all three defaults. Existing two-action settings
+  migrate without losing custom values; if the new selection shortcut cannot be
+  registered, the two established actions remain active.
 - Apply shortcut changes transactionally. If any new registration fails, Recall
   restores the previous working registrations and shows the failure in
   Settings, the menu, and the menu-bar status icon.
@@ -225,6 +241,13 @@ Run the build and tests again after regeneration.
   responses.
 - Capture non-empty clipboard text, optional notes, and best-effort source-app
   metadata through `POST /v1/captures`.
+- After the explicit selection shortcut, ask the focused external app for its
+  Accessibility selected text and best-effort range bounds. Reject Recall itself,
+  secure/protected fields, empty selections, unresponsive or unsupported
+  controls, and selections over 12,000 characters without reading the clipboard
+  or silently truncating. Open the existing Quick Capture near valid bounds or
+  centered on the current screen when bounds are unavailable. Bounds never leave
+  memory; only reviewed text, source app, and optional note can be saved.
 - Select a screenshot region, preview it, and explicitly extract visible text
   as reviewed source content. GPT/cloud is the default; Apple Vision/on-device
   uses the same UI and subsequent Capture pipeline without calling the backend
@@ -268,8 +291,11 @@ Run the build and tests again after regeneration.
   selected-text/no-selection Captures have been verified end to end against the
   macOS client. Keep the credential and machine-specific extension origin only
   in the untracked root `.env`.
-- Clipboard and screenshot source-application detection is best effort. The app
-  does not read active window titles or Accessibility selections.
+- Clipboard, screenshot, and Accessibility source-application detection is best
+  effort. Selection capture reads only after its explicit shortcut; it does not
+  read active window titles, URLs, surrounding text, or every selection change.
+  Applications that do not expose `AXSelectedText` remain compatible through the
+  separate clipboard action.
 - Global shortcuts work only while Recall is running. Launch at login is a
   separate future opt-in. Stable Screen Recording authorization now survives a
   rebuild. Real-device acceptance also passes: with Recall's main window closed
@@ -284,9 +310,9 @@ Run the build and tests again after regeneration.
 - App sandboxing, notarization, and bundling the Python service are outside the
   current P0 Build Week scope.
 
-The D-032 command-line suite executes 70/70 contract, networking, production
-Vision, global-shortcut, lifecycle, validation, retry, polling, store, and
-signing-identity tests.
+The D-034 command-line suite executes 108/108 Accessibility, contract,
+networking, production Vision, global-shortcut, lifecycle, validation, retry,
+polling, store, window-placement, and signing-identity tests.
 
 ## Manual test matrix
 
@@ -302,6 +328,9 @@ after rerunning them on the current integrated tree.
 | Shortcut settings | Confirm the defaults, change screenshot capture to `Option+Shift+Command+5`, relaunch Recall, then choose **Restore Defaults**. Also try one modifier and a duplicate combination. | The valid change persists across restart and defaults restore correctly. Invalid or duplicate combinations are rejected without replacing the active shortcuts. |
 | Registration failure | Choose a combination already owned by macOS or another app and apply it. | Recall restores the preceding active shortcuts and exposes the failure in Settings, the menu, and the menu-bar status icon. |
 | Global clipboard | Close the main window without quitting Recall, focus another app with 32 known clipboard characters, and press `Option+Shift+Command+C` twice. | Quick Capture opens with the exact 32 characters. The second trigger preserves the existing draft and shows an explanatory notice. |
+| Accessibility permission | With Recall absent or disabled in **Privacy & Security > Accessibility**, select text in another app and press `Option+Shift+Command+S`; then grant access and retry. | The first attempt reads and saves nothing, explains the permission, and offers System Settings/current-clipboard recovery. After authorization, Settings reports access enabled and a new explicit attempt can read the selection. |
+| Global selection | Close the main window without quitting Recall, select known Chinese/emoji/multiline text in TextEdit, and press `Option+Shift+Command+S`. Repeat near each screen edge and with no selection. | Quick Capture shows the exact text and Unicode count, opens near the selection while staying inside the visible screen, focuses the optional note, and saves only after review. No-selection stays unsaved with an actionable fallback. |
+| Accessibility compatibility | Repeat selection capture in Safari/Chrome, selectable PDF text in Preview, and an Electron or custom-drawn control. Try a password field and a selection longer than 12,000 characters. | Supported apps produce exact text and best-effort positioning. Unsupported controls fail clearly without stale clipboard substitution. Secure and oversized text never becomes a draft or request. |
 | Global screenshot | Close the main window without quitting Recall, focus another app, and press `Option+Shift+Command+4`; cancel once and complete a region once. | The selector starts without blocking Recall. Cancellation leaves no draft or temporary PNG; a completed region opens the existing screenshot draft and disclosure UI. |
 | GPT screenshot note | Choose **Capture Screenshot Note**, select a text region, keep **GPT · Cloud**, and choose **Extract source text**. | A preview appears before upload, the UI states the cloud boundary, extracted text fills only the source field, your optional personal note stays separate, and only text is saved. |
 | Local screenshot note | Repeat with **Apple Vision · On device**, disconnect the network after the backend is already running, and extract. | Text extraction succeeds on the Mac, the UI confirms local processing, and no `/v1/ocr` request is made. Saving still uses the localhost Capture API. |
@@ -315,7 +344,7 @@ after rerunning them on the current integrated tree.
 | Search limits and failure | Try 512/513-character queries, a control character, a backend error, and a genuine search-route `404`. | Valid input reaches the backend; invalid input is blocked locally; only `404` enables the visible local fallback. |
 | API-provided web record | POST `contracts/examples/capture-request.json`, refresh, and open the record. | URL, title, selection, note, and truncation state appear in separate sections. Context starts collapsed with a character count; Show/Hide works and long context clearly limits only its on-screen preview. |
 | Real Chrome flow | Load the extension unpacked, configure its exact origin, save a web selection, and refresh Recall. | The Chrome-created card appears without a database edit; repeat once with the backend stopped to verify the popup error. |
-| Menu-bar entry | Exercise **Open Recall**, **Capture Clipboard**, **Capture Screenshot Note**, **Search**, **Check Connection**, and **Quit Recall**. | Each item performs its intended action without unexpected duplicate windows. |
+| Menu-bar entry | Exercise **Open Recall**, **Capture Selection**, **Capture Clipboard**, **Capture Screenshot Note**, **Search**, **Check Connection**, and **Quit Recall**. | Each item performs its intended action without unexpected duplicate windows. |
 
 For the short walkthrough, use
 [`docs/demo-script.md`](../../docs/demo-script.md).

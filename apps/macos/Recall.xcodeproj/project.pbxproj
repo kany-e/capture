@@ -17,6 +17,7 @@
 		2D00AD70CECEDB988150D65E /* APIResponses.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAEF2743986129858D7A1FFA /* APIResponses.swift */; };
 		400EC92694095F860A54A97C /* GlobalCaptureCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FEFB135AD0B8A8FB9952B7C /* GlobalCaptureCoordinator.swift */; };
 		4D055E8631D36BB8D63E810E /* GlobalShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAEE10DE023B7AE4168CE6D0 /* GlobalShortcutTests.swift */; };
+		5686B9BE1BC60FD1716A5D7E /* QuickCaptureWindowPositioner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE2D5CA119FCA9D7BBC29A5A /* QuickCaptureWindowPositioner.swift */; };
 		6220042C8C2DCE392D5FBCC1 /* RecallComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6E5844BF3FF8AEAF4C199D /* RecallComponents.swift */; };
 		7136B53E312C12667962369E /* CaptureRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCC2ABDC4651148E69F99D99 /* CaptureRowView.swift */; };
 		74AC33EE0315136F83F4892F /* GlobalShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B15622577D5C1BB5EB0E450 /* GlobalShortcut.swift */; };
@@ -28,14 +29,17 @@
 		9D163DA49A259A35D95A824E /* LiveRecallAPIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A877F4DBE0CBE9FF7C52E73 /* LiveRecallAPIClientTests.swift */; };
 		9EA018F67FEE2D67C0665C0A /* RecallAPIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 011C73CC5F147DA4AB1A3DF6 /* RecallAPIError.swift */; };
 		A2534BDF787EB07111ED403E /* RecallContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE2B289FC546EE041B98B45 /* RecallContractTests.swift */; };
+		A3770FCA8B9CDB8FCAE7F686 /* AccessibilitySelectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61555D2365AFE7EF93A57329 /* AccessibilitySelectionService.swift */; };
 		A7128583E6EF02AD1A56E3A0 /* CapturePresentationHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF056D863735D286B4A1B9B /* CapturePresentationHost.swift */; };
 		AE10E65C5CE451302A75B51F /* ScreenshotCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F776F9651F812AAF0E2D7CC /* ScreenshotCaptureService.swift */; };
 		B0832794501407BD71E1BE19 /* RecallStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B258E2430D2A3F336680D2 /* RecallStore.swift */; };
 		B56E0936C7FFF112FE692C49 /* CaptureCreateRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72458EB74051F9E77DA848F5 /* CaptureCreateRequest.swift */; };
+		B755C3C6F289AC533F47E5D3 /* AccessibilitySelectionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C336D158132271B6AA133236 /* AccessibilitySelectionServiceTests.swift */; };
 		BBDA81D8565D55B04426F812 /* MockRecallAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77ECC609D0DCBD750ACA976E /* MockRecallAPIClient.swift */; };
 		C318562A514BC53FC7F5152F /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 155D09D62EE905E07CD34B11 /* MenuBarContentView.swift */; };
 		DB7C4D7E57C0FEA8C80F3E66 /* RecallAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DF758BCD3D84700C74B482E /* RecallAPIClient.swift */; };
 		EB433499536141807B2FCEFD /* CaptureDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F0FFD14F1B05A897E900C33 /* CaptureDetailView.swift */; };
+		EF38C163637FE05FD8AC2689 /* QuickCaptureWindowPlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC940BE4C991EF2D24A1083C /* QuickCaptureWindowPlacementTests.swift */; };
 		F564668ABF3237E2C93A45AB /* QuickCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E5CDC46DE2DACAF9607F595 /* QuickCaptureView.swift */; };
 /* End PBXBuildFile section */
 
@@ -58,6 +62,7 @@
 		4A6E5844BF3FF8AEAF4C199D /* RecallComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecallComponents.swift; sourceTree = "<group>"; };
 		589D612419DE8AD691D1CD7C /* Recall.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Recall.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		58B258E2430D2A3F336680D2 /* RecallStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecallStore.swift; sourceTree = "<group>"; };
+		61555D2365AFE7EF93A57329 /* AccessibilitySelectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilitySelectionService.swift; sourceTree = "<group>"; };
 		6B15622577D5C1BB5EB0E450 /* GlobalShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalShortcut.swift; sourceTree = "<group>"; };
 		6FEFB135AD0B8A8FB9952B7C /* GlobalCaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalCaptureCoordinator.swift; sourceTree = "<group>"; };
 		71391B6B888FE7C1EF3039E7 /* GlobalShortcutCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalShortcutCenter.swift; sourceTree = "<group>"; };
@@ -75,10 +80,13 @@
 		99A786D21286E7D456EF199A /* RecallApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecallApp.swift; sourceTree = "<group>"; };
 		9F776F9651F812AAF0E2D7CC /* ScreenshotCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCaptureService.swift; sourceTree = "<group>"; };
 		BA4714F128503F1DA951FAD4 /* ShortcutSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutSettingsView.swift; sourceTree = "<group>"; };
+		C336D158132271B6AA133236 /* AccessibilitySelectionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilitySelectionServiceTests.swift; sourceTree = "<group>"; };
 		C87475464FC1A84612F1AC0D /* RecallStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecallStoreTests.swift; sourceTree = "<group>"; };
 		CA34819F6E69740427617B25 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CAEF2743986129858D7A1FFA /* APIResponses.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIResponses.swift; sourceTree = "<group>"; };
+		CC940BE4C991EF2D24A1083C /* QuickCaptureWindowPlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCaptureWindowPlacementTests.swift; sourceTree = "<group>"; };
 		CCC2ABDC4651148E69F99D99 /* CaptureRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureRowView.swift; sourceTree = "<group>"; };
+		CE2D5CA119FCA9D7BBC29A5A /* QuickCaptureWindowPositioner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCaptureWindowPositioner.swift; sourceTree = "<group>"; };
 		DDD0725565560AE1D29C8887 /* ScreenshotTextExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotTextExtractor.swift; sourceTree = "<group>"; };
 		EAEE10DE023B7AE4168CE6D0 /* GlobalShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalShortcutTests.swift; sourceTree = "<group>"; };
 		EDF056D863735D286B4A1B9B /* CapturePresentationHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturePresentationHost.swift; sourceTree = "<group>"; };
@@ -127,6 +135,7 @@
 				CCC2ABDC4651148E69F99D99 /* CaptureRowView.swift */,
 				155D09D62EE905E07CD34B11 /* MenuBarContentView.swift */,
 				7E5CDC46DE2DACAF9607F595 /* QuickCaptureView.swift */,
+				CE2D5CA119FCA9D7BBC29A5A /* QuickCaptureWindowPositioner.swift */,
 				F11CC75EA9C49ECFDCE9BA01 /* RecallRootView.swift */,
 				BA4714F128503F1DA951FAD4 /* ShortcutSettingsView.swift */,
 				FB66B3E6A3C5079A0B1FFACE /* Components */,
@@ -166,9 +175,11 @@
 		9F3DBEAA2D36FB3151663C54 /* RecallTests */ = {
 			isa = PBXGroup;
 			children = (
+				C336D158132271B6AA133236 /* AccessibilitySelectionServiceTests.swift */,
 				19835D10F285353D77EDF2E3 /* AppleVisionScreenshotTextExtractorTests.swift */,
 				EAEE10DE023B7AE4168CE6D0 /* GlobalShortcutTests.swift */,
 				8A877F4DBE0CBE9FF7C52E73 /* LiveRecallAPIClientTests.swift */,
+				CC940BE4C991EF2D24A1083C /* QuickCaptureWindowPlacementTests.swift */,
 				7BE2B289FC546EE041B98B45 /* RecallContractTests.swift */,
 				C87475464FC1A84612F1AC0D /* RecallStoreTests.swift */,
 				18EA95D7013148198B81BC8D /* ScreenshotCaptureServiceTests.swift */,
@@ -187,6 +198,7 @@
 		D9F903240D41C9B0888E2E8A /* Capture */ = {
 			isa = PBXGroup;
 			children = (
+				61555D2365AFE7EF93A57329 /* AccessibilitySelectionService.swift */,
 				92DD1B7039E6191B76729C2C /* ClipboardCaptureService.swift */,
 				71391B6B888FE7C1EF3039E7 /* GlobalShortcutCenter.swift */,
 				9F776F9651F812AAF0E2D7CC /* ScreenshotCaptureService.swift */,
@@ -315,9 +327,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B755C3C6F289AC533F47E5D3 /* AccessibilitySelectionServiceTests.swift in Sources */,
 				88D0896FCCDB5D862E6EF160 /* AppleVisionScreenshotTextExtractorTests.swift in Sources */,
 				4D055E8631D36BB8D63E810E /* GlobalShortcutTests.swift in Sources */,
 				9D163DA49A259A35D95A824E /* LiveRecallAPIClientTests.swift in Sources */,
+				EF38C163637FE05FD8AC2689 /* QuickCaptureWindowPlacementTests.swift in Sources */,
 				A2534BDF787EB07111ED403E /* RecallContractTests.swift in Sources */,
 				03418CFA47D2C29A01C55E3C /* RecallStoreTests.swift in Sources */,
 				76AC270354C21BA5411B759A /* ScreenshotCaptureServiceTests.swift in Sources */,
@@ -329,6 +343,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2D00AD70CECEDB988150D65E /* APIResponses.swift in Sources */,
+				A3770FCA8B9CDB8FCAE7F686 /* AccessibilitySelectionService.swift in Sources */,
 				1071EB958C7FA7ED4AE218BA /* Capture.swift in Sources */,
 				B56E0936C7FFF112FE692C49 /* CaptureCreateRequest.swift in Sources */,
 				EB433499536141807B2FCEFD /* CaptureDetailView.swift in Sources */,
@@ -342,6 +357,7 @@
 				C318562A514BC53FC7F5152F /* MenuBarContentView.swift in Sources */,
 				BBDA81D8565D55B04426F812 /* MockRecallAPIClient.swift in Sources */,
 				F564668ABF3237E2C93A45AB /* QuickCaptureView.swift in Sources */,
+				5686B9BE1BC60FD1716A5D7E /* QuickCaptureWindowPositioner.swift in Sources */,
 				DB7C4D7E57C0FEA8C80F3E66 /* RecallAPIClient.swift in Sources */,
 				9EA018F67FEE2D67C0665C0A /* RecallAPIError.swift in Sources */,
 				8D8659AB219B92DA79773FAB /* RecallApp.swift in Sources */,

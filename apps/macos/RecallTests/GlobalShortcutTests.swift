@@ -8,6 +8,10 @@ final class GlobalShortcutTests: XCTestCase {
     func testDefaultsUseRequestedThreeModifierShortcuts() {
         let configuration = GlobalShortcutConfiguration.default
 
+        XCTAssertEqual(configuration.selection.key, .s)
+        XCTAssertEqual(configuration.selection.modifiers, [.option, .shift, .command])
+        XCTAssertEqual(configuration.selection.displayName, "⌥⇧⌘S")
+        XCTAssertTrue(configuration.selection.isEnabled)
         XCTAssertEqual(configuration.clipboard.key, .c)
         XCTAssertEqual(configuration.clipboard.modifiers, [.option, .shift, .command])
         XCTAssertEqual(configuration.clipboard.displayName, "⌥⇧⌘C")
@@ -36,6 +40,18 @@ final class GlobalShortcutTests: XCTestCase {
         configuration.screenshot.isEnabled = false
 
         XCTAssertNoThrow(try configuration.validate())
+    }
+
+    func testValidationRejectsAnyTwoEnabledActionsWithTheSameShortcut() {
+        var configuration = GlobalShortcutConfiguration.default
+        configuration.selection = configuration.clipboard
+
+        XCTAssertThrowsError(try configuration.validate()) { error in
+            XCTAssertEqual(
+                error as? GlobalShortcutValidationError,
+                .duplicateShortcut
+            )
+        }
     }
 
     func testValidationIgnoresModifiersForDisabledActions() {
@@ -73,7 +89,7 @@ final class GlobalShortcutTests: XCTestCase {
             try XCTUnwrap(Self.persistedConfiguration(in: harness.userDefaults)),
             proposedConfiguration
         )
-        XCTAssertEqual(persistedConfigurationsDuringRegistration.count, 2)
+        XCTAssertEqual(persistedConfigurationsDuringRegistration.count, 3)
         XCTAssertTrue(
             persistedConfigurationsDuringRegistration.allSatisfy {
                 $0 == nil || $0 == initialConfiguration
@@ -146,10 +162,13 @@ final class GlobalShortcutTests: XCTestCase {
         XCTAssertTrue(center.setEnabled(false, for: .clipboard))
 
         XCTAssertFalse(center.configuration.clipboard.isEnabled)
-        XCTAssertEqual(center.activeActions, [.screenshot])
+        XCTAssertEqual(center.activeActions, [.selection, .screenshot])
         XCTAssertEqual(
-            harness.registrar.activeShortcuts,
-            [GlobalShortcutConfiguration.default.screenshot]
+            Set(harness.registrar.activeShortcuts),
+            Set([
+                GlobalShortcutConfiguration.default.selection,
+                GlobalShortcutConfiguration.default.screenshot,
+            ])
         )
         XCTAssertFalse(
             try XCTUnwrap(Self.persistedConfiguration(in: harness.userDefaults))
@@ -172,6 +191,7 @@ final class GlobalShortcutTests: XCTestCase {
         XCTAssertEqual(
             Set(harness.registrar.activeShortcuts),
             Set([
+                GlobalShortcutConfiguration.default.selection,
                 GlobalShortcutConfiguration.default.clipboard,
                 GlobalShortcutConfiguration.default.screenshot,
             ])
@@ -199,6 +219,143 @@ final class GlobalShortcutTests: XCTestCase {
         )
     }
 
+    func testLegacyTwoActionConfigurationPreservesValuesAndAddsSelection() throws {
+        let harness = makeHarness()
+        defer { harness.cleanUp() }
+        let legacyClipboard = GlobalShortcut(
+            key: .k,
+            modifiers: [.control, .command],
+            isEnabled: false
+        )
+        let legacyScreenshot = GlobalShortcut(
+            key: .digit7,
+            modifiers: [.option, .shift]
+        )
+        harness.userDefaults.set(
+            try JSONSerialization.data(withJSONObject: [
+                "clipboard": encodedJSONObject(for: legacyClipboard),
+                "screenshot": encodedJSONObject(for: legacyScreenshot),
+            ]),
+            forKey: GlobalShortcutCenter.userDefaultsKey
+        )
+
+        let center = GlobalShortcutCenter(
+            userDefaults: harness.userDefaults,
+            registrar: harness.registrar
+        )
+
+        XCTAssertEqual(center.configuration.clipboard, legacyClipboard)
+        XCTAssertEqual(center.configuration.screenshot, legacyScreenshot)
+        XCTAssertEqual(
+            center.configuration.selection,
+            GlobalShortcutConfiguration.defaultSelection
+        )
+        XCTAssertEqual(center.activeActions, [.selection, .screenshot])
+        XCTAssertNil(center.errorMessage)
+        XCTAssertNotNil(
+            try XCTUnwrap(
+                JSONSerialization.jsonObject(
+                    with: try XCTUnwrap(
+                        harness.userDefaults.data(
+                            forKey: GlobalShortcutCenter.userDefaultsKey
+                        )
+                    )
+                ) as? [String: Any]
+            )["selection"]
+        )
+    }
+
+    func testLegacySelectionShortcutConflictDisablesOnlyMigratedAction() throws {
+        let harness = makeHarness()
+        defer { harness.cleanUp() }
+        let conflictingScreenshot = GlobalShortcutConfiguration.default.selection
+        harness.userDefaults.set(
+            try JSONSerialization.data(withJSONObject: [
+                "clipboard": encodedJSONObject(
+                    for: GlobalShortcutConfiguration.default.clipboard
+                ),
+                "screenshot": encodedJSONObject(for: conflictingScreenshot),
+            ]),
+            forKey: GlobalShortcutCenter.userDefaultsKey
+        )
+
+        let center = GlobalShortcutCenter(
+            userDefaults: harness.userDefaults,
+            registrar: harness.registrar
+        )
+
+        XCTAssertEqual(center.configuration.screenshot, conflictingScreenshot)
+        XCTAssertFalse(center.configuration.selection.isEnabled)
+        XCTAssertEqual(center.configuration.selection.key, .s)
+        XCTAssertEqual(center.activeActions, [.clipboard, .screenshot])
+        XCTAssertNil(center.errorMessage)
+    }
+
+    func testLegacyExternalSelectionConflictKeepsExistingShortcutsActive() throws {
+        let harness = makeHarness()
+        defer { harness.cleanUp() }
+        harness.userDefaults.set(
+            try JSONSerialization.data(withJSONObject: [
+                "clipboard": encodedJSONObject(
+                    for: GlobalShortcutConfiguration.default.clipboard
+                ),
+                "screenshot": encodedJSONObject(
+                    for: GlobalShortcutConfiguration.default.screenshot
+                ),
+            ]),
+            forKey: GlobalShortcutCenter.userDefaultsKey
+        )
+        harness.registrar.rejectedShortcut = GlobalShortcutConfiguration.default.selection
+
+        let center = GlobalShortcutCenter(
+            userDefaults: harness.userDefaults,
+            registrar: harness.registrar
+        )
+
+        XCTAssertFalse(center.configuration.selection.isEnabled)
+        XCTAssertEqual(center.activeActions, [.clipboard, .screenshot])
+        XCTAssertEqual(
+            Set(harness.registrar.activeShortcuts),
+            Set([
+                GlobalShortcutConfiguration.default.clipboard,
+                GlobalShortcutConfiguration.default.screenshot,
+            ])
+        )
+        XCTAssertTrue(center.errorMessage?.contains("existing shortcuts active") == true)
+        XCTAssertNil(center.registrationErrorMessage)
+        XCTAssertFalse(
+            try XCTUnwrap(Self.persistedConfiguration(in: harness.userDefaults))
+                .selection.isEnabled
+        )
+    }
+
+    func testLegacyExistingActionConflictDoesNotMislabelOrDisableSelection() throws {
+        let harness = makeHarness()
+        defer { harness.cleanUp() }
+        harness.userDefaults.set(
+            try JSONSerialization.data(withJSONObject: [
+                "clipboard": encodedJSONObject(
+                    for: GlobalShortcutConfiguration.default.clipboard
+                ),
+                "screenshot": encodedJSONObject(
+                    for: GlobalShortcutConfiguration.default.screenshot
+                ),
+            ]),
+            forKey: GlobalShortcutCenter.userDefaultsKey
+        )
+        harness.registrar.rejectedShortcut = GlobalShortcutConfiguration.default.clipboard
+
+        let center = GlobalShortcutCenter(
+            userDefaults: harness.userDefaults,
+            registrar: harness.registrar
+        )
+
+        XCTAssertTrue(center.configuration.selection.isEnabled)
+        XCTAssertTrue(center.activeActions.isEmpty)
+        XCTAssertFalse(center.errorMessage?.contains("new Selection") == true)
+        XCTAssertNotNil(center.registrationErrorMessage)
+    }
+
     func testInvalidPersistedConfigurationIsRemovedAfterFallingBackToDefaults() {
         let harness = makeHarness()
         defer { harness.cleanUp() }
@@ -219,6 +376,7 @@ final class GlobalShortcutTests: XCTestCase {
         XCTAssertEqual(
             Set(harness.registrar.activeShortcuts),
             Set([
+                GlobalShortcutConfiguration.default.selection,
                 GlobalShortcutConfiguration.default.clipboard,
                 GlobalShortcutConfiguration.default.screenshot,
             ])
@@ -256,8 +414,9 @@ final class GlobalShortcutTests: XCTestCase {
 
         harness.registrar.fire(GlobalShortcutConfiguration.default.clipboard)
         harness.registrar.fire(GlobalShortcutConfiguration.default.screenshot)
+        harness.registrar.fire(GlobalShortcutConfiguration.default.selection)
 
-        XCTAssertEqual(recorder.actions, [.clipboard, .screenshot])
+        XCTAssertEqual(recorder.actions, [.clipboard, .screenshot, .selection])
         withExtendedLifetime(center) {}
     }
 
@@ -292,6 +451,11 @@ final class GlobalShortcutTests: XCTestCase {
             return nil
         }
         return try? JSONDecoder().decode(GlobalShortcutConfiguration.self, from: data)
+    }
+
+    private func encodedJSONObject(for shortcut: GlobalShortcut) throws -> Any {
+        let data = try JSONEncoder().encode(shortcut)
+        return try JSONSerialization.jsonObject(with: data)
     }
 }
 

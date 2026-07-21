@@ -5,6 +5,286 @@ import XCTest
 
 @MainActor
 final class RecallStoreTests: XCTestCase {
+    func testAccessibilitySelectionCapturePreservesExactTextAndBounds() async {
+        let text = " 你好 👩‍💻\nsecond line "
+        let bounds = CGRect(x: 100, y: 220, width: 180, height: 42)
+        let service = AccessibilitySelectionServiceStub(
+            result: .success(
+                AccessibilitySelectionSnapshot(
+                    text: text,
+                    sourceApplication: "TextEdit",
+                    selectionBoundsInAXScreenCoordinates: bounds
+                )
+            )
+        )
+        let store = RecallStore(
+            client: RecordingAPIClient(),
+            clipboardService: ClipboardServiceStub(
+                result: .failure(ClipboardCaptureError.noText)
+            ),
+            accessibilitySelectionService: service
+        )
+
+        let snapshot = await store.prepareAccessibilitySelectionCapture()
+
+        XCTAssertEqual(snapshot?.selectionBoundsInAXScreenCoordinates, bounds)
+        XCTAssertEqual(store.quickCaptureDraft?.kind, .selection)
+        XCTAssertEqual(store.quickCaptureDraft?.selectedText, text)
+        XCTAssertEqual(store.quickCaptureDraft?.sourceApplication, "TextEdit")
+        XCTAssertNil(store.accessibilitySelectionError)
+        let readCount = await service.readCount()
+        XCTAssertEqual(readCount, 1)
+    }
+
+    func testAccessibilitySelectionSavesThroughExistingClipboardContract() async throws {
+        let client = RecordingAPIClient()
+        let service = AccessibilitySelectionServiceStub(
+            result: .success(
+                AccessibilitySelectionSnapshot(
+                    text: "Exact native selection",
+                    sourceApplication: "Preview",
+                    selectionBoundsInAXScreenCoordinates: nil
+                )
+            )
+        )
+        let store = RecallStore(
+            client: client,
+            clipboardService: ClipboardServiceStub(
+                result: .failure(ClipboardCaptureError.noText)
+            ),
+            accessibilitySelectionService: service
+        )
+        let preparedSnapshot = await store.prepareAccessibilitySelectionCapture()
+        XCTAssertNotNil(preparedSnapshot)
+        store.quickCaptureDraft?.userNote = "Why this matters"
+
+        let submitted = await store.submitQuickCapture()
+        XCTAssertTrue(submitted)
+
+        let recordedRequest = await client.lastCreateRequest()
+        let request = try XCTUnwrap(recordedRequest)
+        XCTAssertEqual(request.sourceType, .clipboard)
+        XCTAssertEqual(request.selectedText, "Exact native selection")
+        XCTAssertEqual(request.sourceApp, "Preview")
+        XCTAssertEqual(request.userNote, "Why this matters")
+        XCTAssertNil(request.sourceTitle)
+        XCTAssertNil(request.sourceURL)
+        XCTAssertNil(request.surroundingContext)
+        XCTAssertFalse(request.contextTruncated)
+    }
+
+    func testAccessibilitySelectionBoundsSourceApplicationWithoutChangingText() async {
+        let source = String(
+            repeating: "s",
+            count: RecallStore.maximumSourceApplicationLength + 20
+        )
+        let service = AccessibilitySelectionServiceStub(
+            result: .success(
+                AccessibilitySelectionSnapshot(
+                    text: "Keep exact text",
+                    sourceApplication: source,
+                    selectionBoundsInAXScreenCoordinates: nil
+                )
+            )
+        )
+        let store = RecallStore(
+            client: RecordingAPIClient(),
+            clipboardService: ClipboardServiceStub(
+                result: .failure(ClipboardCaptureError.noText)
+            ),
+            accessibilitySelectionService: service
+        )
+
+        _ = await store.prepareAccessibilitySelectionCapture()
+
+        XCTAssertEqual(store.quickCaptureDraft?.selectedText, "Keep exact text")
+        XCTAssertEqual(
+            store.quickCaptureDraft?.sourceApplication?.unicodeScalars.count,
+            RecallStore.maximumSourceApplicationLength
+        )
+    }
+
+    func testExistingDraftRejectsAccessibilityReadBeforeCallingService() async {
+        let service = AccessibilitySelectionServiceStub(
+            result: .success(
+                AccessibilitySelectionSnapshot(
+                    text: "Do not read this",
+                    sourceApplication: "Notes",
+                    selectionBoundsInAXScreenCoordinates: nil
+                )
+            )
+        )
+        let store = RecallStore(
+            client: RecordingAPIClient(),
+            clipboardService: ClipboardServiceStub(
+                result: .success(
+                    ClipboardSnapshot(text: "Keep this draft", sourceApplication: "Safari")
+                )
+            ),
+            accessibilitySelectionService: service
+        )
+        XCTAssertTrue(store.prepareClipboardCapture())
+        let originalDraftID = store.quickCaptureDraft?.clientCaptureID
+
+        let snapshot = await store.prepareAccessibilitySelectionCapture()
+
+        XCTAssertNil(snapshot)
+        let readCount = await service.readCount()
+        XCTAssertEqual(readCount, 0)
+        XCTAssertEqual(store.quickCaptureDraft?.clientCaptureID, originalDraftID)
+        XCTAssertEqual(store.quickCaptureDraft?.selectedText, "Keep this draft")
+    }
+
+    func testAccessibilityFailureCreatesExplicitClipboardRecoveryState() async {
+        let service = AccessibilitySelectionServiceStub(
+            result: .failure(.permissionRequired)
+        )
+        let store = RecallStore(
+            client: RecordingAPIClient(),
+            clipboardService: ClipboardServiceStub(
+                result: .failure(ClipboardCaptureError.noText)
+            ),
+            accessibilitySelectionService: service
+        )
+
+        let snapshot = await store.prepareAccessibilitySelectionCapture()
+
+        XCTAssertNil(snapshot)
+        XCTAssertNil(store.quickCaptureDraft)
+        XCTAssertEqual(store.accessibilitySelectionError, .permissionRequired)
+        XCTAssertTrue(store.quickCaptureError?.contains("Accessibility") == true)
+    }
+
+    func testOversizedAccessibilitySelectionIsRejectedBeforeDraftRendering() async {
+        let oversized = String(
+            repeating: "x",
+            count: RecallStore.maximumSelectedTextLength + 1
+        )
+        let service = AccessibilitySelectionServiceStub(
+            result: .success(
+                AccessibilitySelectionSnapshot(
+                    text: oversized,
+                    sourceApplication: "Pages",
+                    selectionBoundsInAXScreenCoordinates: nil
+                )
+            )
+        )
+        let store = RecallStore(
+            client: RecordingAPIClient(),
+            clipboardService: ClipboardServiceStub(
+                result: .failure(ClipboardCaptureError.noText)
+            ),
+            accessibilitySelectionService: service
+        )
+
+        let snapshot = await store.prepareAccessibilitySelectionCapture()
+
+        XCTAssertNil(snapshot)
+        XCTAssertNil(store.quickCaptureDraft)
+        XCTAssertEqual(store.accessibilitySelectionError, .selectionTooLong)
+        XCTAssertTrue(store.quickCaptureError?.contains("12,000") == true)
+    }
+
+    func testCoordinatorDeduplicatesAccessibilityReadsAndPreservesAnchor() async {
+        let service = SuspendedAccessibilitySelectionService()
+        let store = RecallStore(
+            client: RecordingAPIClient(),
+            clipboardService: ClipboardServiceStub(
+                result: .failure(ClipboardCaptureError.noText)
+            ),
+            accessibilitySelectionService: service
+        )
+        let coordinator = GlobalCaptureCoordinator(store: store)
+        let bounds = CGRect(x: 40, y: 50, width: 120, height: 30)
+
+        coordinator.prepareAccessibilitySelectionCapture()
+        coordinator.prepareAccessibilitySelectionCapture()
+        for _ in 0..<100 {
+            if await service.readCount() > 0 { break }
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        let readCount = await service.readCount()
+        XCTAssertEqual(readCount, 1)
+
+        await service.complete(
+            with: .success(
+                AccessibilitySelectionSnapshot(
+                    text: "One read",
+                    sourceApplication: "TextEdit",
+                    selectionBoundsInAXScreenCoordinates: bounds
+                )
+            )
+        )
+        await waitUntil { coordinator.quickCapturePresentationRequest == 1 }
+
+        XCTAssertEqual(
+            coordinator.quickCapturePresentationContext?
+                .selectionBoundsInAXScreenCoordinates,
+            bounds
+        )
+        XCTAssertEqual(store.quickCaptureDraft?.selectedText, "One read")
+    }
+
+    func testCoordinatorPresentsPermissionRecoveryOnceAndRequestsPrompt() async {
+        let service = AccessibilitySelectionServiceStub(
+            result: .failure(.permissionRequired)
+        )
+        let store = RecallStore(
+            client: RecordingAPIClient(),
+            clipboardService: ClipboardServiceStub(
+                result: .failure(ClipboardCaptureError.noText)
+            ),
+            accessibilitySelectionService: service
+        )
+        let coordinator = GlobalCaptureCoordinator(store: store)
+
+        coordinator.prepareAccessibilitySelectionCapture()
+        await waitUntil { coordinator.quickCapturePresentationRequest == 1 }
+
+        XCTAssertNil(store.quickCaptureDraft)
+        XCTAssertEqual(store.accessibilitySelectionError, .permissionRequired)
+        XCTAssertNil(
+            coordinator.quickCapturePresentationContext?
+                .selectionBoundsInAXScreenCoordinates
+        )
+        let prompts = await service.readPromptValues()
+        XCTAssertEqual(prompts, [true])
+    }
+
+    func testCancelledAccessibilityReadCannotRestoreLateDraftOrPresentation() async {
+        let service = SuspendedAccessibilitySelectionService()
+        let store = RecallStore(
+            client: RecordingAPIClient(),
+            clipboardService: ClipboardServiceStub(
+                result: .failure(ClipboardCaptureError.noText)
+            ),
+            accessibilitySelectionService: service
+        )
+        let coordinator = GlobalCaptureCoordinator(store: store)
+
+        coordinator.prepareAccessibilitySelectionCapture()
+        for _ in 0..<100 {
+            if await service.readCount() > 0 { break }
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        coordinator.cancelPendingCapture()
+        await service.complete(
+            with: .success(
+                AccessibilitySelectionSnapshot(
+                    text: "Late selection",
+                    sourceApplication: "TextEdit",
+                    selectionBoundsInAXScreenCoordinates: .zero
+                )
+            )
+        )
+        try? await Task.sleep(nanoseconds: 30_000_000)
+
+        XCTAssertNil(store.quickCaptureDraft)
+        XCTAssertNil(store.quickCaptureError)
+        XCTAssertNil(store.accessibilitySelectionError)
+        XCTAssertEqual(coordinator.quickCapturePresentationRequest, 0)
+    }
+
     func testPreparingScreenshotCaptureKeepsImageTransientAndDefaultsToGPT() async {
         let store = RecallStore(
             client: RecordingAPIClient(),
@@ -930,6 +1210,57 @@ private struct ScreenshotServiceStub: ScreenshotCaptureServing {
 
     func captureInteractive() async throws -> ScreenshotSnapshot {
         try result.get()
+    }
+}
+
+private actor AccessibilitySelectionServiceStub: AccessibilitySelectionServing {
+    private let result: Result<AccessibilitySelectionSnapshot, AccessibilitySelectionError>
+    private var reads = 0
+    private var readPrompts: [Bool] = []
+    private var trustChecks: [Bool] = []
+
+    init(result: Result<AccessibilitySelectionSnapshot, AccessibilitySelectionError>) {
+        self.result = result
+    }
+
+    func isTrusted(promptIfNeeded: Bool) async -> Bool {
+        trustChecks.append(promptIfNeeded)
+        return true
+    }
+
+    func readSelection(
+        promptIfNeeded: Bool
+    ) async throws -> AccessibilitySelectionSnapshot {
+        reads += 1
+        readPrompts.append(promptIfNeeded)
+        return try result.get()
+    }
+
+    func readCount() -> Int { reads }
+    func readPromptValues() -> [Bool] { readPrompts }
+}
+
+private actor SuspendedAccessibilitySelectionService: AccessibilitySelectionServing {
+    private var continuation: CheckedContinuation<AccessibilitySelectionSnapshot, Error>?
+    private var reads = 0
+
+    func isTrusted(promptIfNeeded: Bool) async -> Bool { true }
+
+    func readSelection(
+        promptIfNeeded: Bool
+    ) async throws -> AccessibilitySelectionSnapshot {
+        reads += 1
+        return try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func readCount() -> Int { reads }
+
+    func complete(with result: Result<AccessibilitySelectionSnapshot, Error>) {
+        let continuation = continuation
+        self.continuation = nil
+        continuation?.resume(with: result)
     }
 }
 

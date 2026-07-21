@@ -47,6 +47,7 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-031 | Native global capture through Carbon and one app-level coordinator | Addition | Implemented and merged through PR #10 at `0ab687b`; real-device acceptance passed |
 | D-032 | Stable development code identity for TCC-protected screenshot capture | Reliability/privacy safeguard | Implemented; 70/70 tests and live TCC rebuild-persistence proof pass |
 | D-033 | Deterministic Chrome action-popup dimensions | Reliability safeguard | Implemented; 68/68 tests and real-Chrome selected/metadata layouts pass |
+| D-034 | User-triggered native Accessibility selection capture | Addition | Implemented; 108/108 host tests pass, real-device acceptance pending |
 
 ## D-001 — Localhost monorepo architecture
 
@@ -916,6 +917,46 @@ extension, real Chrome displayed the complete popup on an internal page, a
 regular metadata-only page, and a 72-character selected-text state. The source
 card, preview, note field, Save button, and inline-access setting remained
 visible and reachable; verification did not submit a Capture.
+
+## D-034 — User-triggered native Accessibility selection capture
+
+- Classification: Addition approved by user direction
+- Status: Implemented on `codex/native-accessibility-selection`; 108/108 host
+  tests pass and real-device acceptance remains open
+- Product impact: Reduces native selected-text capture to one explicit shortcut
+  and opens the existing review UI near the selection
+- Schedule impact: Current native priority; merge remains gated on real-device
+  permission, compatibility, and positioning acceptance
+
+Recall will add a third configurable global action, **Capture Selection**, with
+`Option+Shift+Command+S` as its default. Only after the user invokes that action
+does Recall ask macOS Accessibility for the focused external application's
+selected text, selected range, and—when the application supports it—the range's
+screen bounds. It reads no window title or surrounding context, never simulates
+copy, and does not modify the clipboard. Bounds are transient presentation data
+and are not submitted, logged, or persisted.
+
+The exact selected text within the 12,000-character limit and source application
+enter the existing Quick Capture review, idempotency, and save pipeline. A
+native selection has its own draft and UI label, but it continues to submit as the existing
+`source_type: clipboard`; this addition therefore changes no API, schema,
+database, extension, enrichment, or retrieval contract. Unsupported bounds fall
+back to centering the window on the target screen without turning a valid text
+selection into a failure. Missing permission, secure fields, empty selections,
+unresponsive targets, and unsupported applications fail closed and offer an
+explicit clipboard action rather than silently saving stale clipboard content.
+
+Adding the third action must preserve existing `globalShortcutConfiguration.v1`
+values through backward-compatible decoding. All enabled actions participate in
+duplicate validation and whole-set registration rollback.
+
+Passive selection observation is a separate, later addition. The intended
+future shape is an explicit opt-in setting and a non-activating pill that keeps
+candidate text only in memory, rejects secure fields, debounces and deduplicates
+Accessibility notifications, and opens the existing composer only after a user
+click. Splitting it from this decision keeps permission, one-shot reading,
+cross-application compatibility, and anchored-window behavior independently
+testable while retaining the explicit shortcut as the reliable fallback.
 
 ## Pending decisions
 
