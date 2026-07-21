@@ -49,7 +49,8 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-033 | Deterministic Chrome action-popup dimensions | Reliability safeguard | Implemented; 68/68 tests and real-Chrome selected/metadata layouts pass |
 | D-034 | User-triggered native Accessibility selection capture | Addition | Implemented; 108/108 host tests and primary-path user acceptance pass |
 | D-035 | Opt-in transactional clipboard fallback for native selection | Compatibility/privacy safeguard | Implemented; 149/149 host tests and user WeChat acceptance pass |
-| D-037 | Persisted image notes with opt-in background visual indexing | Addition | Implemented on `codex/image-notes`; automated verification passes, real-device acceptance pending |
+| D-036 | Conservative structured-text line restoration | Capture-correctness addition | Merged in PR #14; live Gemini clipboard payload verified |
+| D-037 | Persisted image notes with opt-in background visual indexing | Addition | Implemented; automated verification and real-app AI-disabled/AI-enabled acceptance pass |
 
 ## D-001 — Localhost monorepo architecture
 
@@ -1015,8 +1016,8 @@ user explicitly asking Recall to perform Copy in that verified frontmost app.
 ## D-037 — Persisted image notes with opt-in background visual indexing
 
 - Classification: Addition approved by user direction
-- Status: Implemented on `codex/image-notes`; automated verification passes and
-  real-device acceptance is pending
+- Status: Implemented; automated verification and real-app AI-disabled and
+  AI-enabled image-note acceptance pass
 - Product impact: A screenshot can now remain an image memory with an optional
   note instead of existing only as transient OCR input
 - Schedule impact: Crosses macOS, API, persistence, enrichment, search,
@@ -1057,9 +1058,62 @@ backend restart leaves the original and note intact as a visible, retryable
 error. The first implementation deliberately reuses the existing in-process
 background-task boundary rather than introducing a queue service.
 
-D-036 is intentionally not reused here because it is already allocated by the
-independent structured-clipboard draft PR. Keeping D-037 stable prevents the two
-branches from colliding when both reach `main`.
+D-036 remains a separate capture-correctness decision and was merged through PR
+#14 before D-037 integration. The image-note model does not change its bounded
+structured-clipboard resolver.
+
+## D-036 — Conservative structured-text line restoration
+
+- Classification: Capture-correctness addition approved by user direction
+- Status: Merged through PR #14; 176/176 host tests and the live Gemini payload
+  verification pass
+- Product impact: Preserves useful paragraph and line boundaries when a source
+  application supplies plain text together with HTML or RTF clipboard data
+- Schedule impact: Bounded first slice before image attachments or a full rich-
+  text viewer
+
+Recall's current Capture contract, JSON transport, SQLite `TEXT` column, and
+SwiftUI `Text` views already preserve newline characters. The first observed
+loss therefore belongs at the native intake boundary: Clipboard Capture
+currently asks `NSPasteboard` only for `.string`, while some rich source
+applications expose better paragraph boundaries in HTML or RTF.
+
+The native clients require plain text and may also decode bounded HTML or RTF
+representations into inert text. Plain text remains authoritative for its
+content and leading/trailing whitespace. A structured candidate may project a
+richer boundary only onto an existing internal plain-text whitespace separator.
+Ordered visible anchors must match. Supported paired Markdown presentation
+delimiters, headings, and list bullets may occupy a plain gap because rendered
+HTML omits those literal characters, but every delimiter remains unchanged in
+the returned text; unpaired operators remain anchors and reject a mismatch.
+Gemini math nodes may contribute their bounded `data-math` value only when their
+class identifies an inline or block formula, and the resulting `$...$` or
+`$$...$$` is still verified against the authoritative plain characters. A
+candidate cannot move a boundary where plain text has no separator. HTML/RTF
+without a matching plain representation is rejected.
+
+The resolver is limited to explicit Clipboard Capture. Selection Capture and its
+opt-in compatibility fallback remain at the D-034/D-035 behavior. No clipboard
+representation is logged, persisted as markup, sent before Save, or added to a
+draft beyond the resolved text.
+
+Multiple pasteboard items are resolved independently and joined with newlines,
+matching macOS's plain-text behavior without allowing one item's HTML/RTF to
+reshape another item's text. If the explicit clipboard exceeds its bounded item
+or type inspection limits, Recall falls back to the system plain-text value
+rather than partially returning rich data.
+
+Accessibility selection remains an explicitly weaker source. Recall can retain
+the exact string or attributed string returned by `AXSelectedText`, but rendered
+MathJax/KaTeX and other custom content may omit original Markdown or TeX syntax
+from the Accessibility tree. Recall must not reverse-engineer or invent source
+markup that the target application did not expose. Clipboard capture and the
+browser client remain the honest compatibility paths for those sources.
+
+D-036 changes no API, schema, migration, enrichment, FTS, or embedding
+projection. Persisting original HTML/RTF/Markdown, declaring a source-format
+field, or rendering Markdown/LaTeX requires a later reviewed contract and
+privacy decision. Image attachments remain a separate storage design.
 
 ## Pending decisions
 

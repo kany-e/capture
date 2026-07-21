@@ -345,8 +345,10 @@ Run the build and tests again after regeneration.
 - App sandboxing, notarization, and bundling the Python service are outside the
   current P0 Build Week scope.
 
-The original D-034 command-line suite executed 108/108 tests. D-035 expanded
-clipboard transaction/privacy coverage to 149/149. D-037 now executes 157/157
+The original D-034 command-line suite executed 108/108 tests. With the D-035
+clipboard transaction and D-036 explicit Clipboard Capture intake, the current
+suite reached 176/176 tests. The integrated D-037 image-note work now executes
+184/184
 Accessibility, pasteboard, contract, networking, production Vision,
 global-shortcut, lifecycle, validation, image-upload/display/delete, retry,
 polling, store, window-placement, and signing-identity tests.
@@ -362,6 +364,7 @@ after rerunning them on the current integrated tree.
 | Healthy launch | Start the backend, then launch Recall. | Connection shows **Connected** and live records load. `AI not configured` is acceptable without a key. |
 | Offline recovery | Stop the backend, launch Recall, restart the backend, then choose **Try Again** or **Refresh**. | Recall shows an offline state, reconnects, and reloads the library without losing persisted records. |
 | Clipboard capture | Copy non-empty text in TextEdit, open **Capture Clipboard**, add a note, and save. | The exact text and note are saved separately; the record appears immediately and progresses to a safe terminal state. |
+| Rich clipboard line breaks | Copy a known multiline model response containing headings and a literal delimiter such as `$e$`, then open **Capture Clipboard**. | Clipboard Capture retains line breaks already present in plain text and may restore safe boundaries from equivalent HTML/RTF; a mismatched rich representation never removes `$e$`. |
 | Shortcut settings | Confirm the defaults, change screenshot capture to `Option+Shift+Command+5`, relaunch Recall, then choose **Restore Defaults**. Also try one modifier and a duplicate combination. | The valid change persists across restart and defaults restore correctly. Invalid or duplicate combinations are rejected without replacing the active shortcuts. |
 | Registration failure | Choose a combination already owned by macOS or another app and apply it. | Recall restores the preceding active shortcuts and exposes the failure in Settings, the menu, and the menu-bar status icon. |
 | Global clipboard | Close the main window without quitting Recall, focus another app with 32 known clipboard characters, and press `Option+Shift+Command+C` twice. | Quick Capture opens with the exact 32 characters. The second trigger preserves the existing draft and shows an explanatory notice. |

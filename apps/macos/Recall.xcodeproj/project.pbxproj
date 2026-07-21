@@ -19,6 +19,7 @@
 		400EC92694095F860A54A97C /* GlobalCaptureCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FEFB135AD0B8A8FB9952B7C /* GlobalCaptureCoordinator.swift */; };
 		4D055E8631D36BB8D63E810E /* GlobalShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAEE10DE023B7AE4168CE6D0 /* GlobalShortcutTests.swift */; };
 		5686B9BE1BC60FD1716A5D7E /* QuickCaptureWindowPositioner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE2D5CA119FCA9D7BBC29A5A /* QuickCaptureWindowPositioner.swift */; };
+		5891C70EEE5AF7F920185463 /* ClipboardTextResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BF0369E9A16EB40262C407C /* ClipboardTextResolver.swift */; };
 		6220042C8C2DCE392D5FBCC1 /* RecallComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6E5844BF3FF8AEAF4C199D /* RecallComponents.swift */; };
 		7136B53E312C12667962369E /* CaptureRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCC2ABDC4651148E69F99D99 /* CaptureRowView.swift */; };
 		74A8840A29B59DB720580574 /* SelectionClipboardFallbackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46C02B818E77E3EDD454F63 /* SelectionClipboardFallbackServiceTests.swift */; };
@@ -27,6 +28,7 @@
 		875C528DF07F73F9B52EC956 /* ScreenshotTextExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD0725565560AE1D29C8887 /* ScreenshotTextExtractor.swift */; };
 		88D0896FCCDB5D862E6EF160 /* AppleVisionScreenshotTextExtractorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19835D10F285353D77EDF2E3 /* AppleVisionScreenshotTextExtractorTests.swift */; };
 		8D8659AB219B92DA79773FAB /* RecallApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99A786D21286E7D456EF199A /* RecallApp.swift */; };
+		90478AC03C15B086CA50E980 /* ClipboardTextResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0575A254E85CCB907A561C7C /* ClipboardTextResolverTests.swift */; };
 		96D17649CC7F26C588335E6A /* ClipboardCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92DD1B7039E6191B76729C2C /* ClipboardCaptureService.swift */; };
 		9D163DA49A259A35D95A824E /* LiveRecallAPIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A877F4DBE0CBE9FF7C52E73 /* LiveRecallAPIClientTests.swift */; };
 		9EA018F67FEE2D67C0665C0A /* RecallAPIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 011C73CC5F147DA4AB1A3DF6 /* RecallAPIError.swift */; };
@@ -57,10 +59,12 @@
 
 /* Begin PBXFileReference section */
 		011C73CC5F147DA4AB1A3DF6 /* RecallAPIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecallAPIError.swift; sourceTree = "<group>"; };
+		0575A254E85CCB907A561C7C /* ClipboardTextResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardTextResolverTests.swift; sourceTree = "<group>"; };
 		155D09D62EE905E07CD34B11 /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
 		18EA95D7013148198B81BC8D /* ScreenshotCaptureServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCaptureServiceTests.swift; sourceTree = "<group>"; };
 		19835D10F285353D77EDF2E3 /* AppleVisionScreenshotTextExtractorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleVisionScreenshotTextExtractorTests.swift; sourceTree = "<group>"; };
 		1F0FFD14F1B05A897E900C33 /* CaptureDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureDetailView.swift; sourceTree = "<group>"; };
+		3BF0369E9A16EB40262C407C /* ClipboardTextResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardTextResolver.swift; sourceTree = "<group>"; };
 		3F99204CB67ACB2CF20FE08B /* SelectionClipboardFallbackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionClipboardFallbackService.swift; sourceTree = "<group>"; };
 		4A6E5844BF3FF8AEAF4C199D /* RecallComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecallComponents.swift; sourceTree = "<group>"; };
 		589D612419DE8AD691D1CD7C /* Recall.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Recall.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -181,6 +185,7 @@
 			children = (
 				C336D158132271B6AA133236 /* AccessibilitySelectionServiceTests.swift */,
 				19835D10F285353D77EDF2E3 /* AppleVisionScreenshotTextExtractorTests.swift */,
+				0575A254E85CCB907A561C7C /* ClipboardTextResolverTests.swift */,
 				EAEE10DE023B7AE4168CE6D0 /* GlobalShortcutTests.swift */,
 				8A877F4DBE0CBE9FF7C52E73 /* LiveRecallAPIClientTests.swift */,
 				CC940BE4C991EF2D24A1083C /* QuickCaptureWindowPlacementTests.swift */,
@@ -205,6 +210,7 @@
 			children = (
 				61555D2365AFE7EF93A57329 /* AccessibilitySelectionService.swift */,
 				92DD1B7039E6191B76729C2C /* ClipboardCaptureService.swift */,
+				3BF0369E9A16EB40262C407C /* ClipboardTextResolver.swift */,
 				71391B6B888FE7C1EF3039E7 /* GlobalShortcutCenter.swift */,
 				9F776F9651F812AAF0E2D7CC /* ScreenshotCaptureService.swift */,
 				DDD0725565560AE1D29C8887 /* ScreenshotTextExtractor.swift */,
@@ -335,6 +341,7 @@
 			files = (
 				B755C3C6F289AC533F47E5D3 /* AccessibilitySelectionServiceTests.swift in Sources */,
 				88D0896FCCDB5D862E6EF160 /* AppleVisionScreenshotTextExtractorTests.swift in Sources */,
+				90478AC03C15B086CA50E980 /* ClipboardTextResolverTests.swift in Sources */,
 				4D055E8631D36BB8D63E810E /* GlobalShortcutTests.swift in Sources */,
 				9D163DA49A259A35D95A824E /* LiveRecallAPIClientTests.swift in Sources */,
 				EF38C163637FE05FD8AC2689 /* QuickCaptureWindowPlacementTests.swift in Sources */,
@@ -358,6 +365,7 @@
 				A7128583E6EF02AD1A56E3A0 /* CapturePresentationHost.swift in Sources */,
 				7136B53E312C12667962369E /* CaptureRowView.swift in Sources */,
 				96D17649CC7F26C588335E6A /* ClipboardCaptureService.swift in Sources */,
+				5891C70EEE5AF7F920185463 /* ClipboardTextResolver.swift in Sources */,
 				400EC92694095F860A54A97C /* GlobalCaptureCoordinator.swift in Sources */,
 				74AC33EE0315136F83F4892F /* GlobalShortcut.swift in Sources */,
 				166578FD81AF1A6978AA0DA8 /* GlobalShortcutCenter.swift in Sources */,

@@ -256,16 +256,25 @@ is never logged, persisted, or sent to the backend. The current host suite passe
 merge; rich text, image, Finder-file, and race cases remain release-regression
 coverage rather than an open merge gate.
 
-D-037 adds the first persisted image-note vertical slice on
-`codex/image-notes`. A screenshot draft can save one original PNG with a
-separate note, display it in library/detail views, delete it with its local
-file, and—only with explicit opt-in—run background OCR plus visual indexing into
-the existing search fields. Provider errors keep the original safe and support
-the ordinary **Retry AI** action. Automated verification currently passes 234
-backend and 157 macOS tests; signed real-device image/AI acceptance remains the
-feature's final gate.
+D-036 begins rich-source support at the conservative intake boundary rather than
+adding a rich editor prematurely. Explicit Clipboard Capture now uses a bounded
+resolver: plain text owns the content, while content-equivalent HTML or RTF may
+replace an existing whitespace separator with a paragraph or line boundary.
+Mismatched rich data cannot remove Markdown/TeX delimiters, and no markup is
+rendered, persisted, or sent. Gemini's live clipboard payload verifies that the
+resolver can preserve inline/display TeX and recover safe block boundaries.
+Native Accessibility selection remains unchanged and limited to what the source
+app exposes.
 
-The preceding integrated baseline also passes 44/44 stress scenarios and
+D-037 adds persisted image notes. A screenshot draft can save one original PNG
+or JPEG with a separate note, display it in library/detail views, delete it with
+its local file, and—only within the global privacy master switch—run background
+OCR plus visual indexing into the existing search fields. Provider errors keep
+the original safe and support **Retry AI**. The user verified real-app image
+notes with AI both disabled and enabled.
+
+The integrated D-036/D-037 tree passes 234 backend tests, 44/44 stress
+scenarios, 184/184 macOS tests, and
 68/68 Chrome-extension tests.
 
 Live verification covers provider-off keyword fallback, real OpenAI enrichment

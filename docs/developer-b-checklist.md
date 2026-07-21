@@ -6,12 +6,13 @@ Project: Recall
 
 Last updated: 2026-07-21
 
-Current phase: Persisted image-note vertical slice implemented; signed
-real-device acceptance and PR review pending
+Current phase: Structured-text fidelity and persisted image notes implemented;
+primary real-app acceptance complete and release regression work remains
 
-Implementation branch: `codex/image-notes`
+Recorded implementation branches: `codex/text-capture-fidelity` and
+`codex/image-notes`
 
-Branch base: `e6206e0` (`main` at image-note branch creation)
+Integration base: `667b045` (PR #14 merge commit)
 
 Canonical target: `main`
 
@@ -41,11 +42,19 @@ D-035 is implemented with a 149/149 host suite, and B-016 closed after final
 real-device acceptance on 2026-07-21.
 
 D-037 now adds one persisted screenshot image per Capture, an independent note,
-an off-by-default visual-analysis preference, background OCR/visual enrichment
+an off-by-default visual-analysis master switch, background OCR/visual enrichment
 through the existing searchable fields, library/detail rendering, and deletion
 of both metadata and the local file. The feature branch passes 234 backend and
-157 macOS tests. Signed real-device provider-off/provider-on acceptance remains
-open; no claim of live privacy or visual-search acceptance is made yet.
+the integrated macOS suite passes 184 tests. The user verified real-app image
+notes with AI both disabled and enabled; visual-concept retrieval, restart,
+retry, and physical deletion remain explicit release-regression checks.
+
+D-036 now adds one conservative intake layer to explicit Clipboard Capture. It
+keeps plain characters authoritative and restores only richer line boundaries
+from bounded, content-equivalent HTML/RTF. The real Gemini clipboard payload
+restores verified block boundaries from an intentionally flattened plain string
+while retaining inline and display TeX. Selection Capture remains unchanged, and
+the resulting host suite passes 176/176.
 
 Last baseline cross-check: 2026-07-18 against all sections of
 `docs/product-plan.md`
@@ -99,7 +108,8 @@ Update protocol:
 | Safeguard | Chrome action popup sizing | Complete and real-Chrome verified | D-033 uses a 344 × 510 root without viewport-height feedback; 68/68 tests and selected/metadata layouts pass |
 | Addition | Native Accessibility selection | Implemented; primary path accepted | D-034 adds explicit `Option+Shift+Command+S`, fail-closed AX reading, anchored review, safe v1 shortcut migration, and 108/108 macOS tests; user acceptance passed on 2026-07-21 |
 | Addition | Clipboard selection compatibility | Complete and real-device accepted | D-035 adds an off-by-default transactional synthetic-Copy fallback with exact-control and application-scoped tickets; 149/149 host tests and B-016 user acceptance pass |
-| Addition | Persisted image notes and visual indexing | Implemented; signed acceptance pending | D-037 adds one bounded local image, separate note, off-by-default background AI, existing-search reuse, rendering, retry, and deletion; 234 backend and 157 macOS tests pass |
+| Addition | Structured-text capture fidelity | Implemented; live payload verified | D-036 adds a bounded plain/HTML/RTF resolver to explicit Clipboard Capture; the real Gemini payload restores verified boundaries from flattened plain text while retaining TeX |
+| Addition | Persisted image notes and visual indexing | Implemented; primary real-app flow accepted | D-037 adds one bounded local image, separate note, off-by-default AI master switch, existing-search reuse, rendering, retry, and deletion; 234 backend and 184 integrated macOS tests pass |
 
 The D-023 integration closes B-010, the macOS slice closes B-006, and real
 provider plus unpacked-Chrome evidence closes B-007, B-008, and B-009. B-011 is
@@ -109,8 +119,8 @@ gate.
 
 ## Active addition — persisted image notes and visual indexing
 
-Status: `[~]` D-037 automated implementation verified; signed real-device
-acceptance and PR review pending
+Status: `[x]` D-037 automated implementation and real-app AI-disabled/AI-enabled
+image-note acceptance verified
 
 - [x] Preserve D-027 as the separate text-only screenshot choice; add an explicit
   **Image note** choice rather than silently changing existing behavior.
@@ -132,11 +142,12 @@ acceptance and PR review pending
 - [x] Verify invalid images, idempotent retries, provider-off preservation,
   provider-on OCR/visual search, attachment reads, deletion, migration, health,
   networking, preference persistence, upload retry, image loading, and old-
-  backend decoding. Evidence: 234/234 backend and 157/157 macOS tests.
-- [ ] On the stably signed app, verify one provider-off image never reaches
-  OpenAI, one provider-on image becomes searchable by a visual concept absent
-  from its OCR, restart persistence, full-resolution detail display, retry, and
-  deletion from both the library and attachment directory.
+  backend decoding. Evidence: 234/234 backend and 184/184 integrated macOS tests.
+- [x] In the real app, verify image notes save successfully with AI disabled and
+  enabled, and that the enabled path produces visible AI interpretation.
+- [ ] During release regression, verify visual-concept retrieval absent from OCR,
+  restart persistence, full-resolution detail display, retry, and deletion from
+  both the library and attachment directory.
 
 ## Historical addition — screenshot text into notes
 
@@ -421,6 +432,35 @@ acceptance are complete; the user authorized merge on 2026-07-21
 - [x] Complete automated service/store/privacy tests and pass the expanded
   149/149 host suite.
 - [x] Pass B-016 in WeChat and obtain explicit merge authorization.
+
+## Active addition — structured-text capture fidelity
+
+Status: `[x]` D-036 implementation, its 176/176 host suite, and live Gemini
+clipboard payload verification are complete
+
+- [x] Confirm that the API contract, JSON transport, SQLite `TEXT`, and current
+  native views already retain newline characters; make no schema or migration
+  change for this bounded slice.
+- [x] Add one bounded resolver for plain text plus inert HTML/RTF clipboard
+  representations to explicit Clipboard Capture.
+- [x] Keep plain content authoritative. Project richer line boundaries only
+  when the structured candidate has identical ordered non-whitespace content;
+  otherwise preserve the original plain string exactly, including TeX or
+  Markdown delimiters such as `$e$`.
+- [x] Keep HTML/RTF markup transient and local. Do not render it, persist it,
+  log it, or send it before the user saves the resolved text.
+- [x] Reject whitespace-only plain text, rich-only payloads, cross-item pairing,
+  and explicit-capture reads whose pasteboard change count moves mid-snapshot.
+- [x] Resolve multiple text items independently and join them with macOS's
+  newline semantics; fall back to system plain text when bounded item/type
+  inspection is exceeded.
+- [x] Pass host macOS tests covering HTML/RTF line restoration,
+  whitespace-position safety, mismatch fallback, size bounds, and explicit
+  Clipboard Capture.
+- [x] Verify the user's Gemini clipboard payload. Its HTML exposes semantic
+  `data-math`; flattening the plain string to zero newlines and resolving it
+  restores 46 verified block boundaries while preserving inline/display TeX
+  and identical ordered non-whitespace content.
 
 ## Active reliability correction — stable Screen Recording identity
 
@@ -1711,6 +1751,21 @@ release candidates should repeat the interaction check.
 
 Use IDs `E-###`. Record the original symptom and the resolution. Do not erase
 resolved errors.
+
+## E-060 — UTF-16 regression exposed an ambiguous no-BOM byte order
+
+- Date: 2026-07-21
+- Status: Resolved 2026-07-21
+- Symptom: The first 171-test D-036 run passed 170 tests but decoded a synthetic
+  `public.utf16-plain-text` payload without a byte-order mark as unrelated CJK
+  characters.
+- Cause: Foundation's generic UTF-16 decoder accepted the no-BOM bytes with the
+  wrong order before the explicit little-endian decoder was tried.
+- Resolution: Honor an explicit big- or little-endian BOM first and otherwise
+  use the native little-endian order of every supported macOS target. The same
+  171-test host suite now passes completely.
+- Project impact: Correct plain-text decoding for a legacy pasteboard alias;
+  no API, storage, or rendering change.
 
 ## E-059 — Chrome action popup collapsed to a title-height strip
 
