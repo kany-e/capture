@@ -29,6 +29,7 @@
     const characters = Array.from(normalizeText(value));
     return {
       text: characters.slice(0, maximum).join(""),
+      characterCount: characters.length,
       truncated: characters.length > maximum,
     };
   }

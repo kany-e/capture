@@ -6,22 +6,23 @@ Project: Recall
 
 Last updated: 2026-07-20
 
-Current phase: D-029 inline browser capture verification and review
+Current phase: D-030 browser context and long-detail-view hardening
 
-Current branch: `codex/browser-inline-capture`
+Current branch: `codex/inline-context-ui-fixes`
 
-Last verified commit: `f66d936` (branch base; current change not yet committed)
+Branch base: `71ec387` (PR #8 merge commit)
 
 Canonical target: `main`
 
 The canonical `main` tree combines the hardened backend, Chrome extension,
-macOS client, screenshot OCR, shared contracts, and layered CI. The current
-baseline passes 214 backend tests, 44/44 stress scenarios, 16 extension tests,
-and 43 macOS tests.
+macOS client, screenshot OCR, shared contracts, and layered CI. It includes the
+D-029 inline browser feature merged through PR #8 at `71ec387`. Baseline backend
+and stress evidence remains 214 tests and 44/44 scenarios.
 
-The current D-029 feature change passes 68/68 dependency-free extension tests;
-this count is verification evidence for the current implementation rather than
-a permanent suite-size requirement.
+The current D-030 branch keeps the dependency-free extension suite at 68 tests
+and adds five bounded macOS context-projection tests. The current working tree
+passes 68/68 extension tests and 48/48 macOS tests; the detail behavior is
+covered by the real-app evidence recorded below.
 
 Last baseline cross-check: 2026-07-18 against all sections of
 `docs/product-plan.md`
@@ -64,11 +65,12 @@ Update protocol:
 | 5 | FTS5 keyword retrieval | Complete | Commit `d34a567` pushed; 119 tests and provider-off live/restart proof pass |
 | 6 | Chrome capture | Complete / shortcut polish awaiting manual check | 16 automated tests pass; earlier unpacked selected-text/no-selection Captures displayed in macOS resolve B-009 |
 | 7 | Embeddings and hybrid retrieval | Complete | Real embedding and vague semantic-query proof with non-null score resolve B-008 |
-| 8 | Reliability and demo readiness | P0 integration verified / backlog reduced | Current branch passes 214 backend tests and 44/44 stress scenarios; stale-process recovery, version-aware one-command startup, and 16 Chrome tests are verified |
+| 8 | Reliability and demo readiness | P0 integration verified / backlog reduced | Layer 8 baseline passes 214 backend tests and 44/44 stress scenarios; stale-process recovery and version-aware one-command startup are verified |
 | 9 | Optional Apple on-device path | Gated | Decision D-008 accepted; prerequisites unmet |
 | 10 | Final freeze and submission | Pending | Not started |
 | Addition | Screenshot-to-notes OCR | Complete and verified | PR #5 supersedes draft PR #4; 214 backend, 44/44 stress, 16 extension, and 43 macOS tests pass; live GPT, Apple Vision, permission, cancellation, and dismissal flows pass |
-| Addition | Opt-in inline browser capture | Implemented and real-Chrome acceptance verified / merge pending | 68/68 extension tests pass; enable/save/retry/revoke/BFCache/toolbar fallback and macOS display were verified |
+| Addition | Opt-in inline browser capture | Complete, real-Chrome verified, and merged | PR #8 merged D-029 at `71ec387`; 68/68 extension tests and enable/save/retry/revoke/BFCache/toolbar-fallback evidence passed before merge |
+| Addition | Browser context and detail-view hardening | Implementation and bounded UI review complete / CI pending | D-030 disables unsafe Chrome context, bounds native display, fixes inline count/scroll, and compacts the popup; 68/68 extension and 48/48 macOS tests pass |
 
 The D-023 integration closes B-010, the macOS slice closes B-006, and real
 provider plus unpacked-Chrome evidence closes B-007, B-008, and B-009. B-011 is
@@ -124,7 +126,7 @@ D-027; the reviewed change is recorded in PR #5
 ## Active addition — opt-in inline browser selected-text capture
 
 Status: `[x]` implementation, deterministic coverage, and real-Chrome acceptance
-verified under D-029; pull-request CI and merge remain pending
+verified under D-029; PR #8 merged the change at `71ec387`
 
 - [x] Keep inline capture off by default and request broad HTTP/HTTPS access only
   through Chrome's optional permission prompt. Toolbar and keyboard capture keep
@@ -132,9 +134,10 @@ verified under D-029; pull-request CI and merge remain pending
 - [x] Declare no static content script. After opt-in, register the isolated
   script dynamically and inject it into eligible already-open tabs so users do
   not need to refresh them.
-- [x] Keep selected source and bounded context inside the page until Save. Do
-  not write the selection to extension storage, log it, or send it merely
-  because a user selected text.
+- [x] Keep selected source and the originally bounded context inside the page
+  until Save. Do not write the selection to extension storage, log it, or send
+  it merely because a user selected text. D-030 later disables browser context
+  submission after real-site evidence; this row records the merged D-029 state.
 - [x] Route toolbar and inline saves through one service-worker coordinator that
   validates the attempt and freezes source, note, timestamp, and
   `client_capture_id` across retryable ambiguity.
@@ -167,6 +170,47 @@ verified under D-029; pull-request CI and merge remain pending
   unconfigured. The stored Capture later entering enrichment `error` is expected
   and is not a capture failure: the persist-first pipeline retained its exact
   source and user note.
+- [x] PR #8 completed review and CI, then merged D-029 into `main` at merge
+  commit `71ec387`.
+
+## Active addition — browser context and detail-view hardening
+
+Status: `[~]` D-030 implementation, automated verification, the bounded UI
+verification recorded below, and source review complete on
+`codex/inline-context-ui-fixes`; CI and merge evidence remain pending
+
+- [x] Record the real Gemini failure without storing its content in this log:
+  selected text was 1,530 characters, context was 19,144 characters, and that
+  context contained 1,912 newline characters. Broad `main`/`body` extraction
+  included the conversation-history sidebar.
+- [x] Temporarily send empty `surrounding_context` from both Chrome entry
+  points with `context_truncated=false`. A selection Capture keeps normalized
+  text unshortened through the shared 12,000-character limit plus
+  title/URL/note; longer selections display the full count and an explicit
+  first-12,000 warning. A no-selection toolbar Capture keeps title/URL/note.
+  D-009 and the backend 20,000-character context contract remain unchanged.
+- [x] Keep selected text and its optional note as the current enrichment input;
+  do not replace browser context with another broad page scrape. A future
+  extractor must be centered on the selected Range and independently bounded by
+  characters plus lines/blocks.
+- [x] Add a separate Unicode-aware selected-text count to inline capture and
+  make its long-selection preview pointer- and keyboard-scrollable.
+- [x] Tighten the action popup width and spacing and give its shell an internal
+  vertical scroller so controls remain reachable on a short viewport.
+- [x] Preserve every existing database value. In macOS, collapse surrounding
+  context by default, show its character count, and render at most 2,000
+  characters and 60 lines only after explicit expansion. The complete original
+  remains on the model for search and AI.
+- [x] Retain 68 extension tests for the changed Chrome behavior and pass all
+  68. Add five bounded macOS context-projection tests and pass all 48 macOS
+  tests.
+- [x] Complete bounded UI verification and source review. The real unpacked
+  Chrome toolbar popup remained fully reachable; the standalone production
+  content-script harness reported and scrolled an 800-character inline preview;
+  and the rebuilt native app kept the 19,144-character context collapsed before
+  rendering only its bounded 60-line preview. The standalone harness uses a
+  mocked runtime and open Shadow DOM, so it is not injection or CSP evidence.
+- [ ] Complete CI and merge evidence.
 
 ## Scope, schedule, and collaboration guardrails
 
@@ -715,6 +759,11 @@ Status: `[x]` implementation, exit gate, and delivery complete
 
 Status: `[x]` implementation and real unpacked-Chrome/macOS gate verified
 
+Historical note: the extraction and real-page context rows below prove the
+original D-018/D-009 implementation. D-030 supersedes that browser-client
+behavior: current Chrome submissions use empty `surrounding_context`, including
+the no-selection toolbar path, while the shared contract capability remains.
+
 ## Decisions and prerequisites
 
 - [x] End the D-016 deferral after the verified Layer 7 backend implementation.
@@ -728,14 +777,21 @@ Status: `[x]` implementation and real unpacked-Chrome/macOS gate verified
 - [x] Create a Manifest V3 extension under `apps/chrome-extension/`.
 - [x] Request only `activeTab`, `scripting`, `storage`, and required localhost
   host permission.
-- [x] Extract page title, URL, selected text, and nearby context.
-- [x] Locate the selection's `commonAncestorContainer`, then prefer `article`,
+- [x] Historically extracted page title, URL, selected text, and nearby context;
+  D-030 now extracts the same fields but submits no browser context.
+- [x] The historical extractor located the selection's
+  `commonAncestorContainer`, then preferred `article`,
   `[role="main"]`, `.answer`, `.post-text`, `main`, or the nearest `p`, `div`,
-  or `section` without site-specific parsers.
-- [x] If no useful container exists, fall back to a truncated portion of
-  `document.body.innerText`.
-- [x] Enforce context limits and set `context_truncated`.
-- [x] Support no-selection page-context capture with a clear warning.
+  or `section` without site-specific parsers. D-030 removes this strategy after
+  the Gemini sidebar failure.
+- [x] The historical fallback used a truncated portion of
+  `document.body.innerText`; D-030 explicitly forbids this fallback.
+- [x] Historically enforced the shared context limit and set
+  `context_truncated`; current browser requests use empty context and therefore
+  keep this context-specific flag `false`. Selection shortening is reported
+  separately in the browser UI.
+- [x] Historically supported no-selection page-context capture with a clear
+  warning. D-030 keeps the D-009 metadata-only path but submits no page text.
 - [x] Build popup page title, selection preview, optional note, Save, `Saved`,
   and `Processing with AI` states.
 - [x] Send the exact Capture contract to the backend.
@@ -743,6 +799,9 @@ Status: `[x]` implementation and real unpacked-Chrome/macOS gate verified
 - [x] Configure narrow CORS origins; never submit with `*`.
 
 ## Required browser tests
+
+These are retained historical acceptance results. The first seven context
+expectations were replaced by D-030 and are not current browser behavior.
 
 - [x] Stack Overflow: actual page returned 6,211 characters from the preferred
   page container without truncation.

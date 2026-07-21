@@ -30,12 +30,12 @@
               sourceTitle: "FastAPI systemd repair",
               sourceUrl: "https://fixture.example/systemd-repair",
               selectedText: hasSelection ? "Set WorkingDirectory before restart." : "",
-              surroundingContext: "The service worked manually but failed under systemd.",
+              surroundingContext: "",
               contextTruncated: false,
               hasSelection,
               extractionMode: hasSelection
-                ? "preferred-container"
-                : "page-container",
+                ? "selection-only"
+                : "metadata-only",
             },
           }],
         },

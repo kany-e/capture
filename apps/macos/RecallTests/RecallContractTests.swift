@@ -121,6 +121,73 @@ final class RecallContractTests: XCTestCase {
         XCTAssertEqual(object["context_truncated"] as? Bool, false)
     }
 
+    func testSurroundingContextPreviewKeepsShortTrimmedContext() throws {
+        let preview = try XCTUnwrap(
+            SurroundingContextPreview(context: "  Nearby explanation 🧠  ")
+        )
+
+        XCTAssertEqual(preview.text, "Nearby explanation 🧠")
+        XCTAssertEqual(preview.totalCharacterCount, 20)
+        XCTAssertEqual(preview.displayedCharacterCount, 20)
+        XCTAssertEqual(preview.displayedLineCount, 1)
+        XCTAssertEqual(preview.omittedCharacterCount, 0)
+        XCTAssertFalse(preview.isDisplayLimited)
+    }
+
+    func testSurroundingContextPreviewBoundsLongDisplayWithoutChangingSource() throws {
+        let context = String(repeating: "左", count: 20_000)
+        let preview = try XCTUnwrap(
+            SurroundingContextPreview(context: context)
+        )
+
+        XCTAssertEqual(context.count, 20_000)
+        XCTAssertEqual(preview.totalCharacterCount, 20_000)
+        XCTAssertEqual(preview.displayedCharacterCount, 2_000)
+        XCTAssertEqual(preview.text.count, 2_000)
+        XCTAssertEqual(preview.displayedLineCount, 1)
+        XCTAssertEqual(preview.omittedCharacterCount, 18_000)
+        XCTAssertTrue(preview.isDisplayLimited)
+    }
+
+    func testSurroundingContextPreviewAlsoBoundsLineHeavyContext() throws {
+        let context = (1...100).map { "Line \($0)" }.joined(separator: "\n")
+        let preview = try XCTUnwrap(
+            SurroundingContextPreview(
+                context: context,
+                characterLimit: 20_000,
+                lineLimit: 60
+            )
+        )
+
+        XCTAssertEqual(preview.displayedLineCount, 60)
+        XCTAssertTrue(preview.text.hasSuffix("Line 60"))
+        XCTAssertFalse(preview.text.contains("Line 61"))
+        XCTAssertTrue(preview.isDisplayLimited)
+    }
+
+    func testSurroundingContextPreviewCountsAllLogicalNewlineCharacters() throws {
+        let context = "Line 1\r\nLine 2\rLine 3\u{2028}Line 4\u{2029}Line 5\nLine 6"
+        let preview = try XCTUnwrap(
+            SurroundingContextPreview(
+                context: context,
+                characterLimit: 20_000,
+                lineLimit: 5
+            )
+        )
+
+        XCTAssertEqual(preview.displayedLineCount, 5)
+        XCTAssertTrue(preview.text.hasSuffix("Line 5"))
+        XCTAssertFalse(preview.text.contains("Line 6"))
+        XCTAssertTrue(preview.isDisplayLimited)
+    }
+
+    func testSurroundingContextPreviewRejectsEmptyContextAndInvalidLimit() {
+        XCTAssertNil(SurroundingContextPreview(context: nil))
+        XCTAssertNil(SurroundingContextPreview(context: " \n\t "))
+        XCTAssertNil(SurroundingContextPreview(context: "context", characterLimit: 0))
+        XCTAssertNil(SurroundingContextPreview(context: "context", lineLimit: 0))
+    }
+
     private func jsonObject(from data: Data) throws -> [String: Any] {
         try XCTUnwrap(
             JSONSerialization.jsonObject(with: data) as? [String: Any]

@@ -1,0 +1,61 @@
+<!doctype html>
+<!--
+  Deliberately omits the strict CSP used by inline-capture-harness.html so the
+  in-app browser can inspect the real Shadow DOM UI in isolation. This is a
+  manual layout/scroll fixture, not CSP acceptance evidence.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Recall standalone inline capture harness</title>
+    <link rel="stylesheet" href="inline-capture-harness.css" />
+  </head>
+  <body>
+    <header>
+      <p class="eyebrow">Recall isolated-browser fixture</p>
+      <h1>Inline selection compatibility</h1>
+      <p>Select the complete article to exercise a long preview.</p>
+    </header>
+
+    <main>
+      <article id="capture-article">
+        <h2>Systemd deployment repair</h2>
+        <p id="primary-selection">
+          Set WorkingDirectory before restart. The service worked in a terminal
+          but failed when systemd started it from a different directory. Keep
+          the unit file, environment configuration, and working directory in
+          sync before restarting the local service.
+        </p>
+        <pre><code>sudo systemctl daemon-reload
+sudo systemctl restart recall
+sudo systemctl status recall</code></pre>
+        <p lang="zh-Hans">保存这段中文内容，并确认选区字符数准确，长内容可以在预览中上下滚动。</p>
+        <p dir="rtl" lang="ar">هذا نص لاختبار تحديد النص من اليمين إلى اليسار.</p>
+      </article>
+
+      <section class="unsupported">
+        <h2>Unsupported editable targets</h2>
+        <label>Input <input value="Inline capture must not appear here" /></label>
+        <div contenteditable="true" role="textbox">Nor inside this editable region.</div>
+      </section>
+
+      <aside class="high-stack">Page element with a high z-index</aside>
+      <dialog id="top-layer-dialog">
+        <p>Native top-layer compatibility probe.</p>
+        <button id="close-dialog" type="button">Close</button>
+      </dialog>
+      <button id="open-dialog" type="button">Open top-layer probe</button>
+      <a id="navigate-away" href="?away=1">Navigate for BFCache probe</a>
+    </main>
+
+    <footer id="harness-status" aria-live="polite">
+      <span id="focus-status">Focus: body</span>
+      <span id="escape-status">Escape events: 0; canceled: 0</span>
+      <span id="layout-status">Article layout: stable</span>
+      <span id="bfcache-status">BFCache restores: 0</span>
+    </footer>
+
+    <script src="inline-capture-harness.js"></script>
+  </body>
+</html>

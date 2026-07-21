@@ -40,19 +40,38 @@ OS temporary PNG and removes it after the normal selection flow.
 
 ## Browser inline capture boundary
 
-Decision D-029 adds an opt-in selected-text surface without changing the
-backend contract. The extension keeps HTTP/HTTPS website access in
-`optional_host_permissions`, leaves it disabled by default, and declares no
-static content script. After explicit permission, the service worker registers
-the isolated content script dynamically and injects it into eligible tabs that
-are already open, so users do not need to refresh them.
+Decision D-029, merged through PR #8 in `71ec387`, adds an opt-in selected-text
+surface without changing the backend contract. The extension keeps HTTP/HTTPS
+website access in `optional_host_permissions`, leaves it disabled by default,
+and declares no static content script. After explicit permission, the service
+worker registers the isolated content script dynamically and injects it into
+eligible tabs that are already open, so users do not need to refresh them.
 
-Selection text and bounded context stay inside the page until the user chooses
-Save. The content script then sends one frozen attempt to the extension service
-worker; toolbar and inline capture share the same validation, retry identity,
-and localhost delivery coordinator. The page script never calls the backend
-directly. Revoking access unregisters future injection and immediately asks
-already-open tabs to remove Recall controls and listeners.
+Selection text stays inside the page until the user chooses Save. The content
+script then sends one frozen attempt to the extension service worker; toolbar
+and inline capture share the same validation, retry identity, and localhost
+delivery coordinator. The page script never calls the backend directly.
+Revoking access unregisters future injection and immediately asks already-open
+tabs to remove Recall controls and listeners.
+
+Decision D-030 temporarily disables browser-generated surrounding context in
+both entry points. With a selection, Chrome submits up to the shared 12,000-
+character limit plus title, URL, and optional note; text within that limit uses
+the existing normalization but is not shortened, and a longer selection
+receives an explicit UI warning. Without a selection, the toolbar submits title,
+URL, and optional note. Because no context is sent, `context_truncated` remains
+`false`. This is a client policy, not a contract removal: D-009 still allows
+metadata-only Captures, and the API continues to accept up to 20,000 characters
+of surrounding context from clients that can produce it safely.
+
+The immediate boundary avoids broad SPA containers such as `main` or `body`.
+A real Gemini record contained a 1,530-character selection but 19,144
+characters and 1,912 newline characters of context because navigation and
+conversation history shared that container. Any future browser context
+extractor must start from the selected DOM Range, exclude navigation and hidden
+regions, and apply independent character plus line/block limits. If it cannot
+prove locality, it must fall back to no surrounding context rather than the
+whole page.
 
 An injected document becomes suspended on `pagehide`. If Chrome restores it
 from the back-forward cache, it sends a read-only permission-status message and
@@ -65,6 +84,19 @@ off-screen page could otherwise miss the revocation broadcast.
 This boundary remains text-only. It does not persist page images or add an
 attachment contract. The native D-027 screenshot flow likewise stores reviewed
 OCR-derived text rather than an image attachment.
+
+## Long-context display boundary
+
+The backend keeps the complete persisted context for enrichment and retrieval;
+D-030 does not migrate or delete existing rows. The native detail view treats
+that value as potentially hostile to layout performance. Context is collapsed
+by default with only its character count visible. On explicit expansion,
+SwiftUI receives a display-only preview capped at the first 2,000 characters
+and 60 lines. The full value remains on the Capture model for search and AI.
+
+This display limit is separate from the 20,000-character transport contract.
+It prevents the newest-record auto-selection plus an eager selectable `Text`
+from repeatedly laying out a page-sized, newline-heavy string at app launch.
 
 ## Component ownership
 
@@ -123,7 +155,9 @@ implementation.
 
 Every Capture keeps three independent layers:
 
-1. **Source** — selected text, surrounding context, URL, title, and source app.
+1. **Source** — selected text, optional surrounding context, URL, title, and
+   source app. Current Chrome Captures intentionally omit surrounding context;
+   the field remains a cross-client contract capability.
 2. **User note** — the user's personal reason, situation, or caution.
 3. **AI interpretation** — title, summary, problem, key insight, inferred reason,
    caveats, tags, entities, and search aliases.

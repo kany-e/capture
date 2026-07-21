@@ -42,7 +42,8 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-026 | Deterministic macOS command-line test runner | Reliability safeguard | Accepted |
 | D-027 | Transient screenshot OCR into the existing Capture pipeline | Addition | Implemented and live-verified in PR #5 |
 | D-028 | Layered GitHub Actions pull-request checks | Reliability safeguard | Accepted by user direction |
-| D-029 | Opt-in inline browser selected-text capture | Addition | Implemented and real-Chrome acceptance verified; merge pending |
+| D-029 | Opt-in inline browser selected-text capture | Addition | Implemented, real-Chrome verified, and merged in PR #8 |
+| D-030 | Omit unsafe browser context and bound native display | Reliability/privacy safeguard | Implemented and UI-verified at the recorded boundaries; 68 extension and 48 macOS tests pass |
 
 ## D-001 — Localhost monorepo architecture
 
@@ -181,6 +182,12 @@ content fields must be non-empty.
 
 This is not a new capture mode. It reconciles the no-selection browser behavior
 with the baseline data model.
+
+D-030 later changes the current Chrome client to omit page text when there is
+no selection and rely on title, URL, and optional note. D-009 remains the
+cross-client contract capability for metadata- or safely bounded-context
+Captures; it does not require every browser capture to populate
+`surrounding_context`.
 
 ## D-010 — Standard-library virtual environment for the backend
 
@@ -624,8 +631,8 @@ interactive operating-system flows retain their documented manual gates.
 ## D-029 — Opt-in inline browser selected-text capture
 
 - Classification: Addition approved by explicit user direction
-- Status: Implemented on the current branch and real unpacked-Chrome acceptance
-  verified; pull-request CI and merge remain pending
+- Status: Implemented, real unpacked-Chrome acceptance verified, and merged
+  through PR #8 at merge commit `71ec387`
 - Product impact: Reduces a selected-web-text Capture to one nearby action, an
   optional personal note, and an explicit save
 - Schedule impact: Bounded Chrome-extension slice; native capture improvements
@@ -634,9 +641,10 @@ interactive operating-system flows retain their documented manual gates.
 After a user explicitly enables optional HTTP/HTTPS website access, the Chrome
 extension may observe a completed selection locally and show a transient
 **Add to Recall** action beside it. Selecting text alone must not persist, log,
-or transmit source content. The selected source, bounded surrounding context,
-page title, URL, and optional user note enter the existing `POST /v1/captures`
-pipeline only after the user chooses Save.
+or transmit source content. As originally merged, the selected source, bounded
+surrounding context, page title, URL, and optional user note entered the existing
+`POST /v1/captures` pipeline only after the user chose Save. D-030 hardens this
+after real-site evidence by temporarily omitting browser surrounding context.
 
 The inline surface must not change document layout, take focus merely by
 appearing, suppress the page's normal keyboard behavior, interpret page text as
@@ -677,8 +685,72 @@ disabled, and toolbar capture still saved after revocation. All resulting cards
 displayed with the exact source and note in the macOS app. The temporary backend
 intentionally had no AI provider configured, so the resulting enrichment
 `error` demonstrates the existing persist-first rule: the Capture succeeded and
-retained its source and note even though enrichment did not. Final pull-request
-checks and merge evidence remain to be recorded.
+retained its source and note even though enrichment did not. PR #8 completed
+the pull-request checks and merged the feature into `main` at `71ec387`.
+
+## D-030 — Omit unsafe browser context and bound native display
+
+- Classification: Reliability and privacy safeguard approved by user direction
+- Status: Implemented and UI-verified at the boundaries recorded below on
+  `codex/inline-context-ui-fixes`; 68 extension and 48 macOS tests pass, with CI
+  and merge evidence still pending
+- Product impact: Prevents unrelated page regions from entering new Chrome
+  Captures and prevents oversized stored context from stalling the native detail
+  view
+- Schedule impact: Current browser-hardening priority; native global capture
+  remains next
+
+A real Gemini Capture exposed two coupled failure modes. Its exact selected
+answer was 1,530 characters, while `surrounding_context` reached 19,144
+characters with 1,912 newline characters because broad `main`/`body` ancestry
+also included the conversation-history sidebar. The macOS detail view eagerly
+constructed one selectable SwiftUI `Text` for that value; because the newest
+record is selected automatically, the cost recurred immediately after every app
+restart and made the library nearly unusable.
+
+Until a local extractor is demonstrably safe, both Chrome entry points send an
+empty `surrounding_context` and `context_truncated=false`. With a selection,
+they save up to the shared 12,000-character selection limit plus page title,
+URL, and optional note. Text within that limit follows the existing normalization
+without shortening; a longer selection shows its full count and warns that only
+the first 12,000 characters will be saved. Without a selection, the toolbar
+saves page title, URL, and optional note. D-009 still permits that metadata-only
+Capture, and the backend's
+20,000-character context field remains an available contract capability rather
+than a statement of current browser behavior. No schema, database, or
+enrichment contract changes are made.
+
+Any future Chrome context implementation must be centered on the selected DOM
+Range, exclude navigation and hidden regions, and enforce independent character
+plus line/block limits. It must fall back to empty context rather than a broad
+ancestor when locality cannot be established. This future work may improve AI
+interpretation, but selected text within the shared contract limit and the
+user's note remain the primary browser inputs in the meantime.
+
+Existing context is neither migrated nor deleted. The macOS model keeps the
+complete value for search and AI processing, while its detail UI starts the
+section collapsed and displays only a character count. Explicit expansion
+passes at most the first 2,000 characters and 60 lines to selectable `Text` and
+labels the preview limit. These display limits are independent of transport and
+storage limits.
+
+The same hardening clarifies the browser surfaces: inline capture shows a
+Unicode-aware selected-text count separate from the note count, its selection
+preview is pointer- and keyboard-scrollable, and the action popup uses a more
+compact internally scrollable layout. All 68 extension tests pass. Five macOS
+tests cover the bounded context projection, and all 48 macOS tests pass; the
+detail view's collapse, expansion, and responsiveness are covered by the manual
+evidence below.
+
+UI verification reloaded the unpacked extension and confirmed the toolbar
+popup's complete compact layout and metadata-only Gemini result. The standalone
+production content-script harness reported an 800-character selection and
+allowed its preview to scroll from the top into the remaining text; because it
+uses a mocked runtime and open Shadow DOM, this is not extension-injection or
+CSP evidence. The rebuilt macOS app opened the problematic 19,144-character
+record with context collapsed, remained responsive, and expanded only a 60-line
+bounded preview while keeping the full stored value intact. No verification
+Capture or database mutation was left behind.
 
 ## Pending decisions
 

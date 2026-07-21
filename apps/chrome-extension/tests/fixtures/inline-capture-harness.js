@@ -63,3 +63,53 @@ new MutationObserver(checkLayout).observe(document.documentElement, {
 });
 describeFocus();
 checkLayout();
+
+
+function loadScript(source) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = source;
+    script.addEventListener("load", resolve, { once: true });
+    script.addEventListener("error", reject, { once: true });
+    document.head.append(script);
+  });
+}
+
+
+async function installStandaloneInlineCapture() {
+  if (new URLSearchParams(location.search).get("standalone") !== "1") {
+    return;
+  }
+
+  const runtimeListeners = new Set();
+  globalThis.__RECALL_INLINE_TEST__ = true;
+  globalThis.chrome = {
+    runtime: {
+      onMessage: {
+        addListener: (listener) => runtimeListeners.add(listener),
+        removeListener: (listener) => runtimeListeners.delete(listener),
+      },
+      sendMessage: async (message) => {
+        if (message?.type === "recall:inline:status") {
+          return { ok: true, enabled: true };
+        }
+        if (message?.type === "recall:capture:create") {
+          return {
+            ok: true,
+            capture: { id: "standalone-fixture", status: "processing" },
+          };
+        }
+        return { ok: false };
+      },
+    },
+  };
+
+  await loadScript("../../src/content/inline-core.js");
+  await loadScript("../../src/content/inline-capture.js");
+  document.documentElement.dataset.recallStandalone = "ready";
+}
+
+
+void installStandaloneInlineCapture().catch(() => {
+  document.documentElement.dataset.recallStandalone = "error";
+});

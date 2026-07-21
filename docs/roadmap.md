@@ -19,9 +19,12 @@ split; they are no longer assignment gates.
   Apple Vision. Screenshot bytes remain transient and are not stored.
 - D-028 CI runs backend, deterministic stress, Chrome-extension, and macOS jobs
   plus one aggregate **Required checks** result.
-- The current D-029 change implements opt-in inline selected-text capture and
-  has passed its real unpacked-Chrome acceptance matrix; it is not part of
-  `main` until its pull request and CI complete.
+- D-029 opt-in inline selected-text capture passed its real unpacked-Chrome
+  acceptance matrix and was merged through PR #8 at `71ec387`.
+- The current `codex/inline-context-ui-fixes` branch implements D-030 browser
+  context and long-detail-view hardening. Chrome temporarily omits surrounding
+  context; existing stored context remains intact and is display-bounded in the
+  macOS detail view.
 - The macOS app and Chrome extension are separate clients of the loopback
   FastAPI service. The app does not yet package or start that service.
 
@@ -43,10 +46,17 @@ not approval from a particular historical developer role.
    variants in the macOS asset catalog and the supplied Chrome sizes in the
    extension manifest. Keep the color app icon separate from a monochrome
    menu-bar template image.
-2. **Opt-in inline browser selected-text capture — implemented and verified in
-   the current change.** D-029 now ships selected text plus an optional note
-   through the existing Capture API with optional, default-off website access.
-   The remaining work is pull-request review, CI, and merge evidence.
+2. **Browser capture reliability and privacy hardening — current.** D-030
+   temporarily sends no `surrounding_context` from either Chrome entry point,
+   keeps normalized selected text unshortened through the 12,000-character
+   contract limit, explicitly warns before saving a longer prefix, separates
+   the inline Unicode selection count from the note count, makes long selections
+   scrollable, and
+   keeps the action popup usable on shorter displays. Existing context is
+   collapsed and display-bounded in macOS without altering stored data. The real
+   Chrome toolbar, standalone production-script inline harness, rebuilt macOS
+   app, and source review are complete; finish CI and merge evidence.
+   Deterministic suites pass 68/68 for Chrome and 48/48 for macOS.
 3. **Native global capture shortcut and menu-bar availability — next.** Add a
    configurable global screenshot shortcut that reuses the existing region
    selection and Quick Capture flow, and keep it available from the menu-bar app
@@ -71,10 +81,11 @@ not approval from a particular historical developer role.
 
 ## Later product polish
 
-- Center inline browser context around the selected Range on very long pages;
-  the current bounded article/main extraction may spend its 20,000-character
-  context budget before reaching a selection near the end. The exact selected
-  text is still saved independently.
+- Reintroduce browser surrounding context only with a Range-centered extractor
+  that excludes navigation/hidden regions and enforces both character and
+  line/block limits. Falling back to no context is preferable to sending a
+  broad `main` or `body` container. The backend's 20,000-character contract
+  capability is not the target browser extraction size.
 - Make semantic retrieval visible in the macOS results, for example by showing
   when a Capture matched by meaning rather than only by literal text.
 - Group the library timeline into useful recent-date sections without changing
@@ -88,7 +99,7 @@ not approval from a particular historical developer role.
 
 ## Near-term acceptance gates
 
-### Inline browser capture — verified in the current change
+### Inline browser capture — merged baseline and current hardening
 
 - Website access is optional, explicit, revocable, and off by default.
 - Merely selecting text stores and transmits nothing.
@@ -104,7 +115,20 @@ not approval from a particular historical developer role.
 - The same run proved offline retry, normal page Escape behavior, ignored
   editable targets, immediate composer cleanup on revocation, a disabled real
   BFCache return, toolbar capture after revocation, and exact card display in
-  the macOS app. Pull-request CI remains the merge gate.
+  the macOS app. PR #8 merged this D-029 baseline at `71ec387`.
+- D-030 makes both current Chrome entry points send no surrounding context.
+  Selection/title/URL/note follow their established normalization and limits; a
+  longer selection is visibly limited to its first 12,000 characters, and a
+  no-selection toolbar capture relies on title/URL/note as allowed by D-009.
+- Inline UI shows a Unicode-aware selection count independent of the note count
+  and exposes a keyboard-scrollable long-selection preview. The action popup is
+  compact and internally scrollable.
+- Existing stored context is collapsed by default in the native detail view.
+  Expanding it renders at most 2,000 characters and 60 lines while preserving
+  the complete database/model value for retrieval and AI.
+- The extension suite passes 68/68 tests. The macOS suite adds five bounded
+  context-projection tests and passes 48/48; detail collapse/expansion was
+  verified in the rebuilt app against the problematic long record.
 
 The verification backend intentionally had no AI provider configured. Its later
 enrichment `error` did not invalidate the successful Capture: the persist-first

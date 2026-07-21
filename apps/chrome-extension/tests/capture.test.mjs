@@ -4,45 +4,22 @@ import { afterEach, test } from "node:test";
 import { extractPageCapture } from "../src/content/capture.js";
 
 
-function element({ innerText = "", preferred = null, nearby = null } = {}) {
-  return {
-    nodeType: 1,
-    innerText,
-    textContent: innerText,
-    closest(selector) {
-      return selector.includes("article") ? preferred : nearby;
-    },
-  };
-}
-
-
 function installPage({
   selectedText = "",
-  anchor = null,
-  pageContainer = null,
-  bodyText = "Body fallback",
   title = "Example page",
   url = "https://example.com/article",
+  bodyGetter,
 } = {}) {
-  const commonAncestorContainer = anchor
-    ? { nodeType: 3, parentElement: anchor }
-    : null;
   globalThis.window = {
     location: { href: url },
-    getSelection() {
-      return {
-        rangeCount: commonAncestorContainer ? 1 : 0,
-        anchorNode: commonAncestorContainer,
-        toString: () => selectedText,
-        getRangeAt: () => ({ commonAncestorContainer }),
-      };
-    },
+    getSelection: () => ({
+      toString: () => selectedText,
+    }),
   };
-  globalThis.document = {
-    title,
-    body: element({ innerText: bodyText }),
-    querySelector: () => pageContainer,
-  };
+  globalThis.document = { title };
+  if (bodyGetter) {
+    Object.defineProperty(globalThis.document, "body", { get: bodyGetter });
+  }
 }
 
 
@@ -52,95 +29,71 @@ afterEach(() => {
 });
 
 
-test("preferred article context wins over the nearest generic element", () => {
-  const article = element({ innerText: "Question and selected answer context" });
-  const paragraph = element({ innerText: "Only the selected paragraph" });
-  const anchor = element({ preferred: article, nearby: paragraph });
+test("selected-text capture does not read broad page context", () => {
   installPage({
     selectedText: "selected answer",
-    anchor,
-    title: "Stack Overflow question",
-    url: "https://stackoverflow.com/questions/123/example",
+    title: "Gemini conversation",
+    bodyGetter() {
+      assert.fail("page body should not be read for surrounding context");
+    },
   });
 
   const capture = extractPageCapture();
 
   assert.equal(capture.selectedText, "selected answer");
-  assert.equal(capture.surroundingContext, article.innerText);
-  assert.equal(capture.extractionMode, "preferred-container");
+  assert.equal(capture.surroundingContext, "");
+  assert.equal(capture.contextTruncated, false);
+  assert.equal(capture.extractionMode, "selection-only");
   assert.equal(capture.hasSelection, true);
 });
 
 
-test("nearest paragraph, div, or section is used when no preferred container exists", () => {
-  const codeContainer = element({
-    innerText: "npm test\nERR_MODULE_NOT_FOUND\ncheck package exports",
+test("no selection saves metadata without reading the page body", () => {
+  installPage({
+    selectedText: "",
+    title: "OpenAI documentation",
+    url: "https://example.com/docs",
+    bodyGetter() {
+      assert.fail("page body should not be read for surrounding context");
+    },
   });
-  const anchor = element({ nearby: codeContainer });
-  installPage({ selectedText: "ERR_MODULE_NOT_FOUND", anchor });
-
-  const capture = extractPageCapture();
-
-  assert.equal(capture.extractionMode, "nearby-container");
-  assert.match(capture.surroundingContext, /npm test/);
-  assert.equal(capture.contextTruncated, false);
-});
-
-
-test("no selection saves a preferred page container and reports the warning state", () => {
-  const main = element({ innerText: "OpenAI documentation page context" });
-  installPage({ selectedText: "", pageContainer: main });
 
   const capture = extractPageCapture();
 
   assert.equal(capture.selectedText, "");
+  assert.equal(capture.surroundingContext, "");
+  assert.equal(capture.contextTruncated, false);
+  assert.equal(capture.extractionMode, "metadata-only");
   assert.equal(capture.hasSelection, false);
-  assert.equal(capture.surroundingContext, main.innerText);
-  assert.equal(capture.extractionMode, "page-container");
-});
-
-
-test("body fallback truncates long context and marks it explicitly", () => {
-  const anchor = element();
-  installPage({
-    selectedText: "small selection",
-    anchor,
-    bodyText: "x".repeat(20_050),
-  });
-
-  const capture = extractPageCapture();
-
-  assert.equal(Array.from(capture.surroundingContext).length, 20_000);
-  assert.equal(capture.contextTruncated, true);
-  assert.equal(capture.extractionMode, "body");
+  assert.equal(capture.sourceTitle, "OpenAI documentation");
+  assert.equal(capture.sourceUrl, "https://example.com/docs");
 });
 
 
 test("selection limits count Unicode characters without splitting emoji", () => {
-  const container = element({ innerText: "short context" });
-  const anchor = element({ preferred: container });
-  installPage({ selectedText: "🧠".repeat(12_001), anchor });
+  installPage({ selectedText: "🧠".repeat(12_001) });
 
   const capture = extractPageCapture();
 
   assert.equal(Array.from(capture.selectedText).length, 12_000);
   assert.equal(capture.selectedText.endsWith("🧠"), true);
-  assert.equal(capture.contextTruncated, true);
+  assert.equal(capture.selectionCharacterCount, 12_001);
+  assert.equal(capture.selectionTruncated, true);
+  assert.equal(capture.surroundingContext, "");
+  assert.equal(capture.contextTruncated, false);
 });
 
 
 test("line endings and only outer whitespace are normalized", () => {
-  const container = element({ innerText: "  first\r\n  indented\rline  " });
-  const anchor = element({ preferred: container });
   installPage({
     selectedText: "  selected\r\n  code  ",
-    anchor,
     title: "  GitHub Issue  ",
+    url: "  https://github.com/example/issues/1  ",
   });
 
   const capture = extractPageCapture();
 
   assert.equal(capture.selectedText, "selected\n  code");
-  assert.equal(capture.surroundingContext, "first\n  indented\nline");
   assert.equal(capture.sourceTitle, "GitHub Issue");
+  assert.equal(capture.sourceUrl, "https://github.com/example/issues/1");
 });

@@ -4,6 +4,15 @@ import SwiftUI
 struct CaptureDetailView: View {
     @EnvironmentObject private var store: RecallStore
     let capture: Capture
+    private let surroundingContextPreview: SurroundingContextPreview?
+    @State private var isSurroundingContextExpanded = false
+
+    init(capture: Capture) {
+        self.capture = capture
+        surroundingContextPreview = SurroundingContextPreview(
+            context: capture.surroundingContext
+        )
+    }
 
     var body: some View {
         ScrollView {
@@ -45,18 +54,8 @@ struct CaptureDetailView: View {
                         .foregroundStyle(capture.selectedText.nonEmptyTrimmed == nil ? .secondary : .primary)
                 }
 
-                if let context = capture.surroundingContext?.nonEmptyTrimmed {
-                    RecallSection("Surrounding context", icon: "text.alignleft") {
-                        Text(context)
-                            .font(.body)
-                            .lineSpacing(3)
-                            .textSelection(.enabled)
-                        if capture.contextTruncated {
-                            Label("Context was shortened during capture", systemImage: "scissors")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                if let surroundingContextPreview {
+                    surroundingContextSection(surroundingContextPreview)
                 }
 
                 interpretationDetails
@@ -85,6 +84,60 @@ struct CaptureDetailView: View {
         }
         .background(Color(nsColor: .windowBackgroundColor).opacity(0.65))
         .navigationTitle(capture.displayTitle)
+    }
+
+    private func surroundingContextSection(
+        _ preview: SurroundingContextPreview
+    ) -> some View {
+        RecallSection("Surrounding context", icon: "text.alignleft") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(
+                            "\(preview.totalCharacterCount.formatted()) \(preview.totalCharacterCount == 1 ? "character" : "characters") captured"
+                        )
+                            .font(.callout.weight(.medium))
+                        Text("Hidden by default to keep this memory responsive.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 12)
+                    Button(isSurroundingContextExpanded ? "Hide" : "Show") {
+                        isSurroundingContextExpanded.toggle()
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel(
+                        isSurroundingContextExpanded
+                            ? "Hide surrounding context"
+                            : "Show surrounding context"
+                    )
+                }
+
+                if isSurroundingContextExpanded {
+                    Divider()
+                    Text(preview.text)
+                        .font(.body)
+                        .lineSpacing(3)
+                        .textSelection(.enabled)
+
+                    if preview.isDisplayLimited {
+                        Label(
+                            "Previewing the first \(preview.displayedCharacterCount.formatted()) of \(preview.totalCharacterCount.formatted()) \(preview.totalCharacterCount == 1 ? "character" : "characters") across \(preview.displayedLineCount.formatted()) \(preview.displayedLineCount == 1 ? "line" : "lines"). The full context remains saved for search and AI.",
+                            systemImage: "text.badge.ellipsis"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                if capture.contextTruncated {
+                    Label("Context was shortened during capture", systemImage: "scissors")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 
     private var hero: some View {

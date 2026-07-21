@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <main class="popup-shell">
+    <main class="popup-shell" aria-label="Save to Recall">
       <header class="brand-row">
         <span class="brand-mark" aria-hidden="true">R</span>
         <div>
@@ -28,18 +28,18 @@
           <span id="preview-count" class="character-count"></span>
         </div>
         <p id="selection-warning" class="warning" hidden>
-          No text selected; saving page context.
+          No text selected; saving the page title, URL, and optional note only.
         </p>
         <pre id="selection-preview" class="selection-preview">Loading…</pre>
       </section>
 
       <div class="note-heading">
         <label class="note-label" for="user-note">Why are you saving this?</label>
-        <span id="note-count" class="character-count">0 / 4,000</span>
+        <span id="note-count" class="character-count">Note: 0 / 4,000 characters</span>
       </div>
       <textarea
         id="user-note"
-        rows="4"
+        rows="3"
         placeholder="Optional note, situation, or caution"
         aria-describedby="note-count save-hint retry-warning"
       ></textarea>

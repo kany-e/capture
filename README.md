@@ -104,6 +104,12 @@ configured Chrome-extension origins; follow
 [`apps/chrome-extension/README.md`](apps/chrome-extension/README.md) to add the
 generated origin to the untracked root `.env` and restart the backend.
 
+The browser client currently saves selected text (when present), page title,
+URL, and the optional personal note. It deliberately sends no surrounding page
+context: broad DOM containers on conversation-style sites can mix navigation
+and unrelated turns into one Capture. The shared API still supports bounded
+context for other clients and future, selection-centered browser extraction.
+
 ## Contracts and architecture
 
 - [`contracts/api.md`](contracts/api.md) defines HTTP paths, lifecycle,
@@ -138,12 +144,26 @@ all 44 deterministic stress scenarios, 16 extension tests, and 27 macOS tests.
 The screenshot-note hardening tree passes 214 backend tests, 44/44 stress
 scenarios, 16 extension tests, and 43 macOS tests, including the production
 Apple Vision extractor.
-The current inline-browser-capture change passes 68 extension tests while the
-unchanged backend, stress, and macOS suites remain green at 214, 44/44, and 43.
+
+Opt-in inline browser capture was merged through PR #8 at merge commit
+`71ec387`. Its 68 extension tests cover the permission, retry, revocation, and
+toolbar-fallback boundaries described below.
+
 Real unpacked-Chrome verification covers opt-in on an already-open page, exact
 Unicode source/note persistence, offline retry, Escape and editable-page
 compatibility, immediate revocation, BFCache return after revocation, and the
 toolbar fallback; the resulting cards were also verified in the macOS app.
+
+The current D-030 browser-context and display hardening keeps the browser suite
+at 68 tests. Inline capture now shows a separate Unicode-aware selection count
+and a keyboard-scrollable selection preview, while the action popup uses a
+smaller, internally scrollable layout. Both Chrome entry points temporarily
+omit surrounding context. Existing stored context is neither migrated nor
+deleted: the macOS detail view hides it by default and, when requested, renders
+at most 2,000 characters and 60 lines while retaining the complete value for
+search and AI processing. This boundary expands the macOS suite from 43 to 48
+tests; the current branch passes all 48 alongside 68/68 extension tests.
+
 Live verification covers provider-off keyword fallback, real OpenAI enrichment
 and embeddings, semantic retrieval with a non-null score, and both selected-text
 and no-selection Chrome Captures appearing as ready cards in the macOS app.

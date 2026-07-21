@@ -58,7 +58,7 @@ function previewText(capture) {
   if (capture.hasSelection) {
     return capture.selectedText;
   }
-  return capture.surroundingContext || capture.sourceTitle || "No page text found.";
+  return "No text selected.";
 }
 
 
@@ -70,7 +70,7 @@ function noteCharacterCount() {
 function updateControls() {
   const characterCount = noteCharacterCount();
   const noteIsValid = characterCount <= CAPTURE_LIMITS.userNote;
-  noteCount.textContent = `${characterCount.toLocaleString()} / ${CAPTURE_LIMITS.userNote.toLocaleString()}`;
+  noteCount.textContent = `Note: ${characterCount.toLocaleString()} / ${CAPTURE_LIMITS.userNote.toLocaleString()} characters`;
   noteInput.dataset.invalid = String(!noteIsValid);
   noteInput.setAttribute("aria-invalid", String(!noteIsValid));
   noteInput.disabled = isSubmitting || captureAttempt.isLocked;
@@ -147,10 +147,23 @@ async function initialize() {
     pageTitle.textContent = extractedCapture.sourceTitle || "Untitled page";
     pageUrl.textContent = extractedCapture.sourceUrl;
     preview.textContent = previewText(extractedCapture);
-    previewCount.textContent = `${Array.from(
+    const savedCharacterCount = Array.from(
       extractedCapture.selectedText,
-    ).length.toLocaleString()} selected`;
-    warning.hidden = extractedCapture.hasSelection;
+    ).length;
+    const selectedCharacterCount = Number.isInteger(
+      extractedCapture.selectionCharacterCount,
+    )
+      ? extractedCapture.selectionCharacterCount
+      : savedCharacterCount;
+    previewCount.textContent = extractedCapture.selectionTruncated
+      ? `${selectedCharacterCount.toLocaleString()} selected · first ${savedCharacterCount.toLocaleString()} saved`
+      : `${selectedCharacterCount.toLocaleString()} ${selectedCharacterCount === 1 ? "character" : "characters"} selected`;
+    if (extractedCapture.selectionTruncated) {
+      warning.textContent = `Only the first ${savedCharacterCount.toLocaleString()} characters can be saved in one Capture.`;
+      warning.hidden = false;
+    } else {
+      warning.hidden = extractedCapture.hasSelection;
+    }
     updateControls();
     noteInput.focus();
   } catch (_error) {

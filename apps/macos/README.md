@@ -127,7 +127,11 @@ Run the build and tests again after regeneration.
   image. The system screenshot command removes its random temporary PNG after
   the normal selection flow.
 - Keep source, surrounding context, user note, and generated interpretation
-  visually separate.
+  visually separate. Surrounding context is collapsed by default with its
+  character count visible; expanding it renders at most the first 2,000
+  characters and 60 lines so an overly broad web capture cannot stall the
+  detail view. The complete stored context remains available to search and AI
+  processing.
 - Show `processing`, `ready`, `error`, and captured lifecycle states; poll
   processing records about every two seconds for approximately 60 seconds.
 - Retry enrichment without losing the raw Capture.
@@ -161,7 +165,7 @@ Run the build and tests again after regeneration.
 - App sandboxing, notarization, and bundling the Python service are outside the
   current P0 Build Week scope.
 
-The current command-line suite executes 43 contract, networking, production
+The current command-line suite executes 47 contract, networking, production
 Vision, lifecycle, validation, retry, polling, and store tests.
 
 ## Manual test matrix
@@ -185,7 +189,7 @@ after rerunning them on the current integrated tree.
 | Lifecycle polling | Save or retry a processing record and leave it visible. | Polling stops on `ready` or `error`, does not duplicate records, and visibly stops after its time cap. |
 | Keyword fallback | Run without a key and search for indexed source/note text. | Backend FTS results display even when `semantic_score` is `null`. |
 | Search limits and failure | Try 512/513-character queries, a control character, a backend error, and a genuine search-route `404`. | Valid input reaches the backend; invalid input is blocked locally; only `404` enables the visible local fallback. |
-| API-provided web record | POST `contracts/examples/capture-request.json`, refresh, and open the record. | URL, title, selection, context, note, and truncation state appear in separate sections. |
+| API-provided web record | POST `contracts/examples/capture-request.json`, refresh, and open the record. | URL, title, selection, note, and truncation state appear in separate sections. Context starts collapsed with a character count; Show/Hide works and long context clearly limits only its on-screen preview. |
 | Real Chrome flow | Load the extension unpacked, configure its exact origin, save a web selection, and refresh Recall. | The Chrome-created card appears without a database edit; repeat once with the backend stopped to verify the popup error. |
 | Menu-bar entry | Exercise **Open Recall**, **Capture Clipboard**, **Capture Screenshot Note**, **Search**, **Check Connection**, and **Quit Recall**. | Each item performs its intended action without unexpected duplicate windows. |
 

@@ -160,3 +160,72 @@ extension String {
         return String(prefix(limit)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
     }
 }
+
+/// A bounded, display-only projection of surrounding context.
+///
+/// The complete value remains on `Capture` for search and AI processing. Keeping
+/// this projection small prevents SwiftUI's selectable `Text` from laying out a
+/// whole web page when a browser capture contains unusually broad context.
+struct SurroundingContextPreview: Equatable, Sendable {
+    static let defaultCharacterLimit = 2_000
+    static let defaultLineLimit = 60
+
+    let text: String
+    let totalCharacterCount: Int
+    let displayedCharacterCount: Int
+    let displayedLineCount: Int
+
+    var omittedCharacterCount: Int {
+        totalCharacterCount - displayedCharacterCount
+    }
+
+    var isDisplayLimited: Bool {
+        omittedCharacterCount > 0
+    }
+
+    init?(
+        context: String?,
+        characterLimit: Int = SurroundingContextPreview.defaultCharacterLimit,
+        lineLimit: Int = SurroundingContextPreview.defaultLineLimit
+    ) {
+        guard characterLimit > 0,
+              lineLimit > 0,
+              let context,
+              let firstContentIndex = context.firstIndex(where: { !$0.isWhitespace }),
+              let lastContentIndex = context.lastIndex(where: { !$0.isWhitespace }) else {
+            return nil
+        }
+
+        let trimmedContext = context[firstContentIndex...lastContentIndex]
+        let characterCount = trimmedContext.count
+        var displayEnd = trimmedContext.index(
+            trimmedContext.startIndex,
+            offsetBy: min(characterCount, characterLimit)
+        )
+        var currentIndex = trimmedContext.startIndex
+        var lineBreakCount = 0
+
+        while currentIndex < displayEnd {
+            if trimmedContext[currentIndex].isNewline {
+                lineBreakCount += 1
+                if lineBreakCount >= lineLimit {
+                    displayEnd = currentIndex
+                    break
+                }
+            }
+            currentIndex = trimmedContext.index(after: currentIndex)
+        }
+
+        let displayedText = String(trimmedContext[..<displayEnd])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        text = displayedText
+        totalCharacterCount = characterCount
+        displayedCharacterCount = displayedText.count
+        displayedLineCount = displayedText.reduce(into: 1) { count, character in
+            if character.isNewline {
+                count += 1
+            }
+        }
+    }
+}

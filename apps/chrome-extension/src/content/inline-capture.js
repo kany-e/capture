@@ -19,13 +19,9 @@
   const INLINE_CAPTURE_STATUS_MESSAGE = "recall:inline:status";
   const DISABLE_INLINE_CAPTURE_MESSAGE = "recall:inline:disable";
   const MAX_SELECTION_CHARACTERS = 12_000;
-  const MAX_CONTEXT_CHARACTERS = 20_000;
   const MAX_NOTE_CHARACTERS = 4_000;
   const PILL_TIMEOUT_MS = 4_000;
   const SUCCESS_TIMEOUT_MS = 700;
-  const PREFERRED_CONTEXT_SELECTOR =
-    "article, [role='main'], .answer, .post-text, main";
-  const NEARBY_CONTEXT_SELECTOR = "p, pre, blockquote, div, section";
   const EXCLUDED_TARGET_SELECTOR = [
     "input",
     "textarea",
@@ -131,6 +127,8 @@
       background: rgba(249,252,248,.98);
       box-shadow: 0 18px 54px rgba(20,41,28,.24);
       pointer-events: auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
       font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     .recall-header { display: flex; align-items: center; gap: 10px; }
@@ -144,10 +142,19 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .recall-selection-row,
+    .recall-note-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .recall-selection-row { margin-top: 12px; }
     .recall-preview {
-      display: -webkit-box;
-      overflow: hidden;
-      margin: 12px 0;
+      overflow: auto;
+      min-height: 48px;
+      max-height: 128px;
+      margin: 6px 0 12px;
       padding: 9px 10px;
       border: 1px solid #dce4dd;
       border-radius: 10px;
@@ -155,13 +162,24 @@
       background: #fff;
       font-size: 12px;
       line-height: 1.4;
+      overflow-wrap: anywhere;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
       white-space: pre-wrap;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
     }
-    .recall-note-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .recall-preview:focus-visible {
+      outline: 3px solid rgba(90,161,113,.42);
+      outline-offset: 2px;
+    }
     .recall-label { color: #304b3b; font-size: 12px; font-weight: 700; }
-    .recall-count { color: #718078; font-size: 10px; font-variant-numeric: tabular-nums; }
+    .recall-count {
+      min-width: 0;
+      color: #718078;
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+      text-align: right;
+    }
     .recall-count[data-invalid="true"] { color: #a13d35; font-weight: 700; }
     .recall-note {
       width: 100%;
@@ -237,11 +255,29 @@
   headingGroup.append(heading, source);
   header.append(headingGroup);
 
+  const selectionRow = element("div", "recall-selection-row");
+  const selectionLabel = element("span", "recall-label", "Selected text");
+  selectionLabel.id = "recall-inline-selection-label";
+  const selectionCount = element(
+    "span",
+    "recall-count",
+    "0 characters selected",
+  );
+  selectionCount.id = "recall-inline-selection-count";
+  selectionRow.append(selectionLabel, selectionCount);
   const preview = element("p", "recall-preview");
+  preview.tabIndex = 0;
+  preview.setAttribute("role", "region");
+  preview.setAttribute("aria-labelledby", selectionLabel.id);
+  preview.setAttribute("aria-describedby", selectionCount.id);
   const noteRow = element("div", "recall-note-row");
   const noteLabel = element("label", "recall-label", "Why are you saving this?");
   noteLabel.htmlFor = "recall-inline-note";
-  const noteCount = element("span", "recall-count", "0 / 4,000");
+  const noteCount = element(
+    "span",
+    "recall-count",
+    "Note: 0 / 4,000 characters",
+  );
   noteCount.id = "recall-inline-note-count";
   noteRow.append(noteLabel, noteCount);
   const note = element("textarea", "recall-note");
@@ -252,7 +288,7 @@
   const privacy = element(
     "p",
     "recall-privacy",
-    "Nothing is sent until Save. Recall then sends this selection, nearby page context, and your note to its local service; configured AI enrichment follows Recall settings.",
+    "Nothing is sent until Save. Recall then sends this selection, page title and URL, and your note to its local service; configured AI enrichment follows Recall settings.",
   );
   privacy.id = "recall-inline-privacy";
   const status = element("div", "recall-status");
@@ -266,7 +302,16 @@
   saveButton.type = "button";
   saveButton.dataset.primary = "true";
   actions.append(cancelButton, saveButton);
-  composer.append(header, preview, noteRow, note, privacy, status, actions);
+  composer.append(
+    header,
+    selectionRow,
+    preview,
+    noteRow,
+    note,
+    privacy,
+    status,
+    actions,
+  );
 
   shadow.append(style, pill, composer);
   document.documentElement.append(host);
@@ -290,6 +335,7 @@
     status.style.display = "none";
     status.textContent = "";
     preview.textContent = "";
+    selectionCount.textContent = "0 characters selected";
     source.textContent = "";
     note.value = "";
     note.removeAttribute("aria-invalid");
@@ -306,10 +352,6 @@
       return true;
     }
     return false;
-  }
-
-  function textFrom(node) {
-    return core.normalizeText(node?.innerText ?? node?.textContent ?? "");
   }
 
   function elementForNode(node) {
@@ -380,16 +422,10 @@
       return null;
     }
 
-    const preferred = contextAnchor.closest?.(PREFERRED_CONTEXT_SELECTOR);
-    const nearby = contextAnchor.closest?.(NEARBY_CONTEXT_SELECTOR);
-    const contextNode = preferred || nearby || document.body;
-    const context = core.truncateUnicode(
-      textFrom(contextNode),
-      MAX_CONTEXT_CHARACTERS,
-    );
-
     return {
       selectedText: selected.text,
+      selectionCharacterCount: selected.characterCount,
+      selectionTruncated: selected.truncated,
       anchorRect: {
         top: rect.top,
         right: rect.right,
@@ -400,8 +436,8 @@
         sourceTitle: core.normalizeText(document.title),
         sourceUrl: core.normalizeText(global.location?.href),
         selectedText: selected.text,
-        surroundingContext: context.text,
-        contextTruncated: selected.truncated || context.truncated,
+        surroundingContext: "",
+        contextTruncated: false,
       },
     };
   }
@@ -494,7 +530,7 @@
     const submitting = machine.state === core.STATES.submitting;
     const succeeded = machine.state === core.STATES.success;
     const locked = Boolean(machine.attempt);
-    noteCount.textContent = `${count.toLocaleString()} / ${MAX_NOTE_CHARACTERS.toLocaleString()}`;
+    noteCount.textContent = `Note: ${count.toLocaleString()} / ${MAX_NOTE_CHARACTERS.toLocaleString()} characters`;
     noteCount.dataset.invalid = String(invalid);
     note.setAttribute("aria-invalid", String(invalid));
     note.disabled = submitting || succeeded || locked;
@@ -522,6 +558,12 @@
     pill.style.display = "none";
     const snapshot = machine.snapshot;
     preview.textContent = snapshot.selectedText;
+    const savedCharacterCount = core.unicodeLength(snapshot.selectedText);
+    const selectedCharacterCount = snapshot.selectionCharacterCount
+      ?? savedCharacterCount;
+    selectionCount.textContent = snapshot.selectionTruncated
+      ? `${selectedCharacterCount.toLocaleString()} characters selected · first ${savedCharacterCount.toLocaleString()} will be saved`
+      : `${selectedCharacterCount.toLocaleString()} ${selectedCharacterCount === 1 ? "character" : "characters"} selected`;
     source.textContent = snapshot.extractedCapture.sourceTitle
       || global.location?.hostname
       || "Current page";
@@ -770,8 +812,12 @@
     const current = core.truncateUnicode(
       global.getSelection?.()?.toString(),
       MAX_SELECTION_CHARACTERS,
-    ).text;
-    if (!current || current !== machine.snapshot?.selectedText) {
+    );
+    if (
+      !current.text
+      || current.text !== machine.snapshot?.selectedText
+      || current.characterCount !== machine.snapshot?.selectionCharacterCount
+    ) {
       dismiss();
     }
   });

@@ -141,6 +141,7 @@ test("Unicode note limits count emoji as characters at 4,000 and 4,001", () => {
   const truncated = core.truncateUnicode(rejected, 4_000);
   assert.equal(core.unicodeLength(truncated.text), 4_000);
   assert.equal(truncated.text, accepted);
+  assert.equal(truncated.characterCount, 4_001);
   assert.equal(truncated.truncated, true);
 });
 
@@ -405,11 +406,48 @@ test("content source keeps selection private until explicit submit", () => {
 });
 
 
+test("inline capture sends no broad surrounding page context", () => {
+  const captureStart = captureSource.indexOf("function captureSelection(originTarget)");
+  const captureEnd = captureSource.indexOf("function positionSurface", captureStart);
+  const captureBlock = captureSource.slice(captureStart, captureEnd);
+
+  assert.match(captureBlock, /surroundingContext: ""/);
+  assert.match(captureBlock, /selectionCharacterCount: selected\.characterCount/);
+  assert.match(captureBlock, /selectionTruncated: selected\.truncated/);
+  assert.match(captureBlock, /contextTruncated: false/);
+  assert.doesNotMatch(captureBlock, /document\.body/);
+  assert.doesNotMatch(captureBlock, /innerText/);
+  assert.doesNotMatch(captureSource, /PREFERRED_CONTEXT_SELECTOR/);
+  assert.doesNotMatch(captureSource, /MAX_CONTEXT_CHARACTERS/);
+});
+
+
 test("content source enforces Unicode note limits without the UTF-16 maxlength trap", () => {
   assert.match(captureSource, /core\.unicodeLength\(note\.value\)/);
   assert.match(captureSource, /count > MAX_NOTE_CHARACTERS/);
   assert.doesNotMatch(captureSource, /note\.maxLength\s*=/);
   assert.doesNotMatch(captureSource, /setAttribute\(["']maxlength["']/i);
+});
+
+
+test("inline composer distinguishes selection and note counts with a scrollable preview", () => {
+  assert.match(
+    captureSource,
+    /core\.unicodeLength\(snapshot\.selectedText\)/,
+  );
+  assert.match(captureSource, /characters?" : "characters/);
+  assert.match(captureSource, /first \$\{savedCharacterCount\.toLocaleString\(\)\} will be saved/);
+  assert.match(captureSource, /Note: \$\{count\.toLocaleString\(\)\}/);
+  assert.match(captureSource, /preview\.tabIndex = 0/);
+  assert.match(captureSource, /preview\.setAttribute\("role", "region"\)/);
+  assert.match(captureSource, /\.recall-preview \{[\s\S]*overflow: auto;/);
+  assert.match(captureSource, /\.recall-preview \{[\s\S]*max-height: 128px;/);
+  assert.match(captureSource, /\.recall-composer \{[\s\S]*overflow: auto;/);
+  assert.match(
+    captureSource,
+    /\.recall-composer \{[\s\S]*max-height: calc\(100vh - 16px\);/,
+  );
+  assert.doesNotMatch(captureSource, /-webkit-line-clamp: 2/);
 });
 
 

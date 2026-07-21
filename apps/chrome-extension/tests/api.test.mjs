@@ -230,12 +230,16 @@ test("manifest has only the approved permissions and fixed backend access", asyn
 
 
 test("popup preserves toolbar capture while exposing opt-in inline access", async () => {
-  const [html, popupSource] = await Promise.all([
+  const [html, popupSource, popupStyles] = await Promise.all([
     readFile(`${extensionRoot}/src/popup/popup.html`, "utf8"),
     readFile(`${extensionRoot}/src/popup/popup.js`, "utf8"),
+    readFile(`${extensionRoot}/src/popup/popup.css`, "utf8"),
   ]);
 
-  assert.match(html, /No text selected; saving page context\./);
+  assert.match(
+    html,
+    /No text selected; saving the page title, URL, and optional note only\./,
+  );
   assert.match(html, /Ctrl\/⌘/);
   assert.match(html, /aria-describedby="note-count save-hint retry-warning"/);
   assert.match(html, /Retry uses the original source and note\./);
@@ -249,4 +253,9 @@ test("popup preserves toolbar capture while exposing opt-in inline access", asyn
   assert.match(popupSource, /event\.metaKey \|\| event\.ctrlKey/);
   assert.match(popupSource, /setAttribute\("aria-invalid"/);
   assert.match(popupSource, /window\.close\(\)/);
+  assert.match(popupSource, /characters?" : "characters/);
+  assert.match(popupSource, /Note: \$\{characterCount\.toLocaleString\(\)\}/);
+  assert.match(popupStyles, /body \{[\s\S]*width: 344px;/);
+  assert.match(popupStyles, /\.popup-shell \{[\s\S]*max-height: min\(560px, 100vh\);/);
+  assert.match(popupStyles, /\.popup-shell \{[\s\S]*overflow-y: auto;/);
 });
