@@ -3,6 +3,11 @@
 This is a build-free Manifest V3 extension. Chrome runs the checked-in ES
 modules directly; only Node's built-in test runner is used during development.
 
+`assets/icons/icon128.png` is the canonical browser logo. Keep Chrome's 16-,
+32-, and 48-pixel files because the manifest uses native sizes for crisp toolbar
+rendering, but regenerate them from that 128-pixel master instead of maintaining
+independent artwork.
+
 ## Load unpacked
 
 1. Start the Recall backend at `http://127.0.0.1:8765`.
@@ -22,8 +27,9 @@ modules directly; only Node's built-in test runner is used during development.
 ## Capture paths
 
 Toolbar and keyboard capture remain available with no broad website access. For
-the lower-friction inline path, open the popup and enable **Show Add to Recall
-when I select text**. Chrome then asks for optional HTTP/HTTPS website access.
+the lower-friction inline path, open the popup's Settings page and enable **Show
+Add to Recall when I select text**. Chrome then asks for optional HTTP/HTTPS
+website access.
 Inline capture is off by default. Granting access dynamically injects the inline
 behavior into already-open web pages, so a refresh is not required.
 
@@ -32,6 +38,8 @@ action appears beside the selection without moving page layout or focus. Open it
 to review the selection, add an optional note, then choose **Save**. The
 Unicode-aware selected-text count is separate from the note's 4,000-character
 count, and a long selection preview can be scrolled with a pointer or keyboard.
+Long page titles wrap instead of widening the composer, and the branded header
+can be dragged to move the composer within the visible browser area.
 Selections through the 12,000-character contract limit keep their content after
 the established line-ending and outer-whitespace normalization; longer
 selections show their full count and clearly state that only the first 12,000
@@ -44,11 +52,17 @@ viewer, and iframe content are not supported by this path.
 For the keyboard-first path, press `Command+Shift+Y` on macOS or
 `Control+Shift+Y` on other platforms. Chrome may reserve or override suggested
 shortcuts; confirm or customize Recall's binding at `chrome://extensions/shortcuts`.
+The popup Settings page displays the active binding and opens that Chrome-owned
+shortcut manager; extensions cannot silently rewrite their own command keys.
 The popup focuses the optional note. Press `Command+Enter` or `Control+Enter` to
 save. After a brief **Saved** confirmation, the popup closes automatically.
-The action popup uses a fixed 344 × 510 pixel root and an internal vertical
-scroller. The explicit root size avoids viewport-relative feedback while Chrome
-is calculating the popup's own window, and keeps every control reachable.
+The action popup uses a fixed 380 × 560 pixel root and an internal vertical
+scroller. The selection preview is independently scrollable and vertically
+resizable, while the Save button keeps a fixed 40-pixel height. The explicit
+root size avoids viewport-relative feedback while Chrome is calculating the
+popup's own window, and keeps every control reachable. The Page title and URL
+wrap instead of being ellipsized and share a keyboard-focusable, independently
+scrollable metadata region for unusually long values.
 
 The extension always requests only `activeTab`, `scripting`, `storage`, and
 access to the fixed localhost backend. HTTP/HTTPS page access is optional,
@@ -115,3 +129,5 @@ fixture deliberately omits the strict CSP so an in-app browser can inspect the
 real Shadow DOM controls. Use `inline-capture-harness.html` through the unpacked
 extension for CSP and injection acceptance; the standalone fixture is not CSP
 evidence.
+
+The dependency-free suite currently contains 70 tests.

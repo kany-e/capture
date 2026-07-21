@@ -96,9 +96,42 @@ struct AppNotice: Identifiable, Equatable, Sendable {
         case error
     }
 
+    enum Scope: Equatable, Sendable {
+        case general
+        case connection
+        case clipboard
+        case processing(String)
+    }
+
+    enum Lifetime: Equatable, Sendable {
+        case timed(UInt64)
+        case untilStateChanges
+        case persistent
+    }
+
     let id = UUID()
     let style: Style
     let message: String
+    let scope: Scope
+    let lifetime: Lifetime
+
+    init(
+        style: Style,
+        message: String,
+        scope: Scope = .general,
+        lifetime: Lifetime? = nil
+    ) {
+        self.style = style
+        self.message = message
+        self.scope = scope
+        self.lifetime = lifetime ?? {
+            switch style {
+            case .information: .timed(4_000_000_000)
+            case .warning: .timed(7_000_000_000)
+            case .error: .persistent
+            }
+        }()
+    }
 }
 
 @MainActor
@@ -106,6 +139,7 @@ final class RecallStore: ObservableObject {
     static let selectionClipboardFallbackUserDefaultsKey =
         "selectionClipboardFallbackEnabled.v1"
     static let imageAnalysisUserDefaultsKey = "imageAnalysisEnabled.v1"
+    static let captureSortOrderUserDefaultsKey = "captureSortOrder.v1"
     static let maximumSelectedTextLength = 12_000
     static let maximumUserNoteLength = 4_000
     static let maximumSearchQueryLength = 512
@@ -143,7 +177,12 @@ final class RecallStore: ObservableObject {
     @Published private(set) var isPreparingScreenshot = false
     @Published private(set) var isExtractingScreenshot = false
     @Published private(set) var screenshotExtractionSummary: String?
-    @Published var notice: AppNotice?
+    @Published private(set) var sortOrder: CaptureSortOrder
+    @Published private(set) var isUpdatingCapture = false
+    @Published private(set) var captureUpdateError: String?
+    @Published private(set) var notice: AppNotice? {
+        didSet { scheduleNoticeDismissal() }
+    }
     @Published private(set) var searchFocusToken = UUID()
     @Published private(set) var attachmentImageData: [String: Data] = [:]
 
@@ -153,6 +192,7 @@ final class RecallStore: ObservableObject {
     private let selectionClipboardFallbackService: any SelectionClipboardFallbackServing
     private let selectionPreferenceUserDefaults: UserDefaults?
     private let imageAnalysisPreferenceUserDefaults: UserDefaults?
+    private let sortingPreferenceUserDefaults: UserDefaults?
     private let screenshotCaptureService: any ScreenshotCaptureServing
     private let localScreenshotExtractor: any LocalScreenshotTextExtracting
     private var libraryCaptures: [Capture] = []
@@ -165,11 +205,13 @@ final class RecallStore: ObservableObject {
     private var attemptedQuickCaptureRequest: PendingQuickCaptureRequest?
     private var loadingAttachmentIDs: Set<String> = []
     private var activeScreenshotExtractionID: UUID?
+    private var noticeDismissalTask: Task<Void, Never>?
     private var screenshotMediaType = "image/png"
     private let foregroundRefreshIntervalNanoseconds: UInt64
     private let pollingIntervalNanoseconds: UInt64
     private let pollingAttemptLimit: Int
     private let pollingTimeoutNanoseconds: UInt64
+    private let noticeTimeoutOverrideNanoseconds: UInt64?
 
     init(
         client: any RecallAPIClient,
@@ -180,12 +222,15 @@ final class RecallStore: ObservableObject {
         selectionPreferenceUserDefaults: UserDefaults? = nil,
         imageAnalysisIsEnabled: Bool = false,
         imageAnalysisPreferenceUserDefaults: UserDefaults? = nil,
+        sortOrder: CaptureSortOrder = .createdNewest,
+        sortingPreferenceUserDefaults: UserDefaults? = nil,
         screenshotCaptureService: any ScreenshotCaptureServing = SystemScreenshotCaptureService(),
         localScreenshotExtractor: any LocalScreenshotTextExtracting = AppleVisionScreenshotTextExtractor(),
         foregroundRefreshIntervalNanoseconds: UInt64 = 5_000_000_000,
         pollingIntervalNanoseconds: UInt64 = 2_000_000_000,
         pollingAttemptLimit: Int = 30,
-        pollingTimeoutNanoseconds: UInt64 = 60_000_000_000
+        pollingTimeoutNanoseconds: UInt64 = 60_000_000_000,
+        noticeTimeoutOverrideNanoseconds: UInt64? = nil
     ) {
         self.client = client
         self.clipboardService = clipboardService
@@ -196,16 +241,22 @@ final class RecallStore: ObservableObject {
         self.imageAnalysisIsEnabled = imageAnalysisIsEnabled
         self.screenshotImageAnalysisIsEnabled = imageAnalysisIsEnabled
         self.imageAnalysisPreferenceUserDefaults = imageAnalysisPreferenceUserDefaults
+        self.sortOrder = sortOrder
+        self.sortingPreferenceUserDefaults = sortingPreferenceUserDefaults
         self.screenshotCaptureService = screenshotCaptureService
         self.localScreenshotExtractor = localScreenshotExtractor
         self.foregroundRefreshIntervalNanoseconds = foregroundRefreshIntervalNanoseconds
         self.pollingIntervalNanoseconds = pollingIntervalNanoseconds
         self.pollingAttemptLimit = pollingAttemptLimit
         self.pollingTimeoutNanoseconds = pollingTimeoutNanoseconds
+        self.noticeTimeoutOverrideNanoseconds = noticeTimeoutOverrideNanoseconds
     }
 
     convenience init(client: any RecallAPIClient = LiveRecallAPIClient()) {
         let userDefaults = UserDefaults.standard
+        let sortOrder = CaptureSortOrder(
+            rawValue: userDefaults.string(forKey: Self.captureSortOrderUserDefaultsKey) ?? ""
+        ) ?? .createdNewest
         self.init(
             client: client,
             clipboardService: SystemClipboardCaptureService(),
@@ -219,6 +270,8 @@ final class RecallStore: ObservableObject {
                 forKey: Self.imageAnalysisUserDefaultsKey
             ),
             imageAnalysisPreferenceUserDefaults: userDefaults,
+            sortOrder: sortOrder,
+            sortingPreferenceUserDefaults: userDefaults,
             screenshotCaptureService: SystemScreenshotCaptureService(),
             localScreenshotExtractor: AppleVisionScreenshotTextExtractor()
         )
@@ -271,6 +324,7 @@ final class RecallStore: ObservableObject {
                 && response.database == "ok"
                 && response.attachments == "ok" {
                 connectionState = .connected(openAIConfigured: response.openAIConfigured)
+                dismissNotice(scope: .connection)
             } else {
                 connectionState = .degraded
             }
@@ -329,13 +383,23 @@ final class RecallStore: ObservableObject {
         }
 
         do {
-            let response = try await client.listCaptures(limit: 50, offset: 0)
+            let response = try await client.listCaptures(
+                limit: 50,
+                offset: 0,
+                sort: sortOrder
+            )
             libraryCaptures = response.items
+            if case let .processing(captureID) = notice?.scope,
+               let status = response.items.first(where: { $0.id == captureID })?.status,
+               status == .ready || status == .error {
+                resolveProcessingNotice(captureID: captureID, status: status)
+            }
             if query.nonEmptyTrimmed == nil {
                 captures = response.items
             }
             preserveSelection()
             connectionState = connectedStatePreservingAIConfiguration()
+            dismissNotice(scope: .connection)
             loadState = .loaded
         } catch {
             guard !Self.isCancellation(error) else { return }
@@ -343,8 +407,28 @@ final class RecallStore: ObservableObject {
             if initial || libraryCaptures.isEmpty {
                 loadState = .failed(error.recallUserMessage)
             } else if !silent {
-                notice = AppNotice(style: .error, message: error.recallUserMessage)
+                notice = AppNotice(
+                    style: .error,
+                    message: error.recallUserMessage,
+                    scope: .connection,
+                    lifetime: .untilStateChanges
+                )
             }
+        }
+    }
+
+    func setSortOrder(_ newValue: CaptureSortOrder) async {
+        guard sortOrder != newValue else { return }
+        sortOrder = newValue
+        sortingPreferenceUserDefaults?.set(
+            newValue.rawValue,
+            forKey: Self.captureSortOrderUserDefaultsKey
+        )
+        sortLibraryCaptures()
+        if query.nonEmptyTrimmed == nil {
+            captures = libraryCaptures
+            preserveSelection()
+            await loadLibrary(initial: false, silent: true)
         }
     }
 
@@ -409,6 +493,7 @@ final class RecallStore: ObservableObject {
             captures = response.results.map(\.capture)
             preserveSelection()
             connectionState = connectedStatePreservingAIConfiguration()
+            dismissNotice(scope: .connection)
         } catch let error as RecallAPIError where error.statusCode == 404 {
             guard generation == searchGeneration,
                   !Task.isCancelled,
@@ -457,7 +542,12 @@ final class RecallStore: ObservableObject {
         } catch {
             guard !Self.isCancellation(error) else { return }
             updateConnectionState(after: error)
-            notice = AppNotice(style: .error, message: error.recallUserMessage)
+            notice = AppNotice(
+                style: .error,
+                message: error.recallUserMessage,
+                scope: error is URLError ? .connection : .general,
+                lifetime: error is URLError ? .untilStateChanges : .persistent
+            )
         }
     }
 
@@ -483,11 +573,16 @@ final class RecallStore: ObservableObject {
             screenshotPreviewData = nil
             screenshotExtractionSummary = nil
             screenshotMediaType = "image/png"
+            dismissNotice(scope: .clipboard)
             return true
         } catch {
             clearQuickCapture()
             quickCaptureError = error.recallUserMessage
-            notice = AppNotice(style: .warning, message: error.recallUserMessage)
+            notice = AppNotice(
+                style: .warning,
+                message: error.recallUserMessage,
+                scope: .clipboard
+            )
             return false
         }
     }
@@ -824,7 +919,9 @@ final class RecallStore: ObservableObject {
             case .processing:
                 notice = AppNotice(
                     style: .information,
-                    message: "Saved. Recall is processing this memory."
+                    message: "Saved. Recall is processing this memory.",
+                    scope: .processing(capture.id),
+                    lifetime: .untilStateChanges
                 )
                 beginPolling(captureID: capture.id)
             case .ready:
@@ -905,17 +1002,27 @@ final class RecallStore: ObservableObject {
         do {
             let capture = try await client.enrich(id: id)
             upsert(capture)
-            notice = AppNotice(style: .information, message: "AI processing restarted.")
+            notice = AppNotice(
+                style: .information,
+                message: "AI processing restarted.",
+                scope: .processing(id),
+                lifetime: .untilStateChanges
+            )
             beginPolling(captureID: id)
         } catch let error as RecallAPIError where error.code == "capture_already_processing" {
-            notice = AppNotice(style: .information, message: error.localizedDescription)
+            notice = AppNotice(
+                style: .information,
+                message: error.localizedDescription,
+                scope: .processing(id),
+                lifetime: .untilStateChanges
+            )
             beginPolling(captureID: id)
         } catch let error as RecallAPIError where error.code == "openai_not_configured" {
             notice = AppNotice(style: .warning, message: error.localizedDescription)
         } catch {
             guard !Self.isCancellation(error) else { return }
             updateConnectionState(after: error)
-            notice = AppNotice(style: .error, message: error.recallUserMessage)
+            notice = stateAwareErrorNotice(for: error)
         }
     }
 
@@ -950,7 +1057,7 @@ final class RecallStore: ObservableObject {
         } catch {
             guard !Self.isCancellation(error) else { return false }
             updateConnectionState(after: error)
-            notice = AppNotice(style: .error, message: error.recallUserMessage)
+            notice = stateAwareErrorNotice(for: error)
             return false
         }
 
@@ -966,12 +1073,97 @@ final class RecallStore: ObservableObject {
         return true
     }
 
+    func updateCapture(id: String, request: CaptureUpdateRequest) async -> Bool {
+        guard !isUpdatingCapture else { return false }
+        isUpdatingCapture = true
+        captureUpdateError = nil
+        defer { isUpdatingCapture = false }
+        do {
+            let capture = try await client.updateCapture(id: id, request: request)
+            upsert(capture)
+            connectionState = connectedStatePreservingAIConfiguration()
+            notice = AppNotice(
+                style: capture.aiContentStale ? .warning : .information,
+                message: capture.aiContentStale
+                    ? "Memory updated. The earlier AI interpretation is hidden until you refresh it."
+                    : "Memory updated."
+            )
+            return true
+        } catch {
+            guard !Self.isCancellation(error) else { return false }
+            captureUpdateError = error.recallUserMessage
+            updateConnectionState(after: error)
+            notice = AppNotice(
+                style: error is URLError ? .error : .warning,
+                message: error.recallUserMessage,
+                scope: error is URLError ? .connection : .general,
+                lifetime: error is URLError ? .untilStateChanges : nil
+            )
+            return false
+        }
+    }
+
     func requestSearchFocus() {
         searchFocusToken = UUID()
     }
 
     func dismissNotice() {
         notice = nil
+    }
+
+    private func dismissNotice(scope: AppNotice.Scope) {
+        guard notice?.scope == scope else { return }
+        notice = nil
+    }
+
+    private func stateAwareErrorNotice(for error: Error) -> AppNotice {
+        AppNotice(
+            style: .error,
+            message: error.recallUserMessage,
+            scope: error is URLError ? .connection : .general,
+            lifetime: error is URLError ? .untilStateChanges : .persistent
+        )
+    }
+
+    private func scheduleNoticeDismissal() {
+        noticeDismissalTask?.cancel()
+        noticeDismissalTask = nil
+        guard let notice,
+              case let .timed(defaultNanoseconds) = notice.lifetime else {
+            return
+        }
+        let nanoseconds = noticeTimeoutOverrideNanoseconds ?? defaultNanoseconds
+        let noticeID = notice.id
+        noticeDismissalTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: nanoseconds)
+            } catch {
+                return
+            }
+            guard let self, self.notice?.id == noticeID else { return }
+            self.notice = nil
+        }
+    }
+
+    private func resolveProcessingNotice(
+        captureID: String,
+        status: CaptureStatus
+    ) {
+        guard notice?.scope == .processing(captureID) else { return }
+        switch status {
+        case .ready:
+            notice = AppNotice(
+                style: .information,
+                message: "AI interpretation is ready."
+            )
+        case .error:
+            notice = AppNotice(
+                style: .warning,
+                message: "AI processing needs attention. Your memory is still safe."
+            )
+        case .captured, .processing:
+            break
+        }
     }
 
     private func beginPolling(captureID: String) {
@@ -1010,6 +1202,10 @@ final class RecallStore: ObservableObject {
                     )
                     self.upsert(capture)
                     if capture.status == .ready || capture.status == .error {
+                        self.resolveProcessingNotice(
+                            captureID: captureID,
+                            status: capture.status
+                        )
                         return
                     }
                 } catch is PollingDeadlineReached {
@@ -1025,7 +1221,9 @@ final class RecallStore: ObservableObject {
             }
             self.notice = AppNotice(
                 style: .information,
-                message: "This memory is still processing. Its original content is safely saved; refresh later for updates."
+                message: "This memory is still processing. Its original content is safely saved; refresh later for updates.",
+                scope: .processing(captureID),
+                lifetime: .untilStateChanges
             )
         }
     }
@@ -1109,6 +1307,7 @@ final class RecallStore: ObservableObject {
         } else {
             libraryCaptures.append(capture)
         }
+        sortLibraryCaptures()
 
         if query.nonEmptyTrimmed == nil {
             captures = libraryCaptures
@@ -1133,6 +1332,22 @@ final class RecallStore: ObservableObject {
         selectedCaptureID = captures.first?.id
     }
 
+    private func sortLibraryCaptures() {
+        libraryCaptures.sort { left, right in
+            let leftDate = left.listDate(for: sortOrder) ?? .distantPast
+            let rightDate = right.listDate(for: sortOrder) ?? .distantPast
+            if leftDate == rightDate {
+                return left.id < right.id
+            }
+            switch sortOrder {
+            case .createdNewest, .editedNewest:
+                return leftDate > rightDate
+            case .createdOldest, .editedOldest:
+                return leftDate < rightDate
+            }
+        }
+    }
+
     private func localMatches(for query: String) -> [Capture] {
         let terms = query
             .lowercased()
@@ -1146,13 +1361,13 @@ final class RecallStore: ObservableObject {
                 capture.sourceTitle,
                 capture.sourceApp,
                 capture.aiSummary,
-                capture.problem,
-                capture.keyInsight,
-                capture.whySaved,
+                capture.displayProblem,
+                capture.displayKeyInsight,
+                capture.displayWhySaved,
                 capture.userNote,
                 capture.selectedText,
                 capture.surroundingContext,
-                capture.tags.joined(separator: " "),
+                capture.displayTags.joined(separator: " "),
                 capture.entities.joined(separator: " "),
                 capture.searchAliases.joined(separator: " "),
             ]

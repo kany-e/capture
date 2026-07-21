@@ -85,6 +85,7 @@ async function installStandaloneInlineCapture() {
   globalThis.__RECALL_INLINE_TEST__ = true;
   globalThis.chrome = {
     runtime: {
+      getURL: (path) => `../../${path}`,
       onMessage: {
         addListener: (listener) => runtimeListeners.add(listener),
         removeListener: (listener) => runtimeListeners.delete(listener),

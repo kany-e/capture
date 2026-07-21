@@ -10,6 +10,33 @@ struct ShortcutSettingsView: View {
     @State private var isCheckingAccessibilityAccess = false
 
     var body: some View {
+        TabView {
+            shortcutsForm
+                .tabItem {
+                    Label("Shortcuts", systemImage: "keyboard")
+                }
+
+            privacyAndFeaturesForm
+                .tabItem {
+                    Label("Privacy & Features", systemImage: "hand.raised")
+                }
+        }
+        .frame(width: 560, height: 620)
+        .onAppear {
+            draft = shortcutCenter.configuration
+            refreshAccessibilityAccess()
+        }
+        .onChange(of: shortcutCenter.configuration) {
+            draft = shortcutCenter.configuration
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+        ) { _ in
+            refreshAccessibilityAccess()
+        }
+    }
+
+    private var shortcutsForm: some View {
         Form {
             Section {
                 shortcutEditor(for: .selection)
@@ -27,6 +54,43 @@ struct ShortcutSettingsView: View {
                 )
             }
 
+            if let errorMessage = shortcutCenter.errorMessage {
+                Section {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else if didApply && draft == shortcutCenter.configuration {
+                Section {
+                    Label("Shortcut settings saved.", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
+            }
+
+            HStack {
+                Button("Restore Defaults") {
+                    if shortcutCenter.restoreDefaults() {
+                        draft = shortcutCenter.configuration
+                        didApply = true
+                    }
+                }
+                Spacer()
+                Button("Apply Shortcuts") {
+                    didApply = shortcutCenter.apply(draft)
+                    if didApply {
+                        draft = shortcutCenter.configuration
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .formStyle(.grouped)
+        .padding(.vertical, 8)
+    }
+
+    private var privacyAndFeaturesForm: some View {
+        Form {
             Section {
                 HStack {
                     Label(
@@ -115,52 +179,14 @@ struct ShortcutSettingsView: View {
                 )
             }
 
-            if let errorMessage = shortcutCenter.errorMessage {
-                Section {
-                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            } else if didApply && draft == shortcutCenter.configuration {
-                Section {
-                    Label("Shortcuts are active.", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                }
-            }
-
-            HStack {
-                Button("Restore Defaults") {
-                    if shortcutCenter.restoreDefaults() {
-                        draft = shortcutCenter.configuration
-                        didApply = true
-                    }
-                }
-                Spacer()
-                Button("Apply") {
-                    didApply = shortcutCenter.apply(draft)
-                    if didApply {
-                        draft = shortcutCenter.configuration
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
+            Section {
+                Label("Changes on this page are saved automatically.", systemImage: "checkmark.circle")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520)
         .padding(.vertical, 8)
-        .onAppear {
-            draft = shortcutCenter.configuration
-            refreshAccessibilityAccess()
-        }
-        .onChange(of: shortcutCenter.configuration) {
-            draft = shortcutCenter.configuration
-        }
-        .onReceive(
-            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
-        ) { _ in
-            refreshAccessibilityAccess()
-        }
     }
 
     private func refreshAccessibilityAccess() {

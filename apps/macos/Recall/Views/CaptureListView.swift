@@ -78,6 +78,34 @@ struct CaptureListView: View {
                     .stroke(.primary.opacity(0.08), lineWidth: 1)
             }
 
+            HStack {
+                if store.query.nonEmptyTrimmed == nil {
+                    Menu {
+                        ForEach(CaptureSortOrder.allCases) { order in
+                            Button {
+                                Task { await store.setSortOrder(order) }
+                            } label: {
+                                if order == store.sortOrder {
+                                    Label(order.label, systemImage: "checkmark")
+                                } else {
+                                    Text(order.label)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(store.sortOrder.label, systemImage: "arrow.up.arrow.down")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .accessibilityLabel("Sort memories")
+                } else {
+                    Label("Search results · relevance", systemImage: "sparkles")
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .font(.caption)
+
             if let searchError = store.searchError {
                 Label(searchError, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
@@ -136,7 +164,7 @@ struct CaptureListView: View {
                 }
             } else {
                 List(store.captures, selection: $store.selectedCaptureID) { capture in
-                    CaptureRowView(capture: capture)
+                    CaptureRowView(capture: capture, sortOrder: store.sortOrder)
                         .tag(capture.id)
                 }
                 .listStyle(.sidebar)

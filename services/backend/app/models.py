@@ -63,6 +63,34 @@ class CaptureRecord(NewCapture):
     embedding: list[float] | None = None
     error_message: str | None = None
     enrichment_version: int = 1
+    user_edited_at: str | None = None
+    user_selected_text: str | None = None
+    user_source_app: str | None = None
+    user_source_title: str | None = None
+    user_source_url: str | None = None
+    user_title: str | None = None
+    user_problem: str | None = None
+    user_key_insight: str | None = None
+    user_why_saved: str | None = None
+    user_caveats: list[str] | None = None
+    user_tags: list[str] | None = None
+    ai_interpretation_hidden: bool = False
+    ai_content_stale: bool = False
+
+
+class CaptureUserUpdate(StorageModel):
+    selected_text: str | None = None
+    user_note: str | None = None
+    source_app: str | None = None
+    source_title: str | None = None
+    source_url: str | None = None
+    user_title: str | None = None
+    user_problem: str | None = None
+    user_key_insight: str | None = None
+    user_why_saved: str | None = None
+    user_caveats: list[str] | None = None
+    user_tags: list[str] | None = None
+    show_ai_interpretation: bool = True
 
 
 class EnrichmentUpdate(StorageModel):

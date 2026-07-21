@@ -6,14 +6,14 @@ Project: Recall
 
 Last updated: 2026-07-21
 
-Current phase: Structured-text fidelity and persisted image notes implemented;
-primary real-app acceptance complete and release regression work remains
+Current phase: Editable memories, extension polish, and cross-client icon work
+implemented; automated and user acceptance verification complete
 
-Implementation branch: `codex/image-notes`
+Implementation branch: `codex/note-editing-ui-polish`
 
-Merged prerequisite branch: `codex/text-capture-fidelity`
+Merged prerequisite branches: `codex/text-capture-fidelity`, `codex/image-notes`
 
-Integration base: `667b045` (PR #14 merge commit)
+Integration base: `e18393c` (PR #15 merge commit)
 
 Canonical target: `main`
 
@@ -96,7 +96,7 @@ Update protocol:
 | 3 | Capture CRUD and first integration | Complete | Backend CRUD plus live macOS list/detail/clipboard evidence close D-013 and B-006 |
 | 4 | OpenAI enrichment | Complete | Deterministic coverage plus real Responses API `processing → ready` proof resolve B-007 |
 | 5 | FTS5 keyword retrieval | Complete | Commit `d34a567` pushed; 119 tests and provider-off live/restart proof pass |
-| 6 | Chrome capture | Complete and real-Chrome verified | 68/68 tests pass; unpacked selected-text/no-selection Captures resolve B-009, and D-033 verifies the corrected action-popup layout |
+| 6 | Chrome capture | Complete and real-Chrome verified | 70/70 tests pass; D-039/D-040 add branded settings, stable scroll/resize behavior, wrapped Page metadata, a viewport-bounded movable inline composer, and canonical generated icon sizes |
 | 7 | Embeddings and hybrid retrieval | Complete | Real embedding and vague semantic-query proof with non-null score resolve B-008 |
 | 8 | Reliability and demo readiness | P0 integration verified / backlog reduced | Layer 8 baseline passes 214 backend tests and 44/44 stress scenarios; stale-process recovery and version-aware one-command startup are verified |
 | 9 | Optional Apple on-device path | Gated | Decision D-008 accepted; prerequisites unmet |
@@ -111,6 +111,9 @@ Update protocol:
 | Addition | Clipboard selection compatibility | Complete and real-device accepted | D-035 adds an off-by-default transactional synthetic-Copy fallback with exact-control and application-scoped tickets; 149/149 host tests and B-016 user acceptance pass |
 | Addition | Structured-text capture fidelity | Implemented; live payload verified | D-036 adds a bounded plain/HTML/RTF resolver to explicit Clipboard Capture; the real Gemini payload restores verified boundaries from flattened plain text while retaining TeX |
 | Addition | Persisted image notes and visual indexing | Implemented; primary real-app flow accepted | D-037 adds one bounded local image, separate note, off-by-default AI master switch, existing-search reuse, rendering, retry, and deletion; 235 backend and 184 integrated macOS tests pass |
+| Addition | Editable memories and UI state polish | Implemented and user-accepted | D-038 adds a separate user-edit layer, migration 005, explicit AI refresh, creation/edit sorting, state-driven notices, Settings tabs, and stable image-note layout; 243 backend, 44/44 stress, 68/68 Chrome, and 189/189 macOS checks pass |
+| Addition | Chrome extension UI and settings polish | Implemented and real-Chrome verified | D-039 moves inline access to a branded options page, exposes Chrome shortcut management, stabilizes the popup, wraps long titles, and adds viewport-bounded composer dragging; 70/70 extension tests pass |
+| Addition | Cross-client Recall icon alignment | Implemented and user-accepted | D-040 derives Chrome's required small icons from `icon128.png`, wraps/scrolls popup Page metadata, and adds one adaptive native vector mark; 70/70 extension and 189/189 host macOS tests pass |
 
 The D-023 integration closes B-010, the macOS slice closes B-006, and real
 provider plus unpacked-Chrome evidence closes B-007, B-008, and B-009. B-011 is
@@ -118,7 +121,73 @@ resolved by the hardening work. Remaining work is the explicit Layer 8 backlog
 and Layer 10 submission/release material, not a missing shared P0 integration
 gate.
 
-## Active addition — persisted image notes and visual indexing
+## Completed addition — editable memories and state-driven UI polish
+
+Status: `[x]` D-038 implementation, full automated verification, and user
+acceptance complete
+
+- [x] Add migration 005 with explicit user source/organization overrides and a
+  separate `user_edited_at` timestamp while preserving captured and AI columns.
+- [x] Add `PATCH /v1/captures/{id}`, effective FTS synchronization, embedding
+  invalidation, processing conflict protection, and four deterministic list
+  sort modes.
+- [x] Add native editing for selected content, user note, title, source,
+  visibility, memory details, caveats, and removable/addable tags.
+- [x] Mark prior AI stale and hidden after source/note changes; require explicit
+  **Refresh AI** and retain user organization overrides across regeneration.
+- [x] Replace relative-second list times with stable minute-level display and
+  expose created/user-edited timestamps in detail.
+- [x] Give notices bounded or state-driven lifetimes; clear connection,
+  clipboard, and processing notices when their resolving condition occurs.
+- [x] Split Settings into Shortcuts and Privacy & Features; make Apply copy
+  shortcut-specific and disclose automatic persistence on the second page.
+- [x] Reserve fixed image-preview, two-line explanation, and switch geometry in
+  the image-note composer.
+- [x] Run full backend, stress, Chrome, and host macOS suites. Evidence: 243/243
+  backend, 44/44 stress, 68/68 Chrome-extension, and 189/189 host macOS tests,
+  including production Apple Vision OCR.
+- [x] Complete real-app edit, sort, notice-resolution, Settings-tab, and stable
+  image-composer layout acceptance. User acceptance passed on 2026-07-21.
+
+## Completed addition — Chrome extension UI and settings polish
+
+Status: `[x]` D-039 implementation, automated verification, and bounded real-
+Chrome UI acceptance complete
+
+- [x] Replace text-only green marks with the checked-in Recall icon and pink
+  palette in the popup, inline pill, inline composer, and options page.
+- [x] Move inline-access configuration from the transient popup to an extension
+  Settings page without changing its optional, revocable permission boundary.
+- [x] Display the active `_execute_action` shortcut and link to Chrome's shortcut
+  manager instead of implying the extension can silently rewrite the key.
+- [x] Give the popup preview independent vertical scrolling and resize, retain an
+  internally scrollable deterministic 380 × 560 root, and fix Save at 40 pixels.
+- [x] Wrap long inline source titles without horizontal overflow and make the
+  branded header a pointer drag handle clamped to the visible viewport.
+- [x] Keep the user's inline-access preference off during UI acceptance; use the
+  isolated production-script harness to verify the selection pill, composer,
+  long-title wrapping, and viewport-edge dragging.
+- [x] Pass all 70 dependency-free extension tests, including manifest/options,
+  scroll/resize, fixed-button, title-wrap, branding, drag, and clamp regressions.
+
+## Completed addition — canonical browser and adaptive native icons
+
+Status: `[x]` D-040 implementation, automated verification, and live user
+acceptance complete
+
+- [x] Keep `icon128.png` as the canonical browser logo and regenerate Chrome's
+  required 16-, 32-, and 48-pixel native assets from it.
+- [x] Replace Page title and URL ellipsis in the action popup with wrapping
+  inside an independently scrollable, keyboard-focusable metadata region.
+- [x] Add one transparent monochrome vector Recall mark and reuse it as an
+  adaptive `MenuBarExtra` template icon and accent-colored Quick Capture icon.
+- [x] Pass all 70 extension tests and all 189 host macOS tests, including
+  production Apple Vision OCR.
+- [x] Confirm the updated popup, menu-bar icon, and Quick Capture header in the
+  user's running Chrome/app. User acceptance passed on 2026-07-21 after the
+  automated ScreenCaptureKit session was unavailable.
+
+## Completed addition — persisted image notes and visual indexing
 
 Status: `[x]` D-037 automated implementation and real-app AI-disabled/AI-enabled
 image-note acceptance verified
@@ -2578,3 +2647,45 @@ resolved errors.
   safe 500 can now remain queued during an exceptional local burst. Normal
   requests proceed as soon as the lock is released; a genuinely stuck lock is
   still bounded and fails after 30 seconds rather than waiting indefinitely.
+
+## E-062 — Extension UI verification shell did not expose npm
+
+- Date: 2026-07-21
+- Status: Resolved
+- Symptom: The first D-039 extension test command returned `command not found:
+  npm`.
+- Cause: The desktop review shell does not place a system npm installation on
+  `PATH`; the extension itself remains build-free.
+- Resolution: Loaded the bundled workspace Node runtime and ran the same
+  dependency-free `node --test tests/*.test.mjs` suite directly. All 70 tests
+  pass.
+- Project impact: Verification command only; no extension code failed.
+
+## E-063 — Sandboxed D-039 fixture server could not bind loopback
+
+- Date: 2026-07-21
+- Status: Resolved
+- Symptom: The first temporary `127.0.0.1:8899` static-server launch returned
+  `PermissionError: Operation not permitted`.
+- Cause: The restricted command environment cannot bind a listening socket.
+- Resolution: Started the same Python standard-library server in the approved
+  host environment, verified the bounded real-Chrome layouts, then stopped the
+  server cleanly.
+- Project impact: Local visual-verification environment only; no product port,
+  backend process, or persistent service changed.
+
+## E-064 — ScreenCaptureKit blocked automated D-040 appearance inspection
+
+- Date: 2026-07-21
+- Status: Resolved by independent user acceptance
+- Symptom: The local UI-control session could not acquire a Chrome or native-app
+  screenshot and returned `SCStreamErrorDomain` code `-3811`.
+- Cause: macOS failed to start the requested ScreenCaptureKit stream in the
+  desktop verification environment. The failure occurred before Recall or the
+  extension UI was inspected.
+- Resolution: Verified the template SVG through a rendered preview, compiled it
+  through Xcode, added popup layout regressions, and passed all 70 extension and
+  189 host macOS tests. The user then verified and accepted the actual extension
+  popup, menu-bar mark, and Quick Capture mark on 2026-07-21.
+- Project impact: Visual acceptance only; no product build, test, or runtime
+  failure was observed.

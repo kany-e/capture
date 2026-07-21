@@ -21,6 +21,38 @@ enum CaptureSourceType: String, Codable, Sendable {
     }
 }
 
+enum CaptureSortOrder: String, CaseIterable, Identifiable, Sendable {
+    case createdNewest = "created_desc"
+    case createdOldest = "created_asc"
+    case editedNewest = "edited_desc"
+    case editedOldest = "edited_asc"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .createdNewest: "Created · newest first"
+        case .createdOldest: "Created · oldest first"
+        case .editedNewest: "Last edited · newest first"
+        case .editedOldest: "Last edited · oldest first"
+        }
+    }
+
+    var shortLabel: String {
+        switch self {
+        case .createdNewest, .createdOldest: "Created"
+        case .editedNewest, .editedOldest: "Edited"
+        }
+    }
+
+    var usesEditedTime: Bool {
+        switch self {
+        case .createdNewest, .createdOldest: false
+        case .editedNewest, .editedOldest: true
+        }
+    }
+}
+
 struct CaptureAttachment: Codable, Identifiable, Hashable, Sendable {
     let id: String
     let kind: String
@@ -69,6 +101,19 @@ struct Capture: Codable, Identifiable, Hashable, Sendable {
     let searchAliases: [String]
     let errorMessage: String?
     let enrichmentVersion: Int
+    var userEditedAt: String? = nil
+    var userSelectedText: String? = nil
+    var userSourceApp: String? = nil
+    var userSourceTitle: String? = nil
+    var userSourceURL: String? = nil
+    var userTitle: String? = nil
+    var userProblem: String? = nil
+    var userKeyInsight: String? = nil
+    var userWhySaved: String? = nil
+    var userCaveats: [String]? = nil
+    var userTags: [String]? = nil
+    var aiInterpretationHidden = false
+    var aiContentStale = false
     var attachments: [CaptureAttachment] = []
 
     enum CodingKeys: String, CodingKey {
@@ -97,11 +142,27 @@ struct Capture: Codable, Identifiable, Hashable, Sendable {
         case searchAliases = "search_aliases"
         case errorMessage = "error_message"
         case enrichmentVersion = "enrichment_version"
+        case userEditedAt = "user_edited_at"
+        case userSelectedText = "user_selected_text"
+        case userSourceApp = "user_source_app"
+        case userSourceTitle = "user_source_title"
+        case userSourceURL = "user_source_url"
+        case userTitle = "user_title"
+        case userProblem = "user_problem"
+        case userKeyInsight = "user_key_insight"
+        case userWhySaved = "user_why_saved"
+        case userCaveats = "user_caveats"
+        case userTags = "user_tags"
+        case aiInterpretationHidden = "ai_interpretation_hidden"
+        case aiContentStale = "ai_content_stale"
         case attachments
     }
 
     var displayTitle: String {
-        if let aiTitle = aiTitle?.nonEmptyTrimmed {
+        if let userTitle = userTitle?.nonEmptyTrimmed {
+            return userTitle
+        }
+        if !aiInterpretationHidden, let aiTitle = aiTitle?.nonEmptyTrimmed {
             return aiTitle
         }
         if let sourceTitle = sourceTitle?.nonEmptyTrimmed {
@@ -118,9 +179,38 @@ struct Capture: Codable, Identifiable, Hashable, Sendable {
     }
 
     var displaySummary: String? {
-        aiSummary?.nonEmptyTrimmed
+        (!aiInterpretationHidden ? aiSummary?.nonEmptyTrimmed : nil)
             ?? userNote?.nonEmptyTrimmed
             ?? selectedText.nonEmptyTrimmed?.truncated(to: 180)
+    }
+
+    var displayProblem: String? {
+        effectiveText(userProblem, fallback: problem)
+    }
+
+    var displayKeyInsight: String? {
+        effectiveText(userKeyInsight, fallback: keyInsight)
+    }
+
+    var displayWhySaved: String? {
+        effectiveText(userWhySaved, fallback: whySaved)
+    }
+
+    var displayCaveats: [String] {
+        userCaveats ?? (aiInterpretationHidden ? [] : caveats)
+    }
+
+    var displayTags: [String] {
+        userTags ?? (aiInterpretationHidden ? [] : tags)
+    }
+
+    var hasUserOrganizationOverrides: Bool {
+        userTitle != nil
+            || userProblem != nil
+            || userKeyInsight != nil
+            || userWhySaved != nil
+            || userCaveats != nil
+            || userTags != nil
     }
 
     var primaryImageAttachment: CaptureAttachment? {
@@ -150,6 +240,24 @@ struct Capture: Codable, Identifiable, Hashable, Sendable {
 
     var createdDate: Date? {
         RecallDateParser.date(from: createdAt)
+    }
+
+    var userEditedDate: Date? {
+        userEditedAt.flatMap(RecallDateParser.date(from:))
+    }
+
+    func listDate(for sortOrder: CaptureSortOrder) -> Date? {
+        if sortOrder.usesEditedTime {
+            return userEditedDate ?? createdDate
+        }
+        return createdDate
+    }
+
+    private func effectiveText(_ userValue: String?, fallback: String?) -> String? {
+        if let userValue {
+            return userValue.nonEmptyTrimmed
+        }
+        return aiInterpretationHidden ? nil : fallback?.nonEmptyTrimmed
     }
 }
 
@@ -182,6 +290,25 @@ extension Capture {
         searchAliases = try container.decode([String].self, forKey: .searchAliases)
         errorMessage = try container.decodeIfPresent(String.self, forKey: .errorMessage)
         enrichmentVersion = try container.decode(Int.self, forKey: .enrichmentVersion)
+        userEditedAt = try container.decodeIfPresent(String.self, forKey: .userEditedAt)
+        userSelectedText = try container.decodeIfPresent(String.self, forKey: .userSelectedText)
+        userSourceApp = try container.decodeIfPresent(String.self, forKey: .userSourceApp)
+        userSourceTitle = try container.decodeIfPresent(String.self, forKey: .userSourceTitle)
+        userSourceURL = try container.decodeIfPresent(String.self, forKey: .userSourceURL)
+        userTitle = try container.decodeIfPresent(String.self, forKey: .userTitle)
+        userProblem = try container.decodeIfPresent(String.self, forKey: .userProblem)
+        userKeyInsight = try container.decodeIfPresent(String.self, forKey: .userKeyInsight)
+        userWhySaved = try container.decodeIfPresent(String.self, forKey: .userWhySaved)
+        userCaveats = try container.decodeIfPresent([String].self, forKey: .userCaveats)
+        userTags = try container.decodeIfPresent([String].self, forKey: .userTags)
+        aiInterpretationHidden = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .aiInterpretationHidden
+        ) ?? false
+        aiContentStale = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .aiContentStale
+        ) ?? false
         attachments = try container.decodeIfPresent(
             [CaptureAttachment].self,
             forKey: .attachments

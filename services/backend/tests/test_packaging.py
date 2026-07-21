@@ -74,7 +74,7 @@ def test_release_wheel_loads_packaged_enrichment_schema(tmp_path: Path) -> None:
                 "assert schema['type'] == 'object'; "
                 "assert 'search_aliases' in schema['required']; "
                 "assert 'extracted_text' in image_enrichment_schema()['required']; "
-                "assert [item.version for item in discover_migrations()] == [1, 2, 3, 4]"
+                    "assert [item.version for item in discover_migrations()] == [1, 2, 3, 4, 5]"
             ),
         ],
         cwd=tmp_path,

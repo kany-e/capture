@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CaptureRowView: View {
     let capture: Capture
+    var sortOrder: CaptureSortOrder = .createdNewest
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -25,17 +26,17 @@ struct CaptureRowView: View {
                 }
             }
 
-            if !capture.tags.isEmpty {
+            if !capture.displayTags.isEmpty {
                 HStack(spacing: 5) {
-                    ForEach(capture.tags.prefix(3), id: \.self) { tag in
+                    ForEach(capture.displayTags.prefix(3), id: \.self) { tag in
                         Text(tag)
                             .font(.caption2.weight(.medium))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
                             .background(.primary.opacity(0.06), in: Capsule())
                     }
-                    if capture.tags.count > 3 {
-                        Text("+\(capture.tags.count - 3)")
+                    if capture.displayTags.count > 3 {
+                        Text("+\(capture.displayTags.count - 3)")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -47,8 +48,14 @@ struct CaptureRowView: View {
                 Text(capture.sourceLabel)
                     .lineLimit(1)
                 Spacer()
-                if let createdDate = capture.createdDate {
-                    Text(createdDate, style: .relative)
+                if let date = capture.listDate(for: sortOrder) {
+                    Text(
+                        date.formatted(
+                            date: Calendar.current.isDateInToday(date) ? .omitted : .abbreviated,
+                            time: .shortened
+                        )
+                    )
+                    .monospacedDigit()
                 }
             }
             .font(.caption)

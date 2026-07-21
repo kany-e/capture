@@ -84,10 +84,14 @@ def image_enrichment_schema() -> dict[str, Any]:
 def _image_user_context(capture: CaptureRecord) -> str:
     source_app = (capture.source_app or "").strip()
     user_note = (capture.user_note or "").strip()
+    corrected_text = (
+        capture.selected_text.strip() if capture.user_selected_text is not None else ""
+    )
     return (
         f"SOURCE TYPE:\n{capture.source_type}\n\n"
         f"SOURCE APPLICATION:\n{source_app}\n\n"
-        f"USER NOTE:\n{user_note}"
+        f"USER NOTE:\n{user_note}\n\n"
+        f"USER-CORRECTED VISIBLE TEXT:\n{corrected_text}"
     )
 
 
@@ -257,7 +261,11 @@ class ImageEnrichmentService:
             return None
         enriched_capture = capture.model_copy(
             update={
-                "selected_text": extracted_text,
+                "selected_text": (
+                    capture.selected_text
+                    if capture.user_selected_text is not None
+                    else extracted_text
+                ),
                 "status": "ready",
                 "ai_title": enrichment.title,
                 "ai_summary": enrichment.summary,

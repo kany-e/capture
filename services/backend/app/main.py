@@ -31,6 +31,7 @@ from app.api_models import (
     CaptureCreateRequest,
     CaptureListResponse,
     CaptureResponse,
+    CaptureUpdateRequest,
     ErrorEnvelope,
     ImageCaptureCreateMetadata,
     ScreenshotOCRRequest,
@@ -73,6 +74,7 @@ from app.models import AttachmentRecord, CaptureRecord
 from app.ocr import OCRFailure, OCRProvider, OpenAIOCRProvider
 from app.repository import (
     CaptureAlreadyProcessingError,
+    CaptureEditConflictError,
     CaptureNotFoundError,
     CaptureRepository,
 )
@@ -126,6 +128,16 @@ def check_database(database_path: Path) -> Literal["ok", "error"]:
                     OR CASE WHEN json_valid(search_aliases_json)
                         THEN json_type(search_aliases_json) != 'array' ELSE 1 END
                     OR (
+                        user_caveats_json IS NOT NULL
+                        AND CASE WHEN json_valid(user_caveats_json)
+                            THEN json_type(user_caveats_json) != 'array' ELSE 1 END
+                    )
+                    OR (
+                        user_tags_json IS NOT NULL
+                        AND CASE WHEN json_valid(user_tags_json)
+                            THEN json_type(user_tags_json) != 'array' ELSE 1 END
+                    )
+                    OR (
                         embedding_json IS NOT NULL
                         AND CASE WHEN json_valid(embedding_json)
                             THEN json_type(embedding_json) != 'array' ELSE 1 END
@@ -175,7 +187,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Recall Backend", version="0.8.0", lifespan=lifespan)
+app = FastAPI(title="Recall Backend", version="0.9.0", lifespan=lifespan)
 app.add_middleware(
     ConfiguredCORSMiddleware,
     allow_origins=[],
@@ -500,8 +512,14 @@ def list_captures(
     repository: Annotated[CaptureRepository, Depends(get_repository)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
+    sort: Literal[
+        "created_desc",
+        "created_asc",
+        "edited_desc",
+        "edited_asc",
+    ] = "created_desc",
 ) -> CaptureListResponse:
-    records = repository.list_captures(limit=limit, offset=offset)
+    records = repository.list_captures(limit=limit, offset=offset, sort=sort)
     attachments_by_capture = repository.list_attachments_for_captures(
         record.id for record in records
     )
@@ -646,6 +664,46 @@ def get_capture(
             status_code=status.HTTP_404_NOT_FOUND,
             code="capture_not_found",
             message="Capture was not found.",
+        )
+    return capture_response(repository, record)
+
+
+@app.patch(
+    "/v1/captures/{capture_id}",
+    response_model=CaptureResponse,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorEnvelope},
+        status.HTTP_409_CONFLICT: {"model": ErrorEnvelope},
+    },
+)
+def update_capture(
+    capture_id: UUID,
+    request: CaptureUpdateRequest,
+    repository: Annotated[CaptureRepository, Depends(get_repository)],
+) -> CaptureResponse | JSONResponse:
+    existing = repository.get(str(capture_id))
+    if existing is None:
+        return error_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="capture_not_found",
+            message="Capture was not found.",
+        )
+    try:
+        record = repository.update_user_fields(
+            str(capture_id),
+            request.to_storage_model(existing),
+        )
+    except CaptureNotFoundError:
+        return error_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="capture_not_found",
+            message="Capture was not found.",
+        )
+    except CaptureEditConflictError:
+        return error_response(
+            status_code=status.HTTP_409_CONFLICT,
+            code="capture_processing",
+            message="Wait for AI processing to finish before editing this memory.",
         )
     return capture_response(repository, record)
 

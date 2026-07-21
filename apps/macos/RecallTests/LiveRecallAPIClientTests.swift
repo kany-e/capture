@@ -103,8 +103,68 @@ final class LiveRecallAPIClientTests: XCTestCase {
         )
         XCTAssertEqual(
             Dictionary(uniqueKeysWithValues: queryItems.map { ($0.name, $0.value) }),
-            ["limit": "17", "offset": "3"]
+            ["limit": "17", "offset": "3", "sort": "created_desc"]
         )
+    }
+
+    func testUpdateCaptureSendsUserLayerPatchAndDecodesEditingMetadata() async throws {
+        let recorder = RequestRecorder()
+        var captureObject = try ContractFixtures.readyCaptureJSONObject()
+        captureObject["user_edited_at"] = "2026-07-21T20:00:00Z"
+        captureObject["user_title"] = "My title"
+        captureObject["user_tags"] = ["manual"]
+        captureObject["ai_content_stale"] = true
+        captureObject["ai_interpretation_hidden"] = true
+        let responseData = try JSONSerialization.data(withJSONObject: captureObject)
+        URLProtocolStub.install { request in
+            recorder.record(request)
+            return try stubbedResponse(
+                for: request,
+                statusCode: 200,
+                data: responseData
+            )
+        }
+        let update = CaptureUpdateRequest(
+            selectedText: "Corrected source",
+            userNote: "Updated note",
+            sourceApp: nil,
+            sourceTitle: nil,
+            sourceURL: nil,
+            userTitle: "My title",
+            userProblem: nil,
+            userKeyInsight: nil,
+            userWhySaved: nil,
+            userCaveats: nil,
+            userTags: ["manual"],
+            showAIInterpretation: true
+        )
+
+        let capture = try await makeClient().updateCapture(
+            id: "4b3a30b7-55d9-4ef8-93ef-34281c826e52",
+            request: update
+        )
+
+        XCTAssertEqual(capture.userTitle, "My title")
+        XCTAssertEqual(capture.displayTags, ["manual"])
+        XCTAssertTrue(capture.aiContentStale)
+        XCTAssertTrue(capture.aiInterpretationHidden)
+        let request = try XCTUnwrap(recorder.request)
+        XCTAssertEqual(request.httpMethod, "PATCH")
+        XCTAssertEqual(
+            request.url?.path,
+            "/v1/captures/4b3a30b7-55d9-4ef8-93ef-34281c826e52"
+        )
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: try requestBodyData(from: request))
+                as? [String: Any]
+        )
+        XCTAssertEqual(object["selected_text"] as? String, "Corrected source")
+        XCTAssertEqual(object["user_title"] as? String, "My title")
+        XCTAssertEqual(object["user_tags"] as? [String], ["manual"])
+        XCTAssertEqual(object["show_ai_interpretation"] as? Bool, true)
+        XCTAssertTrue(object["source_app"] is NSNull)
+        XCTAssertTrue(object["user_note"] as? String == "Updated note")
+        XCTAssertTrue(object["user_problem"] is NSNull)
     }
 
     func testCreateCaptureSendsJSONPostAndAccepts202() async throws {

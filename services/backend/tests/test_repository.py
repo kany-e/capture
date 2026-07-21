@@ -8,9 +8,10 @@ from pathlib import Path
 import pytest
 
 from app.database import database_connection
-from app.models import EnrichmentUpdate, NewCapture
+from app.models import CaptureUserUpdate, EnrichmentUpdate, NewCapture
 from app.repository import (
     CaptureAlreadyProcessingError,
+    CaptureEditConflictError,
     CaptureNotFoundError,
     CaptureRepository,
     INTERRUPTED_PROCESSING_ERROR_MESSAGE,
@@ -191,6 +192,118 @@ def test_enrichment_update_cannot_modify_source_or_user_note(tmp_path: Path) -> 
     assert updated.user_note == created.user_note
     assert updated.created_at == "2026-07-18T19:00:00.000000Z"
     assert updated.updated_at == "2026-07-18T19:01:00.000000Z"
+
+
+def test_user_edit_preserves_captured_and_ai_layers_with_effective_overrides(
+    tmp_path: Path,
+) -> None:
+    times = iter(
+        [
+            datetime(2026, 7, 18, 19, 0, tzinfo=timezone.utc),
+            datetime(2026, 7, 18, 19, 1, tzinfo=timezone.utc),
+            datetime(2026, 7, 18, 19, 2, tzinfo=timezone.utc),
+        ]
+    )
+    database_path = tmp_path / "recall.db"
+    repository = CaptureRepository(database_path, clock=lambda: next(times))
+    created = repository.create(new_capture(), status="ready")
+    enriched = repository.update_enrichment(
+        created.id,
+        EnrichmentUpdate(
+            status="ready",
+            ai_title="AI title",
+            ai_summary="AI summary",
+            problem="AI problem",
+            tags=["ai-tag"],
+            embedding=[0.1, 0.2],
+        ),
+    )
+
+    edited = repository.update_user_fields(
+        created.id,
+        CaptureUserUpdate(
+            selected_text="Corrected source text",
+            user_note="Revised personal note",
+            source_app="Safari",
+            source_title="Corrected source title",
+            source_url="https://example.com/corrected",
+            user_title="My title",
+            user_problem="My framing",
+            user_key_insight="",
+            user_why_saved="My reason",
+            user_caveats=[],
+            user_tags=["personal", "edited"],
+            show_ai_interpretation=True,
+        ),
+    )
+
+    with database_connection(database_path) as connection:
+        raw = connection.execute(
+            "SELECT * FROM captures WHERE id = ?", (created.id,)
+        ).fetchone()
+
+    assert raw is not None
+    assert raw["selected_text"] == enriched.selected_text
+    assert raw["source_app"] == enriched.source_app
+    assert raw["source_title"] == enriched.source_title
+    assert raw["source_url"] == enriched.source_url
+    assert raw["ai_title"] == "AI title"
+    assert raw["problem"] == "AI problem"
+    assert edited.selected_text == "Corrected source text"
+    assert edited.source_app == "Safari"
+    assert edited.source_title == "Corrected source title"
+    assert edited.source_url == "https://example.com/corrected"
+    assert edited.user_note == "Revised personal note"
+    assert edited.user_title == "My title"
+    assert edited.user_problem == "My framing"
+    assert edited.user_tags == ["personal", "edited"]
+    assert edited.ai_content_stale is True
+    assert edited.ai_interpretation_hidden is True
+    assert edited.embedding is None
+    assert edited.user_edited_at == "2026-07-18T19:02:00.000000Z"
+    assert repository.search_captures(query="personal", limit=10)[0].capture.id == created.id
+    assert repository.search_captures(query="ai-tag", limit=10) == []
+
+
+def test_user_edit_is_rejected_while_ai_processing(tmp_path: Path) -> None:
+    repository = CaptureRepository(tmp_path / "recall.db")
+    created = repository.create(new_capture(), status="processing")
+
+    with pytest.raises(CaptureEditConflictError):
+        repository.update_user_fields(
+            created.id,
+            CaptureUserUpdate(selected_text=created.selected_text),
+        )
+
+
+def test_capture_list_supports_created_and_user_edited_sorting(tmp_path: Path) -> None:
+    times = iter(
+        [
+            datetime(2026, 7, 18, 19, 0, tzinfo=timezone.utc),
+            datetime(2026, 7, 18, 19, 1, tzinfo=timezone.utc),
+            datetime(2026, 7, 18, 19, 2, tzinfo=timezone.utc),
+        ]
+    )
+    repository = CaptureRepository(tmp_path / "recall.db", clock=lambda: next(times))
+    first = repository.create(new_capture(selected_text="first"), status="ready")
+    second = repository.create(new_capture(selected_text="second"), status="ready")
+    repository.update_user_fields(
+        first.id,
+        CaptureUserUpdate(selected_text=first.selected_text),
+    )
+
+    assert [record.id for record in repository.list_captures(
+        limit=10, offset=0, sort="created_desc"
+    )] == [second.id, first.id]
+    assert [record.id for record in repository.list_captures(
+        limit=10, offset=0, sort="created_asc"
+    )] == [first.id, second.id]
+    assert [record.id for record in repository.list_captures(
+        limit=10, offset=0, sort="edited_desc"
+    )] == [first.id, second.id]
+    assert [record.id for record in repository.list_captures(
+        limit=10, offset=0, sort="edited_asc"
+    )] == [second.id, first.id]
 
 
 @pytest.mark.parametrize("status", ["captured", "processing", "ready", "error"])

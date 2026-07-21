@@ -7,12 +7,16 @@ struct CapturePresentationHost: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Label(
-            "Recall",
-            systemImage: shortcutCenter.registrationErrorMessage == nil
-                ? "sparkles.rectangle.stack"
-                : "exclamationmark.triangle"
-        )
+        Label {
+            Text(
+                shortcutCenter.registrationErrorMessage == nil
+                    ? "Recall"
+                    : "Recall — shortcut setup requires attention"
+            )
+        } icon: {
+            Image("RecallMarkTemplate")
+                .renderingMode(.template)
+        }
             .onChange(of: coordinator.quickCapturePresentationRequest) {
                 openWindow(id: RecallWindowID.quickCapture)
                 NSApplication.shared.activate(ignoringOtherApps: true)

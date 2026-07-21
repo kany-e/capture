@@ -96,10 +96,26 @@ actor MockRecallAPIClient: RecallAPIClient {
     }
 
     func listCaptures(limit: Int, offset: Int) async throws -> CaptureListEnvelope {
-        let start = min(offset, captures.count)
-        let end = min(start + limit, captures.count)
+        try await listCaptures(limit: limit, offset: offset, sort: .createdNewest)
+    }
+
+    func listCaptures(
+        limit: Int,
+        offset: Int,
+        sort: CaptureSortOrder
+    ) async throws -> CaptureListEnvelope {
+        let ordered = captures.sorted { left, right in
+            let leftDate = left.listDate(for: sort) ?? .distantPast
+            let rightDate = right.listDate(for: sort) ?? .distantPast
+            switch sort {
+            case .createdNewest, .editedNewest: return leftDate > rightDate
+            case .createdOldest, .editedOldest: return leftDate < rightDate
+            }
+        }
+        let start = min(offset, ordered.count)
+        let end = min(start + limit, ordered.count)
         return CaptureListEnvelope(
-            items: Array(captures[start..<end]),
+            items: Array(ordered[start..<end]),
             limit: limit,
             offset: offset
         )
@@ -148,7 +164,7 @@ actor MockRecallAPIClient: RecallAPIClient {
                 capture.aiSummary,
                 capture.userNote,
                 capture.selectedText,
-                capture.tags.joined(separator: " "),
+                capture.displayTags.joined(separator: " "),
             ]
                 .compactMap { $0 }
                 .joined(separator: " ")

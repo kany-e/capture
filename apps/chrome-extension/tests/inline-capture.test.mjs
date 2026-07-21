@@ -386,6 +386,12 @@ test("overlay positioning avoids selections and clamps at viewport edges", () =>
   ));
   assert.equal(narrow.left, 8);
   assert.equal(narrow.top, 8);
+
+  assert.deepEqual(plain(core.clampOverlayPosition(
+    { left: -40, top: 500 },
+    { width: 340, height: 280 },
+    { width: 1_280, height: 720 },
+  )), { left: 8, top: 432 });
 });
 
 
@@ -442,12 +448,28 @@ test("inline composer distinguishes selection and note counts with a scrollable 
   assert.match(captureSource, /preview\.setAttribute\("role", "region"\)/);
   assert.match(captureSource, /\.recall-preview \{[\s\S]*overflow: auto;/);
   assert.match(captureSource, /\.recall-preview \{[\s\S]*max-height: 128px;/);
-  assert.match(captureSource, /\.recall-composer \{[\s\S]*overflow: auto;/);
+  assert.match(captureSource, /\.recall-composer \{[\s\S]*overflow-x: hidden;/);
+  assert.match(captureSource, /\.recall-composer \{[\s\S]*overflow-y: auto;/);
   assert.match(
     captureSource,
     /\.recall-composer \{[\s\S]*max-height: calc\(100vh - 16px\);/,
   );
   assert.doesNotMatch(captureSource, /-webkit-line-clamp: 2/);
+});
+
+
+test("inline composer uses Recall branding, wraps source titles, and drags within the viewport", () => {
+  assert.match(captureSource, /chrome\.runtime\.getURL\("assets\/icons\/icon32\.png"\)/);
+  assert.match(captureSource, /\.recall-source \{[\s\S]*overflow-wrap: anywhere;/);
+  assert.match(captureSource, /\.recall-source \{[\s\S]*white-space: normal;/);
+  assert.match(captureSource, /\.recall-source \{[\s\S]*max-height: 2\.7em;/);
+  assert.match(captureSource, /\.recall-header \{[\s\S]*cursor: grab;/);
+  assert.match(captureSource, /function beginComposerDrag\(event\)/);
+  assert.match(captureSource, /function moveComposer\(event\)/);
+  assert.match(captureSource, /core\.clampOverlayPosition\(/);
+  assert.match(captureSource, /listeners\.listen\(header, "pointerdown", beginComposerDrag\)/);
+  assert.match(captureSource, /listeners\.listen\(global, "resize", clampVisibleComposer\)/);
+  assert.match(captureSource, /background: #c92f63;/);
 });
 
 

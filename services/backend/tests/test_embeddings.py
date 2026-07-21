@@ -145,6 +145,28 @@ def test_embedding_input_normalizes_outer_space_and_line_endings(
     assert "SEARCH ALIASES:\nsaved fix, 以后查找" in projection
 
 
+def test_embedding_input_prefers_explicit_user_organization(tmp_path: Path) -> None:
+    record = ready_fixture(CaptureRepository(tmp_path / "recall.db"))
+    record = record.model_copy(
+        update={
+            "user_title": "My durable title",
+            "user_selected_text": "Corrected visible text",
+            "user_problem": "My framing",
+            "user_key_insight": "My conclusion",
+            "user_tags": ["manual", "reviewed"],
+        }
+    )
+
+    projection = build_embedding_input(record)
+
+    assert "TITLE:\nMy durable title" in projection
+    assert "SELECTED CONTENT:\nCorrected visible text" in projection
+    assert "PROBLEM:\nMy framing" in projection
+    assert "KEY INSIGHT:\nMy conclusion" in projection
+    assert "TAGS:\nmanual, reviewed" in projection
+    assert record.ai_title not in projection
+
+
 def test_provider_uses_one_float_request_and_default_dimensions() -> None:
     embeddings = FakeEmbeddings(
         SimpleNamespace(data=[SimpleNamespace(embedding=[0.1, 0.2, 0.3])])

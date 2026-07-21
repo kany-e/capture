@@ -41,6 +41,7 @@
   let successTimer = null;
   let positionGeneration = 0;
   let previousFocus = null;
+  let composerDrag = null;
 
   function inlineCaptureInactive() {
     return disabled || suspensionGate.suspended;
@@ -73,6 +74,15 @@
     return node;
   }
 
+  function brandIcon(className) {
+    const icon = element("img", className);
+    icon.src = chrome.runtime.getURL("assets/icons/icon32.png");
+    icon.alt = "";
+    icon.draggable = false;
+    icon.setAttribute("aria-hidden", "true");
+    return icon;
+  }
+
   const style = document.createElement("style");
   style.textContent = `
     :host { color-scheme: light dark; }
@@ -87,60 +97,69 @@
       border: 1px solid rgba(255,255,255,.22);
       border-radius: 999px;
       padding: 6px 11px 6px 7px;
-      color: #f7fff8;
-      background: #24583b;
-      box-shadow: 0 8px 24px rgba(17,45,29,.24);
+      color: #fff9fb;
+      background: #c92f63;
+      box-shadow: 0 8px 24px rgba(137,28,69,.25);
       cursor: pointer;
       pointer-events: auto;
       font: 700 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       letter-spacing: -.01em;
     }
-    .recall-pill:hover { background: #1b472f; }
+    .recall-pill:hover { background: #aa244f; }
     .recall-pill:focus { animation: none; }
     .recall-pill:focus-visible,
     .recall-button:focus-visible,
     .recall-note:focus-visible {
-      outline: 3px solid rgba(90,161,113,.42);
+      outline: 3px solid rgba(201,47,99,.32);
       outline-offset: 2px;
     }
     .recall-mark {
-      display: inline-grid;
       width: 20px;
       height: 20px;
-      place-items: center;
+      flex: 0 0 20px;
       border-radius: 7px;
-      color: #24583b;
-      background: #f5fff6;
-      font-size: 11px;
-      font-weight: 800;
+      box-shadow: 0 3px 8px rgba(88,23,48,.18);
     }
     .recall-composer {
       position: fixed;
       display: none;
-      overflow: auto;
+      overflow-x: hidden;
+      overflow-y: auto;
       width: min(340px, calc(100vw - 16px));
       max-height: calc(100vh - 16px);
-      border: 1px solid rgba(36,88,59,.18);
+      border: 1px solid rgba(176,61,104,.2);
       border-radius: 16px;
       padding: 16px;
-      color: #17211b;
-      background: rgba(249,252,248,.98);
-      box-shadow: 0 18px 54px rgba(20,41,28,.24);
+      color: #28171e;
+      background: rgba(255,250,252,.98);
+      box-shadow: 0 18px 54px rgba(78,26,46,.23);
       pointer-events: auto;
       overscroll-behavior: contain;
       scrollbar-gutter: stable;
       font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    .recall-header { display: flex; align-items: center; gap: 10px; }
-    .recall-header .recall-mark { color: #f7fff8; background: #24583b; }
+    .recall-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+    }
+    .recall-composer[data-dragging="true"] .recall-header { cursor: grabbing; }
+    .recall-header .recall-mark { width: 30px; height: 30px; flex-basis: 30px; border-radius: 10px; }
+    .recall-heading { min-width: 0; flex: 1 1 auto; }
     .recall-title { margin: 0; font-size: 15px; font-weight: 760; letter-spacing: -.015em; }
     .recall-source {
       overflow: hidden;
       margin: 2px 0 0;
-      color: #68756d;
+      color: #806570;
       font-size: 11px;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      line-height: 1.35;
+      max-height: 2.7em;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      white-space: normal;
     }
     .recall-selection-row,
     .recall-note-row {
@@ -156,9 +175,9 @@
       max-height: 128px;
       margin: 6px 0 12px;
       padding: 9px 10px;
-      border: 1px solid #dce4dd;
+      border: 1px solid #ead6de;
       border-radius: 10px;
-      color: #405047;
+      color: #5c4450;
       background: #fff;
       font-size: 12px;
       line-height: 1.4;
@@ -168,13 +187,13 @@
       white-space: pre-wrap;
     }
     .recall-preview:focus-visible {
-      outline: 3px solid rgba(90,161,113,.42);
+      outline: 3px solid rgba(201,47,99,.32);
       outline-offset: 2px;
     }
-    .recall-label { color: #304b3b; font-size: 12px; font-weight: 700; }
+    .recall-label { color: #624050; font-size: 12px; font-weight: 700; }
     .recall-count {
       min-width: 0;
-      color: #718078;
+      color: #8a6b77;
       font-size: 10px;
       font-variant-numeric: tabular-nums;
       overflow-wrap: anywhere;
@@ -186,24 +205,24 @@
       min-height: 72px;
       margin-top: 7px;
       resize: vertical;
-      border: 1px solid #cbd8ce;
+      border: 1px solid #dfc8d1;
       border-radius: 10px;
       outline: none;
       padding: 9px 10px;
-      color: #17211b;
+      color: #28171e;
       background: #fff;
       line-height: 1.4;
     }
-    .recall-note:focus { border-color: #4c8763; }
+    .recall-note:focus { border-color: #c92f63; }
     .recall-note[aria-invalid="true"] { border-color: #bd5148; }
-    .recall-privacy { margin: 8px 0 0; color: #718078; font-size: 10px; }
+    .recall-privacy { margin: 8px 0 0; color: #8a6b77; font-size: 10px; }
     .recall-status {
       display: none;
       margin-top: 10px;
       padding: 8px 9px;
       border-radius: 9px;
-      color: #24583b;
-      background: #e2f2e6;
+      color: #8b2149;
+      background: #fde7ef;
       font-size: 11px;
     }
     .recall-status[data-kind="error"] { color: #7c2e29; background: #fde8e5; }
@@ -214,20 +233,20 @@
       border-radius: 9px;
       padding: 7px 11px;
       cursor: pointer;
-      color: #304b3b;
-      background: #e8eee9;
+      color: #624050;
+      background: #f3e8ec;
       font-weight: 700;
     }
-    .recall-button[data-primary="true"] { color: #fff; background: #24583b; }
+    .recall-button[data-primary="true"] { color: #fff; background: #c92f63; }
     .recall-button:hover:not(:disabled) { filter: brightness(.94); }
     .recall-button:disabled, .recall-note:disabled { cursor: default; opacity: .58; }
     @media (prefers-color-scheme: dark) {
-      .recall-composer { color: #edf6ef; background: rgba(28,35,30,.98); border-color: #3d5847; }
-      .recall-source, .recall-count, .recall-privacy { color: #9daaa1; }
-      .recall-preview, .recall-note { color: #e9f1eb; background: #222d26; border-color: #3c4c41; }
-      .recall-label { color: #cbe2d1; }
-      .recall-button { color: #dbe7de; background: #34433a; }
-      .recall-button[data-primary="true"] { color: #fff; background: #34734f; }
+      .recall-composer { color: #fff3f7; background: rgba(39,27,32,.98); border-color: #684151; }
+      .recall-source, .recall-count, .recall-privacy { color: #beaab2; }
+      .recall-preview, .recall-note { color: #f7eaf0; background: #34252b; border-color: #624653; }
+      .recall-label { color: #eed8e1; }
+      .recall-button { color: #f1dfe6; background: #503844; }
+      .recall-button[data-primary="true"] { color: #fff; background: #c92f63; }
     }
     @media (prefers-reduced-motion: no-preference) {
       .recall-pill, .recall-composer { animation: recall-enter 110ms ease-out; }
@@ -238,7 +257,7 @@
   const pill = element("button", "recall-pill");
   pill.type = "button";
   pill.setAttribute("aria-label", "Add selected text to Recall");
-  pill.append(element("span", "recall-mark", "R"));
+  pill.append(brandIcon("recall-mark"));
   pill.append(element("span", "", "Add to Recall"));
 
   const composer = element("section", "recall-composer");
@@ -247,8 +266,9 @@
   composer.setAttribute("aria-labelledby", "recall-inline-title");
 
   const header = element("header", "recall-header");
-  header.append(element("span", "recall-mark", "R"));
-  const headingGroup = element("div");
+  header.title = "Drag to move";
+  header.append(brandIcon("recall-mark"));
+  const headingGroup = element("div", "recall-heading");
   const heading = element("h2", "recall-title", "Add to Recall");
   heading.id = "recall-inline-title";
   const source = element("p", "recall-source");
@@ -322,12 +342,96 @@
     }
   }
 
+  function endComposerDrag(event) {
+    if (
+      !composerDrag
+      || (event && event.pointerId !== composerDrag.pointerId)
+    ) {
+      return;
+    }
+    const pointerId = composerDrag.pointerId;
+    composerDrag = null;
+    composer.dataset.dragging = "false";
+    if (header.hasPointerCapture?.(pointerId)) {
+      header.releasePointerCapture(pointerId);
+    }
+  }
+
+  function beginComposerDrag(event) {
+    if (
+      inlineCaptureInactive()
+      || event.button !== 0
+      || event.isPrimary === false
+      || ![
+        core.STATES.composer,
+        core.STATES.error,
+        core.STATES.success,
+      ].includes(machine.state)
+    ) {
+      return;
+    }
+    const bounds = composer.getBoundingClientRect();
+    composerDrag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: bounds.left,
+      startTop: bounds.top,
+      width: bounds.width,
+      height: bounds.height,
+    };
+    composer.dataset.dragging = "true";
+    header.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  }
+
+  function moveComposer(event) {
+    if (!composerDrag || event.pointerId !== composerDrag.pointerId) {
+      return;
+    }
+    const position = core.clampOverlayPosition(
+      {
+        left: composerDrag.startLeft + event.clientX - composerDrag.startX,
+        top: composerDrag.startTop + event.clientY - composerDrag.startY,
+      },
+      { width: composerDrag.width, height: composerDrag.height },
+      { width: global.innerWidth, height: global.innerHeight },
+    );
+    composer.style.left = `${position.left}px`;
+    composer.style.top = `${position.top}px`;
+    composer.dataset.placement = "manual";
+    event.preventDefault();
+  }
+
+  function clampVisibleComposer() {
+    if (
+      inlineCaptureInactive()
+      || ![
+        core.STATES.composer,
+        core.STATES.submitting,
+        core.STATES.error,
+        core.STATES.success,
+      ].includes(machine.state)
+    ) {
+      return;
+    }
+    const bounds = composer.getBoundingClientRect();
+    const position = core.clampOverlayPosition(
+      { left: bounds.left, top: bounds.top },
+      { width: bounds.width, height: bounds.height },
+      { width: global.innerWidth, height: global.innerHeight },
+    );
+    composer.style.left = `${position.left}px`;
+    composer.style.top = `${position.top}px`;
+  }
+
   function hideSurface({ restoreFocus = false } = {}) {
     clearTimer(pillTimer);
     clearTimer(successTimer);
     pillTimer = null;
     successTimer = null;
     positionGeneration += 1;
+    endComposerDrag();
     pill.style.display = "none";
     pill.style.visibility = "hidden";
     composer.style.display = "none";
@@ -762,6 +866,10 @@
   listeners.listen(pill, "focus", () => clearTimer(pillTimer));
   listeners.listen(pill, "blur", armPillTimeout);
   listeners.listen(pill, "click", openComposer);
+  listeners.listen(header, "pointerdown", beginComposerDrag);
+  listeners.listen(header, "pointermove", moveComposer);
+  listeners.listen(header, "pointerup", endComposerDrag);
+  listeners.listen(header, "pointercancel", endComposerDrag);
   listeners.listen(note, "input", updateControls);
   listeners.listen(cancelButton, "click", () => dismiss({ restoreFocus: true }));
   listeners.listen(saveButton, "click", () => void submit());
@@ -834,6 +942,7 @@
       dismiss();
     }
   }, true);
+  listeners.listen(global, "resize", clampVisibleComposer);
   listeners.listen(global, "blur", () => {
     if (!inlineCaptureInactive() && machine.state === core.STATES.pill) {
       dismiss();

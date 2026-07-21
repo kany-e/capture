@@ -15,6 +15,7 @@ from app.models import (
     AttachmentRecord,
     CaptureRecord,
     CaptureStatus,
+    CaptureUserUpdate,
     EnrichmentUpdate,
     NewAttachment,
     NewCapture,
@@ -27,6 +28,18 @@ from app.search import (
 
 
 VALID_CAPTURE_STATUSES = frozenset(get_args(CaptureStatus))
+CaptureSortOrder = Literal[
+    "created_desc",
+    "created_asc",
+    "edited_desc",
+    "edited_asc",
+]
+CAPTURE_SORT_SQL: dict[CaptureSortOrder, str] = {
+    "created_desc": "created_at DESC, id DESC",
+    "created_asc": "created_at ASC, id ASC",
+    "edited_desc": "COALESCE(user_edited_at, created_at) DESC, created_at DESC, id DESC",
+    "edited_asc": "COALESCE(user_edited_at, created_at) ASC, created_at ASC, id ASC",
+}
 FTS_CANDIDATE_MULTIPLIER = 5
 FTS_MAX_CANDIDATES = 500
 INTERRUPTED_PROCESSING_ERROR_MESSAGE = (
@@ -40,6 +53,10 @@ class CaptureNotFoundError(LookupError):
 
 class CaptureAlreadyProcessingError(RuntimeError):
     """Raised when an enrichment claim targets an active Capture."""
+
+
+class CaptureEditConflictError(RuntimeError):
+    """Raised when a user edit races with active AI processing."""
 
 
 class CorruptCaptureError(RuntimeError):
@@ -66,6 +83,10 @@ def _decode_list(value: str, column: str) -> list[Any]:
     return decoded
 
 
+def _decode_optional_list(value: str | None, column: str) -> list[Any] | None:
+    return None if value is None else _decode_list(value, column)
+
+
 def _row_to_record(row: sqlite3.Row) -> CaptureRecord:
     embedding = (
         None
@@ -80,10 +101,10 @@ def _row_to_record(row: sqlite3.Row) -> CaptureRecord:
         captured_at=row["captured_at"],
         status=row["status"],
         source_type=row["source_type"],
-        source_app=row["source_app"],
-        source_title=row["source_title"],
-        source_url=row["source_url"],
-        selected_text=row["selected_text"],
+        source_app=row["user_source_app"] if row["user_source_app"] is not None else row["source_app"],
+        source_title=row["user_source_title"] if row["user_source_title"] is not None else row["source_title"],
+        source_url=row["user_source_url"] if row["user_source_url"] is not None else row["source_url"],
+        selected_text=row["user_selected_text"] if row["user_selected_text"] is not None else row["selected_text"],
         surrounding_context=row["surrounding_context"],
         context_truncated=bool(row["context_truncated"]),
         user_note=row["user_note"],
@@ -101,6 +122,21 @@ def _row_to_record(row: sqlite3.Row) -> CaptureRecord:
         embedding=embedding,
         error_message=row["error_message"],
         enrichment_version=row["enrichment_version"],
+        user_edited_at=row["user_edited_at"],
+        user_selected_text=row["user_selected_text"],
+        user_source_app=row["user_source_app"],
+        user_source_title=row["user_source_title"],
+        user_source_url=row["user_source_url"],
+        user_title=row["user_title"],
+        user_problem=row["user_problem"],
+        user_key_insight=row["user_key_insight"],
+        user_why_saved=row["user_why_saved"],
+        user_caveats=_decode_optional_list(
+            row["user_caveats_json"], "user_caveats_json"
+        ),
+        user_tags=_decode_optional_list(row["user_tags_json"], "user_tags_json"),
+        ai_interpretation_hidden=bool(row["ai_interpretation_hidden"]),
+        ai_content_stale=bool(row["ai_content_stale"]),
     )
 
 
@@ -405,12 +441,134 @@ class CaptureRepository:
                 raise
         return paths
 
-    def list_captures(self, *, limit: int, offset: int) -> list[CaptureRecord]:
+    def update_user_fields(
+        self,
+        capture_id: str,
+        update: CaptureUserUpdate,
+    ) -> CaptureRecord:
+        """Apply explicit user overrides without replacing captured or AI data."""
+
+        now = self._timestamp()
+        with database_connection(self.database_path) as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                existing = connection.execute(
+                    "SELECT * FROM captures WHERE id = ?", (capture_id,)
+                ).fetchone()
+                if existing is None:
+                    raise CaptureNotFoundError(capture_id)
+                if existing["status"] == "processing":
+                    raise CaptureEditConflictError(capture_id)
+
+                effective_selected_text = (
+                    existing["user_selected_text"]
+                    if existing["user_selected_text"] is not None
+                    else existing["selected_text"]
+                )
+                effective_source_app = (
+                    existing["user_source_app"]
+                    if existing["user_source_app"] is not None
+                    else existing["source_app"]
+                )
+                effective_source_title = (
+                    existing["user_source_title"]
+                    if existing["user_source_title"] is not None
+                    else existing["source_title"]
+                )
+                effective_source_url = (
+                    existing["user_source_url"]
+                    if existing["user_source_url"] is not None
+                    else existing["source_url"]
+                )
+                new_selected_text = (
+                    update.selected_text
+                    if update.selected_text is not None
+                    else existing["selected_text"]
+                )
+                new_source_app = (
+                    update.source_app
+                    if update.source_app is not None
+                    else existing["source_app"]
+                )
+                new_source_title = (
+                    update.source_title
+                    if update.source_title is not None
+                    else existing["source_title"]
+                )
+                new_source_url = (
+                    update.source_url
+                    if update.source_url is not None
+                    else existing["source_url"]
+                )
+                source_changed = (
+                    new_selected_text != effective_selected_text
+                    or new_source_app != effective_source_app
+                    or new_source_title != effective_source_title
+                    or new_source_url != effective_source_url
+                    or update.user_note != existing["user_note"]
+                )
+                ai_content_stale = bool(existing["ai_content_stale"]) or source_changed
+                ai_interpretation_hidden = (
+                    source_changed or not update.show_ai_interpretation
+                )
+
+                connection.execute(
+                    """
+                    UPDATE captures SET
+                        updated_at = ?, user_edited_at = ?,
+                        user_selected_text = ?, user_note = ?,
+                        user_source_app = ?, user_source_title = ?,
+                        user_source_url = ?, user_title = ?,
+                        user_problem = ?, user_key_insight = ?,
+                        user_why_saved = ?, user_caveats_json = ?,
+                        user_tags_json = ?, ai_interpretation_hidden = ?,
+                        ai_content_stale = ?, embedding_json = NULL
+                    WHERE id = ?
+                    """,
+                    (
+                        now,
+                        now,
+                        update.selected_text,
+                        update.user_note,
+                        update.source_app,
+                        update.source_title,
+                        update.source_url,
+                        update.user_title,
+                        update.user_problem,
+                        update.user_key_insight,
+                        update.user_why_saved,
+                        _encode_json(update.user_caveats),
+                        _encode_json(update.user_tags),
+                        int(ai_interpretation_hidden),
+                        int(ai_content_stale),
+                        capture_id,
+                    ),
+                )
+                row = connection.execute(
+                    "SELECT * FROM captures WHERE id = ?", (capture_id,)
+                ).fetchone()
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+
+        if row is None:  # pragma: no cover - guarded update returned one row.
+            raise RuntimeError("Capture edit completed without a readable row")
+        return _row_to_record(row)
+
+    def list_captures(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: CaptureSortOrder = "created_desc",
+    ) -> list[CaptureRecord]:
+        order_by = CAPTURE_SORT_SQL[sort]
         with database_connection(self.database_path) as connection:
             rows = connection.execute(
-                """
+                f"""
                 SELECT * FROM captures
-                ORDER BY created_at DESC
+                ORDER BY {order_by}
                 LIMIT ? OFFSET ?
                 """,
                 (limit, offset),
@@ -578,7 +736,8 @@ class CaptureRepository:
                         key_insight = NULL, why_saved = NULL,
                         caveats_json = '[]', tags_json = '[]',
                         entities_json = '[]', search_aliases_json = '[]',
-                        embedding_json = NULL, error_message = NULL
+                        embedding_json = NULL, error_message = NULL,
+                        ai_interpretation_hidden = 0
                     WHERE id = ? AND status != 'processing'
                     """,
                     (updated_at, capture_id),
@@ -631,7 +790,9 @@ class CaptureRepository:
                         problem = ?, key_insight = ?, why_saved = ?,
                         caveats_json = ?, tags_json = ?, entities_json = ?,
                         search_aliases_json = ?, embedding_json = ?,
-                        error_message = ?, enrichment_version = ?
+                        error_message = ?, enrichment_version = ?,
+                        ai_content_stale = 0,
+                        ai_interpretation_hidden = 0
                     WHERE id = ?
                     """,
                     values,
@@ -689,7 +850,9 @@ class CaptureRepository:
                         ai_title = ?, ai_summary = ?, problem = ?,
                         key_insight = ?, why_saved = ?, caveats_json = ?,
                         tags_json = ?, entities_json = ?, search_aliases_json = ?,
-                        embedding_json = ?, error_message = ?, enrichment_version = ?
+                        embedding_json = ?, error_message = ?, enrichment_version = ?,
+                        ai_content_stale = 0,
+                        ai_interpretation_hidden = 0
                     WHERE id = ?
                     """,
                     values,

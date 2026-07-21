@@ -92,6 +92,13 @@ knows only migrations 001–003 will reject a database after migration 004, so a
 rollback requires restoring both the pre-004 database and matching attachment
 snapshot rather than checking out old code alone.
 
+Migration 005 adds user source/organization overrides, `user_edited_at`, and AI
+visibility/staleness state. It recreates and backfills the FTS triggers so
+effective user-visible values take precedence while captured and AI columns
+remain intact. Back up a stopped database before upgrading; a rollback requires
+restoring that pre-005 database rather than checking out older code against the
+new schema.
+
 Migration 003 is forward-only for this build: older code knows only migrations
 001–002 and will refuse a database that has applied 003. Before the first run of
 this version against an existing `data/recall.db`, stop the backend and create a
@@ -178,6 +185,20 @@ Clients fetch bytes from the opaque `content_path` returned in `attachments`.
 `DELETE /v1/captures/{id}` removes Capture/FTS/embedding/attachment metadata and
 then its referenced local files. Filesystem paths are never accepted from or
 returned to clients.
+
+## Editable memories
+
+`PATCH /v1/captures/{id}` stores explicit user corrections separately from
+captured and model-generated columns. Source/note changes mark the previous AI
+layer stale and hidden; title/detail/tag-only organization stays current and
+takes display/FTS precedence. Every edit updates `user_edited_at`, clears the
+potentially stale embedding, and leaves trigger-synchronized keyword search
+ready immediately. Editing is rejected while a Capture is processing.
+
+`GET /v1/captures` accepts `created_desc`, `created_asc`, `edited_desc`, and
+`edited_asc`. An explicit `POST /v1/captures/{id}/enrich` uses the corrected
+effective source, replaces only AI fields, and retains user organization
+overrides; no edit automatically calls a provider.
 
 ## AI enrichment
 

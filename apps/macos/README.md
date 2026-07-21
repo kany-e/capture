@@ -250,7 +250,9 @@ Run the build and tests again after regeneration.
 
 - Run as a normal Dock app with the existing `MenuBarExtra`. Closing the main
   window does not quit Recall, so menu-bar and global capture remain available
-  while the app is running.
+  while the app is running. The menu-bar label uses the monochrome
+  `RecallMarkTemplate` asset so macOS can adapt it to the current appearance;
+  Quick Capture reuses the same mark in the app accent color.
 - Register native global selection, screenshot, and clipboard shortcuts with
   Carbon `RegisterEventHotKey`. Defaults are `Option+Shift+Command+S`,
   `Option+Shift+Command+4`, and `Option+Shift+Command+C`, respectively. Carbon
@@ -353,6 +355,14 @@ Accessibility, pasteboard, contract, networking, production Vision,
 global-shortcut, lifecycle, validation, image-upload/display/delete, retry,
 polling, store, window-placement, and signing-identity tests.
 
+D-038 adds native memory editing, separate user organization overrides,
+explicit stale-AI refresh, creation/edit sorting, stable minute-level times,
+state-driven notices, separated Settings tabs, and fixed image-note composer
+geometry. The integrated host suite now passes 189/189 tests, including the
+production Apple Vision check. Real-app editing, sorting, notice, Settings,
+image-composer, menu-bar logo, and Quick Capture logo acceptance passed on
+2026-07-21.
+
 ## Manual test matrix
 
 Run the integrated backend and a Debug build against `127.0.0.1:8765`. These
@@ -363,8 +373,12 @@ after rerunning them on the current integrated tree.
 | --- | --- | --- |
 | Healthy launch | Start the backend, then launch Recall. | Connection shows **Connected** and live records load. `AI not configured` is acceptable without a key. |
 | Offline recovery | Stop the backend, launch Recall, restart the backend, then choose **Try Again** or **Refresh**. | Recall shows an offline state, reconnects, and reloads the library without losing persisted records. |
+| Notice lifecycle | Trigger an empty-clipboard warning, a backend-offline error, and an AI-processing save; then resolve each condition. | Clipboard/success notices expire, connection errors clear after reconnection, and processing changes to a short ready/error notice instead of remaining indefinitely. |
 | Clipboard capture | Copy non-empty text in TextEdit, open **Capture Clipboard**, add a note, and save. | The exact text and note are saved separately; the record appears immediately and progresses to a safe terminal state. |
 | Rich clipboard line breaks | Copy a known multiline model response containing headings and a literal delimiter such as `$e$`, then open **Capture Clipboard**. | Clipboard Capture retains line breaks already present in plain text and may restore safe boundaries from equivalent HTML/RTF; a mismatched rich representation never removes `$e$`. |
+| Edit memory | Edit selected content, note, custom title, source, details, caveats, and tags; remove and add tags; save and reopen. | User values persist and are searchable, creation time stays fixed, user-edit time advances, and captured/AI database layers remain separate. |
+| Stale AI | Change source content or the note, save, inspect the hidden prior interpretation, then choose **Refresh AI**. | Recall does not call AI on save; it marks the old layer stale/hidden, explicitly regenerates from the edited memory, and preserves user title/detail/tag overrides. |
+| Sort and time | Switch among all four creation/edit orders and leave the app open for a minute. | Ordering follows the selected timestamp/direction; unedited notes use creation time and no row redraws every second. Search stays relevance ordered. |
 | Shortcut settings | Confirm the defaults, change screenshot capture to `Option+Shift+Command+5`, relaunch Recall, then choose **Restore Defaults**. Also try one modifier and a duplicate combination. | The valid change persists across restart and defaults restore correctly. Invalid or duplicate combinations are rejected without replacing the active shortcuts. |
 | Registration failure | Choose a combination already owned by macOS or another app and apply it. | Recall restores the preceding active shortcuts and exposes the failure in Settings, the menu, and the menu-bar status icon. |
 | Global clipboard | Close the main window without quitting Recall, focus another app with 32 known clipboard characters, and press `Option+Shift+Command+C` twice. | Quick Capture opens with the exact 32 characters. The second trigger preserves the existing draft and shows an explanatory notice. |

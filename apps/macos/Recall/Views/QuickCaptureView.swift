@@ -53,9 +53,13 @@ struct QuickCaptureView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: "sparkles.rectangle.stack")
-                    .font(.system(size: 28))
+                Image("RecallMarkTemplate")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 32, height: 32)
                     .foregroundStyle(Color.accentColor)
+                    .accessibilityHidden(true)
             }
 
             if draft.kind == .screenshot {
@@ -175,7 +179,8 @@ struct QuickCaptureView: View {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: 150)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 150)
                     .background(.black.opacity(0.06), in: RoundedRectangle(cornerRadius: 11))
                     .clipShape(RoundedRectangle(cornerRadius: 11))
                     .accessibilityLabel("Selected screenshot preview")
@@ -190,7 +195,7 @@ struct QuickCaptureView: View {
             .disabled(store.isExtractingScreenshot || store.isQuickCaptureRetryLocked)
 
             if store.screenshotNoteKind == .image {
-                Toggle(isOn: $store.screenshotImageAnalysisIsEnabled) {
+                HStack(alignment: .top, spacing: 14) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Build a searchable AI index")
                             .font(.headline)
@@ -203,12 +208,23 @@ struct QuickCaptureView: View {
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(2, reservesSpace: true)
+                        .frame(height: 32, alignment: .topLeading)
                     }
+                    Spacer(minLength: 12)
+                    Toggle(
+                        "Build a searchable AI index",
+                        isOn: $store.screenshotImageAnalysisIsEnabled
+                    )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .fixedSize()
+                    .padding(.top, 1)
+                    .disabled(
+                        !store.imageAnalysisIsEnabled || store.isQuickCaptureRetryLocked
+                    )
                 }
-                .toggleStyle(.switch)
-                .disabled(
-                    !store.imageAnalysisIsEnabled || store.isQuickCaptureRetryLocked
-                )
+                .frame(minHeight: 54, alignment: .top)
 
                 Label(
                     "The original image is stored locally; AI annotations remain separate and can fail without losing it.",

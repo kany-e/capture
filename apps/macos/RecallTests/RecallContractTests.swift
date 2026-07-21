@@ -53,6 +53,24 @@ final class RecallContractTests: XCTestCase {
         XCTAssertTrue(capture.attachments.isEmpty)
     }
 
+    func testHiddenAIUsesOnlyUserOrganizedDisplayFields() throws {
+        var capture = try JSONDecoder().decode(
+            Capture.self,
+            from: ContractFixtures.readyCaptureData()
+        )
+        capture.aiInterpretationHidden = true
+        capture.userTitle = nil
+        capture.userProblem = "My framing"
+        capture.userTags = ["manual"]
+
+        XCTAssertNotEqual(capture.displayTitle, capture.aiTitle)
+        XCTAssertEqual(capture.displaySummary, capture.userNote)
+        XCTAssertEqual(capture.displayProblem, "My framing")
+        XCTAssertNil(capture.displayKeyInsight)
+        XCTAssertEqual(capture.displayCaveats, [])
+        XCTAssertEqual(capture.displayTags, ["manual"])
+    }
+
     func testDateParserAcceptsMicrosecondTimestamp() throws {
         let wholeSecond = try XCTUnwrap(
             RecallDateParser.date(from: "2026-07-18T17:20:01Z")

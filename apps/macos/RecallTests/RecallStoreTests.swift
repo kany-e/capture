@@ -1539,6 +1539,93 @@ final class RecallStoreTests: XCTestCase {
         XCTAssertEqual(store.selectedCaptureID, store.captures.first?.id)
     }
 
+    func testClipboardWarningAutomaticallyExpires() async {
+        let store = RecallStore(
+            client: RecordingAPIClient(),
+            clipboardService: ClipboardServiceStub(
+                result: .failure(ClipboardCaptureError.noText)
+            ),
+            noticeTimeoutOverrideNanoseconds: 1_000_000
+        )
+
+        XCTAssertFalse(store.prepareClipboardCapture())
+        XCTAssertEqual(store.notice?.scope, .clipboard)
+        await waitUntil { store.notice == nil }
+    }
+
+    func testSortPreferenceRequestsBackendAndPersists() async {
+        let suiteName = "RecallStoreTests.sort.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let client = RecordingAPIClient()
+        let store = RecallStore(
+            client: client,
+            clipboardService: ClipboardServiceStub(
+                result: .failure(ClipboardCaptureError.noText)
+            ),
+            sortingPreferenceUserDefaults: defaults
+        )
+
+        await store.start()
+        await store.setSortOrder(.editedOldest)
+
+        XCTAssertEqual(store.sortOrder, .editedOldest)
+        XCTAssertEqual(
+            defaults.string(forKey: RecallStore.captureSortOrderUserDefaultsKey),
+            CaptureSortOrder.editedOldest.rawValue
+        )
+        let requests = await client.allRequestedSortOrders()
+        XCTAssertEqual(requests, [.createdNewest, .editedOldest])
+    }
+
+    func testUpdateCapturePublishesUserLayerAndStaleAIState() async throws {
+        let original = try JSONDecoder().decode(
+            Capture.self,
+            from: ContractFixtures.readyCaptureData()
+        )
+        var updated = original
+        updated.userEditedAt = "2026-07-21T20:00:00Z"
+        updated.userTitle = "My title"
+        updated.userTags = ["manual"]
+        updated.aiContentStale = true
+        updated.aiInterpretationHidden = true
+        let client = RecordingAPIClient(
+            listedCaptures: [original],
+            updateResponse: updated
+        )
+        let store = RecallStore(
+            client: client,
+            clipboardService: ClipboardServiceStub(
+                result: .failure(ClipboardCaptureError.noText)
+            )
+        )
+        await store.start()
+        let request = CaptureUpdateRequest(
+            selectedText: "Corrected source",
+            userNote: "Updated note",
+            sourceApp: nil,
+            sourceTitle: nil,
+            sourceURL: nil,
+            userTitle: "My title",
+            userProblem: nil,
+            userKeyInsight: nil,
+            userWhySaved: nil,
+            userCaveats: nil,
+            userTags: ["manual"],
+            showAIInterpretation: true
+        )
+
+        let saved = await store.updateCapture(id: original.id, request: request)
+
+        XCTAssertTrue(saved)
+        XCTAssertEqual(store.selectedCapture?.displayTitle, "My title")
+        XCTAssertEqual(store.selectedCapture?.displayTags, ["manual"])
+        XCTAssertTrue(store.selectedCapture?.aiContentStale == true)
+        XCTAssertEqual(store.notice?.style, .warning)
+        let requests = await client.allUpdateRequests()
+        XCTAssertEqual(requests, [request])
+    }
+
     private func waitUntil(
         timeoutIterations: Int = 100,
         condition: @escaping @MainActor () -> Bool
@@ -1726,6 +1813,8 @@ private actor RecordingAPIClient: RecallAPIClient {
     private var createRequests: [CaptureCreateRequest] = []
     private var imageCreateRequests: [ImageCaptureUploadRequest] = []
     private var deletedCaptureIDs: [String] = []
+    private var updateRequests: [CaptureUpdateRequest] = []
+    private var requestedSortOrders: [CaptureSortOrder] = []
     private var searchQueries: [String] = []
     private var detailRequests = 0
     private var listRequests = 0
@@ -1742,6 +1831,7 @@ private actor RecordingAPIClient: RecallAPIClient {
     private let healthResponse: HealthResponse
     private let screenshotOCRText: String
     private let screenshotOCRDelayNanoseconds: UInt64
+    private let updateResponse: Capture?
 
     init(
         failFirstCreate: Bool = false,
@@ -1755,6 +1845,7 @@ private actor RecordingAPIClient: RecallAPIClient {
         searchDelayNanoseconds: UInt64 = 0,
         screenshotOCRText: String = "Extracted screenshot text",
         screenshotOCRDelayNanoseconds: UInt64 = 0,
+        updateResponse: Capture? = nil,
         healthResponse: HealthResponse = HealthResponse(
             status: "ok",
             database: "ok",
@@ -1773,6 +1864,7 @@ private actor RecordingAPIClient: RecallAPIClient {
         self.healthResponse = healthResponse
         self.screenshotOCRText = screenshotOCRText
         self.screenshotOCRDelayNanoseconds = screenshotOCRDelayNanoseconds
+        self.updateResponse = updateResponse
     }
 
     func creationCount() -> Int {
@@ -1793,6 +1885,14 @@ private actor RecordingAPIClient: RecallAPIClient {
 
     func allDeletedCaptureIDs() -> [String] {
         deletedCaptureIDs
+    }
+
+    func allUpdateRequests() -> [CaptureUpdateRequest] {
+        updateRequests
+    }
+
+    func allRequestedSortOrders() -> [CaptureSortOrder] {
+        requestedSortOrders
     }
 
     func searchCount() -> Int {
@@ -1855,6 +1955,15 @@ private actor RecordingAPIClient: RecallAPIClient {
         )
     }
 
+    func listCaptures(
+        limit: Int,
+        offset: Int,
+        sort: CaptureSortOrder
+    ) async throws -> CaptureListEnvelope {
+        requestedSortOrders.append(sort)
+        return try await listCaptures(limit: limit, offset: offset)
+    }
+
     func getCapture(id: String) async throws -> Capture {
         detailRequests += 1
         if detailDelayNanoseconds > 0 {
@@ -1873,6 +1982,18 @@ private actor RecordingAPIClient: RecallAPIClient {
             code: "capture_not_found",
             message: "Capture was not found."
         )
+    }
+
+    func updateCapture(id: String, request: CaptureUpdateRequest) async throws -> Capture {
+        updateRequests.append(request)
+        guard let updateResponse else {
+            throw RecallAPIError.http(
+                statusCode: 501,
+                code: "capture_update_unavailable",
+                message: "Capture editing is not configured in this test."
+            )
+        }
+        return updateResponse
     }
 
     func search(query: String, limit: Int) async throws -> SearchResponse {

@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from app.api_models import CaptureCreateRequest, CaptureResponse
 from app.config import REPOSITORY_ROOT, get_settings
+from app.database import database_connection
 from app.enrichment import (
     EnrichmentPayload,
     EnrichmentProviderError,
@@ -22,7 +23,7 @@ from app.main import (
     get_ocr_provider,
     get_repository,
 )
-from app.models import NewCapture
+from app.models import CaptureUserUpdate, NewCapture
 from app.ocr import (
     InvalidOCROutputError,
     OCRFailure,
@@ -494,6 +495,152 @@ def test_concurrent_enrichment_is_rejected(
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "capture_already_processing"
+
+
+def test_capture_edit_uses_user_layer_and_marks_prior_ai_stale(
+    api_client: tuple[TestClient, Path],
+) -> None:
+    client, database_path = api_client
+    app.dependency_overrides[get_enrichment_provider] = SuccessfulProvider
+    created = client.post("/v1/captures", json=fixture_request()).json()
+    ready = client.get(f"/v1/captures/{created['id']}").json()
+
+    response = client.patch(
+        f"/v1/captures/{created['id']}",
+        json={
+            "selected_text": "User-corrected selected content",
+            "user_note": "Updated personal note",
+            "source_app": "Safari",
+            "source_title": "Corrected source title",
+            "source_url": "https://example.com/corrected",
+            "user_title": "My durable title",
+            "user_problem": "My framing",
+            "user_key_insight": "My insight",
+            "user_why_saved": "My reason",
+            "user_caveats": [],
+            "user_tags": ["manual-tag"],
+            "show_ai_interpretation": True,
+        },
+    )
+
+    assert response.status_code == 200
+    edited = response.json()
+    assert edited["selected_text"] == "User-corrected selected content"
+    assert edited["user_selected_text"] == "User-corrected selected content"
+    assert edited["user_title"] == "My durable title"
+    assert edited["user_problem"] == "My framing"
+    assert edited["user_tags"] == ["manual-tag"]
+    assert edited["ai_title"] == ready["ai_title"]
+    assert edited["ai_content_stale"] is True
+    assert edited["ai_interpretation_hidden"] is True
+    assert edited["user_edited_at"] is not None
+
+    with database_connection(database_path) as connection:
+        raw = connection.execute(
+            "SELECT selected_text, source_app, ai_title FROM captures WHERE id = ?",
+            (created["id"],),
+        ).fetchone()
+    assert raw is not None
+    assert raw["selected_text"] == ready["selected_text"]
+    assert raw["source_app"] == ready["source_app"]
+    assert raw["ai_title"] == ready["ai_title"]
+
+    search = client.get("/v1/search", params={"q": "manual-tag"})
+    assert search.status_code == 200
+    assert search.json()["results"][0]["capture"]["id"] == created["id"]
+
+
+def test_capture_edit_is_rejected_during_processing(
+    api_client: tuple[TestClient, Path],
+) -> None:
+    client, database_path = api_client
+    capture = CaptureRepository(database_path, initialize=False).create(
+        NewCapture(
+            captured_at="2026-07-18T19:00:00Z",
+            source_type="clipboard",
+            selected_text="processing source",
+        ),
+        status="processing",
+    )
+
+    response = client.patch(
+        f"/v1/captures/{capture.id}",
+        json={"selected_text": "new source"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "capture_processing"
+
+
+def test_partial_capture_edit_preserves_omitted_user_overrides(
+    api_client: tuple[TestClient, Path],
+) -> None:
+    client, _ = api_client
+    app.dependency_overrides[get_enrichment_provider] = SuccessfulProvider
+    created = client.post("/v1/captures", json=fixture_request()).json()
+    first = client.patch(
+        f"/v1/captures/{created['id']}",
+        json={
+            "selected_text": "Corrected source",
+            "source_title": "Corrected source title",
+            "user_title": "First user title",
+            "user_tags": ["manual"],
+        },
+    )
+
+    second = client.patch(
+        f"/v1/captures/{created['id']}",
+        json={"user_title": "Second user title"},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    updated = second.json()
+    assert updated["selected_text"] == "Corrected source"
+    assert updated["user_selected_text"] == "Corrected source"
+    assert updated["source_title"] == "Corrected source title"
+    assert updated["user_source_title"] == "Corrected source title"
+    assert updated["user_title"] == "Second user title"
+    assert updated["user_tags"] == ["manual"]
+    assert updated["ai_content_stale"] is True
+    assert updated["ai_interpretation_hidden"] is True
+
+
+def test_capture_list_accepts_explicit_time_sort(
+    api_client: tuple[TestClient, Path],
+) -> None:
+    client, database_path = api_client
+    repository = CaptureRepository(database_path, initialize=False)
+    first = repository.create(
+        NewCapture(
+            captured_at="2026-07-18T19:00:00Z",
+            source_type="clipboard",
+            selected_text="first",
+        ),
+        status="ready",
+    )
+    second = repository.create(
+        NewCapture(
+            captured_at="2026-07-18T19:01:00Z",
+            source_type="clipboard",
+            selected_text="second",
+        ),
+        status="ready",
+    )
+    repository.update_user_fields(
+        first.id,
+        CaptureUserUpdate(selected_text=first.selected_text),
+    )
+
+    created_desc = client.get(
+        "/v1/captures", params={"sort": "created_desc"}
+    ).json()["items"]
+    edited_desc = client.get(
+        "/v1/captures", params={"sort": "edited_desc"}
+    ).json()["items"]
+
+    assert [item["id"] for item in created_desc] == [second.id, first.id]
+    assert [item["id"] for item in edited_desc] == [first.id, second.id]
 
 
 def test_unknown_capture_enrichment_returns_404(

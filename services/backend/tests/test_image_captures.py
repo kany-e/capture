@@ -60,6 +60,7 @@ def post_image(
 class SuccessfulImageProvider:
     def __init__(self) -> None:
         self.calls: list[tuple[str, bytes, str]] = []
+        self.contexts: list[CaptureRecord] = []
 
     def analyze(
         self,
@@ -68,6 +69,7 @@ class SuccessfulImageProvider:
         media_type: str,
     ) -> ImageEnrichmentPayload:
         self.calls.append((capture.id, image, media_type))
+        self.contexts.append(capture)
         return ImageEnrichmentPayload(
             extracted_text="Logistic Growth\nln absolute values",
             title="Logistic growth derivation diagram",
@@ -83,7 +85,11 @@ class SuccessfulImageProvider:
 
 
 class SuccessfulEmbeddingProvider:
-    def embed(self, _text: str) -> list[float]:
+    def __init__(self) -> None:
+        self.inputs: list[str] = []
+
+    def embed(self, text: str) -> list[float]:
+        self.inputs.append(text)
         return [1.0, 0.0]
 
 
@@ -200,6 +206,42 @@ def test_image_note_ai_analysis_populates_searchable_ocr_and_visual_fields(
     assert search.json()["results"][0]["capture"]["attachments"] == created[
         "attachments"
     ]
+
+
+def test_reanalyzing_edited_image_uses_corrected_visible_text(
+    image_api_client: tuple[TestClient, Path],
+) -> None:
+    client, _ = image_api_client
+    provider = SuccessfulImageProvider()
+    embedding_provider = SuccessfulEmbeddingProvider()
+    app.dependency_overrides[get_image_enrichment_provider] = lambda: provider
+    app.dependency_overrides[get_embedding_provider] = lambda: embedding_provider
+    created = post_image(
+        client,
+        image=png_image(),
+        metadata=image_metadata(analyze=True),
+    ).json()
+    corrected_text = "User-corrected formula: ln |K-y|"
+
+    edited = client.patch(
+        f"/v1/captures/{created['id']}",
+        json={
+            "selected_text": corrected_text,
+            "user_note": "Use my corrected transcription.",
+        },
+    )
+    refreshed = client.post(f"/v1/captures/{created['id']}/enrich")
+    loaded = client.get(f"/v1/captures/{created['id']}").json()
+
+    assert edited.status_code == 200
+    assert refreshed.status_code == 202
+    assert len(provider.contexts) == 2
+    assert provider.contexts[-1].selected_text == corrected_text
+    assert provider.contexts[-1].user_selected_text == corrected_text
+    assert corrected_text in embedding_provider.inputs[-1]
+    assert loaded["selected_text"] == corrected_text
+    assert loaded["user_selected_text"] == corrected_text
+    assert loaded["ai_content_stale"] is False
 
 
 def test_requested_image_analysis_without_provider_keeps_original_and_errors(

@@ -63,6 +63,11 @@ the local engineering URLs:
 > `rollback/pre-screenshot-ocr`. See the backend README before replacing or
 > moving a database.
 
+> **Migration 005 boundary:** editable memories add explicit user-override and
+> user-edit timestamp columns, then rebuild the FTS projection to prefer those
+> values. Preserve a pre-upgrade database backup before starting this version;
+> older backends intentionally reject the newer schema.
+
 ```bash
 ./scripts/dev.sh
 ```
@@ -204,6 +209,22 @@ search and AI processing. This boundary expands the macOS suite from 43 to 48
 tests. PR #9 merged D-030 into `main` at `0c1083e` after all required checks
 passed.
 
+D-039 brings the current Chrome suite to 70/70. The toolbar and inline surfaces
+reuse Recall's pink icon and palette; a dedicated extension Settings page now
+shows the active shortcut and owns the optional inline-access toggle. The popup
+uses a deterministic 380 × 560 root with a scrollable/resizable selection
+preview and fixed-height Save button. Inline page titles wrap, and the branded
+header can move the composer within the visible viewport. These layouts passed
+bounded real-Chrome acceptance without changing the user's disabled inline-
+access preference.
+
+D-040 treats the 128-pixel Chrome logo as the canonical browser artwork and
+derives the required 16-, 32-, and 48-pixel manifest assets from it. The toolbar
+popup's Page title and URL now wrap inside their own scrollable region. Native
+menu-bar and Quick Capture surfaces share a new monochrome vector rendering of
+the same Recall mark, allowing the menu-bar icon to follow the current macOS
+appearance without using the colored app-icon square.
+
 D-031 adds configurable native global screenshot and clipboard capture without
 changing the API, schemas, backend, extension, or screenshot privacy boundary.
 Registration changes are transactional, failures remain visible in the menu
@@ -273,9 +294,19 @@ OCR plus visual indexing into the existing search fields. Provider errors keep
 the original safe and support **Retry AI**. The user verified real-app image
 notes with AI both disabled and enabled.
 
-The integrated D-036/D-037 tree passes 235 backend tests, 44/44 stress
-scenarios, 184/184 macOS tests, and
-68/68 Chrome-extension tests.
+D-038 adds editable memories while retaining provenance. Captured source and AI
+columns remain intact; user corrections, title/details/tags, and AI visibility
+live in an explicit user layer. Source or note edits mark the prior AI
+interpretation stale and hide it until **Refresh AI** is requested. The library
+can sort by creation or user-edit time in either direction, uses stable minute-
+level timestamps, and gives connection, clipboard, save, and processing notices
+state-aware lifetimes. Settings is split into Shortcuts and Privacy & Features,
+and the image-note review layout no longer shifts when AI indexing is toggled.
+
+The integrated D-038/D-040 tree passes 243 backend tests, 44/44 stress scenarios,
+189/189 macOS tests, and 70/70 Chrome-extension tests. User acceptance now also
+covers the edit, sort, notice, Settings, image-composer, popup Page metadata,
+menu-bar logo, and Quick Capture logo interactions.
 
 Live verification covers provider-off keyword fallback, real OpenAI enrichment
 and embeddings, semantic retrieval with a non-null score, and both selected-text

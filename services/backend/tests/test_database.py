@@ -22,8 +22,8 @@ def test_database_connection_allows_bounded_write_lock_queueing(
 def test_migrations_are_idempotent_and_complete(tmp_path: Path) -> None:
     database_path = tmp_path / "recall.db"
 
-    assert apply_migrations(database_path) == 4
-    assert apply_migrations(database_path) == 4
+    assert apply_migrations(database_path) == 5
+    assert apply_migrations(database_path) == 5
 
     with database_connection(database_path) as connection:
         tables = {
@@ -61,6 +61,11 @@ def test_migrations_are_idempotent_and_complete(tmp_path: Path) -> None:
         "caveats_json",
         "embedding_json",
         "enrichment_version",
+        "user_edited_at",
+        "user_selected_text",
+        "user_tags_json",
+        "ai_interpretation_hidden",
+        "ai_content_stale",
     }.issubset(columns)
     assert fts_columns == [
         "capture_id",
@@ -82,6 +87,7 @@ def test_migrations_are_idempotent_and_complete(tmp_path: Path) -> None:
         (2, "fts5_keyword_search"),
         (3, "screenshot_source_type"),
         (4, "image_attachments"),
+        (5, "user_editing"),
     ]
     assert triggers == {
         "captures_fts_after_insert",
@@ -129,7 +135,7 @@ def test_fts_migration_backfills_existing_capture(tmp_path: Path) -> None:
         )
         connection.commit()
 
-    assert apply_migrations(database_path) == 4
+    assert apply_migrations(database_path) == 5
 
     with database_connection(database_path) as connection:
         row = connection.execute(

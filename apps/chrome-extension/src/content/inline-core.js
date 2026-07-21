@@ -55,6 +55,26 @@
     return Math.min(Math.max(value, minimum), Math.max(minimum, maximum));
   }
 
+  function clampOverlayPosition(
+    position,
+    size,
+    viewport,
+    { padding = 8 } = {},
+  ) {
+    return {
+      left: clamp(
+        position.left,
+        padding,
+        viewport.width - size.width - padding,
+      ),
+      top: clamp(
+        position.top,
+        padding,
+        viewport.height - size.height - padding,
+      ),
+    };
+  }
+
   function placeOverlay(
     anchor,
     size,
@@ -303,6 +323,7 @@
 
   global.RecallInlineCore = Object.freeze({
     STATES,
+    clampOverlayPosition,
     createLatestTaskGate,
     createListenerRegistry,
     createStateMachine,

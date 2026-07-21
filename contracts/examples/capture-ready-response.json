@@ -42,5 +42,18 @@
   ],
   "error_message": null,
   "enrichment_version": 1,
+  "user_edited_at": null,
+  "user_selected_text": null,
+  "user_source_app": null,
+  "user_source_title": null,
+  "user_source_url": null,
+  "user_title": null,
+  "user_problem": null,
+  "user_key_insight": null,
+  "user_why_saved": null,
+  "user_caveats": null,
+  "user_tags": null,
+  "ai_interpretation_hidden": false,
+  "ai_content_stale": false,
   "attachments": []
 }

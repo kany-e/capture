@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Recall extension settings</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <main class="settings-shell">
+      <header class="settings-header">
+        <img
+          class="brand-mark"
+          src="../../assets/icons/icon128.png"
+          alt=""
+          width="56"
+          height="56"
+        />
+        <div>
+          <p class="eyebrow">Recall</p>
+          <h1>Extension settings</h1>
+          <p class="intro">Choose how Recall appears while you browse.</p>
+        </div>
+      </header>
+
+      <section class="settings-card" aria-labelledby="shortcut-title">
+        <div class="card-copy">
+          <p class="section-label">Keyboard</p>
+          <h2 id="shortcut-title">Open Recall capture</h2>
+          <p>Chrome manages extension shortcuts so they cannot be changed silently.</p>
+        </div>
+        <div class="shortcut-row">
+          <span id="shortcut-value" class="shortcut-value" aria-live="polite">
+            Checking…
+          </span>
+          <button id="shortcut-button" class="secondary-button" type="button">
+            Change shortcut in Chrome
+          </button>
+        </div>
+      </section>
+
+      <section class="settings-card" aria-labelledby="inline-setting-title">
+        <div class="toggle-row">
+          <div class="card-copy">
+            <p class="section-label">Selected text</p>
+            <label id="inline-setting-title" for="inline-capture-toggle">
+              Show Add to Recall when I select text
+            </label>
+            <p>
+              Optional website access. Selected text stays on the page until you
+              explicitly save it.
+            </p>
+          </div>
+          <label class="switch">
+            <input
+              id="inline-capture-toggle"
+              type="checkbox"
+              aria-describedby="inline-permission-status"
+              disabled
+            />
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+        <p
+          id="inline-permission-status"
+          class="inline-permission-status"
+          role="status"
+          aria-live="polite"
+          hidden
+        ></p>
+      </section>
+    </main>
+    <script type="module" src="settings.js"></script>
+  </body>
+</html>

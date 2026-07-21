@@ -9,17 +9,39 @@
   <body>
     <main class="popup-shell" aria-label="Save to Recall">
       <header class="brand-row">
-        <span class="brand-mark" aria-hidden="true">R</span>
+        <img
+          class="brand-mark"
+          src="../../assets/icons/icon32.png"
+          alt=""
+          width="36"
+          height="36"
+        />
         <div>
           <p class="eyebrow">Recall</p>
           <h1>Save this context</h1>
         </div>
+        <button
+          id="settings-button"
+          class="settings-button"
+          type="button"
+          aria-label="Open Recall extension settings"
+          title="Settings"
+        >
+          <span aria-hidden="true">&#9881;</span>
+        </button>
       </header>
 
       <section class="source-card" aria-labelledby="source-title-label">
         <p class="section-label" id="source-title-label">Page</p>
-        <h2 id="page-title">Reading the active page…</h2>
-        <p id="page-url" class="page-url"></p>
+        <div
+          class="source-content"
+          role="region"
+          aria-label="Page title and address"
+          tabindex="0"
+        >
+          <h2 id="page-title">Reading the active page…</h2>
+          <p id="page-url" class="page-url"></p>
+        </div>
       </section>
 
       <section class="preview-section" aria-labelledby="preview-label">
@@ -55,27 +77,6 @@
 
       <button id="save-button" type="button" disabled>Save</button>
 
-      <section class="inline-setting" aria-labelledby="inline-setting-title">
-        <div>
-          <label id="inline-setting-title" for="inline-capture-toggle">
-            Show Add to Recall when I select text
-          </label>
-          <p>Optional website access · nothing is sent until you save</p>
-        </div>
-        <input
-          id="inline-capture-toggle"
-          type="checkbox"
-          aria-describedby="inline-permission-status"
-          disabled
-        />
-      </section>
-      <p
-        id="inline-permission-status"
-        class="inline-permission-status"
-        role="status"
-        aria-live="polite"
-        hidden
-      ></p>
     </main>
     <script type="module" src="popup.js"></script>
   </body>

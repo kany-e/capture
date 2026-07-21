@@ -133,6 +133,19 @@ All Capture-returning endpoints use this complete shape:
   ],
   "error_message": null,
   "enrichment_version": 1,
+  "user_edited_at": null,
+  "user_selected_text": null,
+  "user_source_app": null,
+  "user_source_title": null,
+  "user_source_url": null,
+  "user_title": null,
+  "user_problem": null,
+  "user_key_insight": null,
+  "user_why_saved": null,
+  "user_caveats": null,
+  "user_tags": null,
+  "ai_interpretation_hidden": false,
+  "ai_content_stale": false,
   "attachments": []
 }
 ```
@@ -157,6 +170,16 @@ Captures always return `attachments: []`.
 
 `embedding_json` is an internal persistence field and is never returned to
 clients.
+
+The ordinary source fields in a response are the effective display/search
+values. When a user corrects captured source metadata, the original database
+columns remain unchanged and the corresponding `user_selected_text` or
+`user_source_*` field records the explicit override. `user_title`,
+`user_problem`, `user_key_insight`, `user_why_saved`, `user_caveats`, and
+`user_tags` form a separate user-organization layer; `null` means use the AI
+value, while an empty string or array deliberately hides that AI field.
+`user_edited_at` changes only after an explicit user edit. `updated_at` remains
+the broader system revision time and can also change during AI processing.
 
 ### Field-state rules
 
@@ -219,7 +242,7 @@ Only a successfully enriched Capture is embedded. The exact projection is:
 
 ```text
 TITLE:
-{ai_title}
+{user_title ?? ai_title}
 
 SUMMARY:
 {ai_summary}
@@ -228,16 +251,16 @@ USER NOTE:
 {user_note}
 
 SELECTED CONTENT:
-{selected_text}
+{user_selected_text ?? selected_text}
 
 PROBLEM:
-{problem}
+{user_problem ?? problem}
 
 KEY INSIGHT:
-{key_insight}
+{user_key_insight ?? key_insight}
 
 TAGS:
-{tags}
+{user_tags ?? tags}
 
 SEARCH ALIASES:
 {search_aliases}
@@ -250,8 +273,11 @@ Construction rules:
 3. Trim leading and trailing whitespace from each value.
 4. Preserve internal whitespace in `user_note` and `selected_text`.
 5. Render missing scalar values as an empty string.
-6. Render `tags` and `search_aliases` by joining stored values with `, `.
-7. Use the configured `OPENAI_EMBEDDING_MODEL` for both Capture and query
+6. Explicit user title, selected-content, problem, key-insight, and tag
+   overrides take precedence over their captured/AI fallback in the projection.
+7. Render effective `tags` and `search_aliases` by joining stored values with
+   `, `.
+8. Use the configured `OPENAI_EMBEDDING_MODEL` for both Capture and query
    embeddings.
 
 See [`examples/embedding-input.txt`](examples/embedding-input.txt).
@@ -332,12 +358,15 @@ limit. The client keeps it as reviewed source content and keeps the optional
 with `source_type: "screenshot"`. Apple Vision is a macOS-local implementation
 of the same user-facing extraction step and does not call this endpoint.
 
-### `GET /v1/captures?limit=50&offset=0`
+### `GET /v1/captures?limit=50&offset=0&sort=created_desc`
 
 - Success: `200 OK`
 - Default order: `created_at DESC`
 - `limit`: integer, default `50`, range `1...100`
 - `offset`: integer, default `0`, minimum `0`
+- `sort`: `created_desc`, `created_asc`, `edited_desc`, or `edited_asc`.
+  Edited ordering uses `COALESCE(user_edited_at, created_at)`, so an unedited
+  Capture has a stable position.
 
 ```json
 {
@@ -351,6 +380,45 @@ of the same user-facing extraction step and does not call this endpoint.
 
 - Success: `200 OK` with one Capture
 - Unknown ID: `404 Not Found`
+
+### `PATCH /v1/captures/{id}`
+
+Applies explicit user edits without overwriting captured or AI-generated
+columns. The request may contain corrected selected content/source metadata,
+the current user note, a user title, user-organized memory details and tags,
+and `show_ai_interpretation`.
+
+This is a true partial update: omitted fields retain their current user-layer
+value. An explicit JSON `null` clears the corresponding override and returns to
+the captured/AI fallback; an empty string or array remains an intentional
+user-visible blank.
+
+- Success: `200 OK` with the updated Capture
+- Unknown ID: `404 Not Found`
+- Capture currently processing: `409 Conflict` with `capture_processing`
+- Source, source-metadata, or user-note changes set `ai_content_stale: true`
+  and force `ai_interpretation_hidden: true`.
+- Title/detail/tag-only edits do not make AI stale. User overrides remain
+  separate and take display/FTS precedence.
+- The edit clears the prior embedding because its searchable projection may no
+  longer be current. Keyword retrieval updates in the same SQLite transaction.
+
+```json
+{
+  "selected_text": "Corrected selected content",
+  "user_note": "Updated personal note",
+  "source_app": "Safari",
+  "source_title": "Corrected source title",
+  "source_url": "https://example.com/corrected",
+  "user_title": "My durable title",
+  "user_problem": "My framing of the problem",
+  "user_key_insight": "",
+  "user_why_saved": "Why I still need this",
+  "user_caveats": [],
+  "user_tags": ["manual", "reference"],
+  "show_ai_interpretation": true
+}
+```
 
 ### `GET /v1/attachments/{id}/content`
 
@@ -375,6 +443,11 @@ Queues or starts a new enrichment attempt without changing original fields.
 - Unknown ID: `404 Not Found`
 - Already processing: `409 Conflict`
 - OpenAI not configured: `503 Service Unavailable`
+
+An explicit refresh uses the effective corrected source and current user note.
+It replaces only the AI layer, clears the stale/hidden flags when the attempt
+finishes, and keeps user title/detail/tag overrides intact. Recall never queues
+this refresh automatically after an edit.
 
 ### Enrichment polling
 

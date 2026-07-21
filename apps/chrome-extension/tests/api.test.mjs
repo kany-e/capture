@@ -186,7 +186,7 @@ test("manifest has only the approved permissions and fixed backend access", asyn
   ]);
 
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "0.3.0");
+  assert.equal(manifest.version, "0.4.0");
   assert.equal(packageMetadata.version, manifest.version);
   assert.deepEqual(manifest.permissions.sort(), [
     "activeTab",
@@ -203,6 +203,15 @@ test("manifest has only the approved permissions and fixed backend access", asyn
     type: "module",
   });
   assert.equal(manifest.action.default_popup, "src/popup/popup.html");
+  assert.deepEqual(manifest.options_ui, {
+    page: "src/settings/settings.html",
+    open_in_tab: true,
+  });
+  assert.deepEqual(manifest.web_accessible_resources, [{
+    resources: ["assets/icons/icon32.png"],
+    matches: ["http://*/*", "https://*/*"],
+    use_dynamic_url: true,
+  }]);
   assert.deepEqual(manifest.icons, {
     16: "assets/icons/icon16.png",
     32: "assets/icons/icon32.png",
@@ -229,7 +238,7 @@ test("manifest has only the approved permissions and fixed backend access", asyn
 });
 
 
-test("popup preserves toolbar capture while exposing opt-in inline access", async () => {
+test("popup preserves toolbar capture with branded, stable, scrollable controls", async () => {
   const [html, popupSource, popupStyles] = await Promise.all([
     readFile(`${extensionRoot}/src/popup/popup.html`, "utf8"),
     readFile(`${extensionRoot}/src/popup/popup.js`, "utf8"),
@@ -243,27 +252,61 @@ test("popup preserves toolbar capture while exposing opt-in inline access", asyn
   assert.match(html, /Ctrl\/⌘/);
   assert.match(html, /aria-describedby="note-count save-hint retry-warning"/);
   assert.match(html, /Retry uses the original source and note\./);
-  assert.match(html, /Show Add to Recall when I select text/);
-  assert.match(html, /id="inline-capture-toggle"[\s\S]*disabled/);
+  assert.match(html, /src="\.\.\/\.\.\/assets\/icons\/icon32\.png"/);
+  assert.match(html, /id="settings-button"/);
+  assert.match(html, /class="source-content"[\s\S]*tabindex="0"/);
+  assert.doesNotMatch(html, /Show Add to Recall when I select text/);
   assert.match(popupSource, /"Saved\."/);
   assert.match(popupSource, /"Your source and note are safely stored\."/);
   assert.match(popupSource, /sendCaptureAttempt\(attempt\)/);
-  assert.match(popupSource, /createInlinePermissionController\(\)/);
+  assert.match(popupSource, /chrome\.runtime\.openOptionsPage\(\)/);
+  assert.doesNotMatch(popupSource, /createInlinePermissionController/);
   assert.match(popupSource, /chrome\.storage\.local\.remove/);
   assert.match(popupSource, /event\.metaKey \|\| event\.ctrlKey/);
   assert.match(popupSource, /setAttribute\("aria-invalid"/);
   assert.match(popupSource, /window\.close\(\)/);
   assert.match(popupSource, /characters?" : "characters/);
   assert.match(popupSource, /Note: \$\{characterCount\.toLocaleString\(\)\}/);
-  assert.match(popupStyles, /:root \{[^}]*width: 344px;/);
-  assert.match(popupStyles, /:root \{[^}]*height: 510px;/);
+  assert.match(popupStyles, /:root \{[^}]*width: 380px;/);
+  assert.match(popupStyles, /:root \{[^}]*height: 560px;/);
   assert.match(popupStyles, /body \{[^}]*width: 100%;/);
   assert.match(popupStyles, /body \{[^}]*height: 100%;/);
   assert.match(popupStyles, /\.popup-shell \{[^}]*height: 100%;/);
   assert.match(popupStyles, /\.popup-shell \{[^}]*overflow-y: auto;/);
+  assert.match(popupStyles, /\.popup-shell \{[^}]*display: flex;/);
+  assert.match(popupStyles, /\.selection-preview \{[^}]*overflow: auto;/);
+  assert.match(popupStyles, /\.selection-preview \{[^}]*resize: vertical;/);
+  assert.match(popupStyles, /\.source-content \{[^}]*overflow: auto;/);
+  assert.match(popupStyles, /\.source-content \{[^}]*max-height: 82px;/);
+  assert.match(popupStyles, /\.source-card h2 \{[^}]*white-space: normal;/);
+  assert.match(popupStyles, /\.page-url \{[^}]*white-space: normal;/);
+  assert.doesNotMatch(popupStyles, /\.source-card h2 \{[^}]*text-overflow: ellipsis;/);
+  assert.doesNotMatch(popupStyles, /-webkit-line-clamp/);
+  assert.match(popupStyles, /#save-button \{[^}]*height: 40px;/);
+  assert.match(popupStyles, /#save-button \{[^}]*flex: 0 0 40px;/);
   assert.doesNotMatch(
     popupStyles,
     /(?:width|height|min-height|max-height):[^;]*(?:vh|dvh|svh|lvh)/,
     "an auto-sized extension popup cannot bootstrap its dimensions from its own viewport",
   );
+});
+
+
+test("settings owns inline access and links to Chrome shortcut management", async () => {
+  const [html, settingsSource, settingsStyles, popupSource] = await Promise.all([
+    readFile(`${extensionRoot}/src/settings/settings.html`, "utf8"),
+    readFile(`${extensionRoot}/src/settings/settings.js`, "utf8"),
+    readFile(`${extensionRoot}/src/settings/settings.css`, "utf8"),
+    readFile(`${extensionRoot}/src/popup/popup.js`, "utf8"),
+  ]);
+
+  assert.match(html, /Show Add to Recall when I select text/);
+  assert.match(html, /id="inline-capture-toggle"[\s\S]*disabled/);
+  assert.match(html, /src="\.\.\/\.\.\/assets\/icons\/icon128\.png"/);
+  assert.match(settingsSource, /createInlinePermissionController\(\)/);
+  assert.match(settingsSource, /chrome\.commands\.getAll\(\)/);
+  assert.match(settingsSource, /chrome:\/\/extensions\/shortcuts/);
+  assert.match(settingsSource, /chrome\.tabs\.create/);
+  assert.match(settingsStyles, /#c92f63/);
+  assert.doesNotMatch(popupSource, /inline-capture-toggle/);
 });

@@ -31,14 +31,27 @@ def _projection_value(value: str | None) -> str:
 def build_embedding_input(capture: CaptureRecord) -> str:
     """Build the exact product-plan §12.1 projection with a final newline."""
 
+    title = capture.user_title if capture.user_title is not None else capture.ai_title
+    selected_text = (
+        capture.user_selected_text
+        if capture.user_selected_text is not None
+        else capture.selected_text
+    )
+    problem = capture.user_problem if capture.user_problem is not None else capture.problem
+    key_insight = (
+        capture.user_key_insight
+        if capture.user_key_insight is not None
+        else capture.key_insight
+    )
+    tags = capture.user_tags if capture.user_tags is not None else capture.tags
     fields = (
-        ("TITLE", capture.ai_title),
+        ("TITLE", title),
         ("SUMMARY", capture.ai_summary),
         ("USER NOTE", capture.user_note),
-        ("SELECTED CONTENT", capture.selected_text),
-        ("PROBLEM", capture.problem),
-        ("KEY INSIGHT", capture.key_insight),
-        ("TAGS", ", ".join(_projection_value(value) for value in capture.tags)),
+        ("SELECTED CONTENT", selected_text),
+        ("PROBLEM", problem),
+        ("KEY INSIGHT", key_insight),
+        ("TAGS", ", ".join(_projection_value(value) for value in tags)),
         (
             "SEARCH ALIASES",
             ", ".join(

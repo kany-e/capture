@@ -5,7 +5,13 @@ protocol RecallAPIClient: Sendable {
     func createCapture(_ request: CaptureCreateRequest) async throws -> Capture
     func createImageCapture(_ request: ImageCaptureUploadRequest) async throws -> Capture
     func listCaptures(limit: Int, offset: Int) async throws -> CaptureListEnvelope
+    func listCaptures(
+        limit: Int,
+        offset: Int,
+        sort: CaptureSortOrder
+    ) async throws -> CaptureListEnvelope
     func getCapture(id: String) async throws -> Capture
+    func updateCapture(id: String, request: CaptureUpdateRequest) async throws -> Capture
     func attachmentData(contentPath: String) async throws -> Data
     func deleteCapture(id: String) async throws
     func search(query: String, limit: Int) async throws -> SearchResponse
@@ -14,6 +20,22 @@ protocol RecallAPIClient: Sendable {
 }
 
 extension RecallAPIClient {
+    func listCaptures(
+        limit: Int,
+        offset: Int,
+        sort: CaptureSortOrder
+    ) async throws -> CaptureListEnvelope {
+        try await listCaptures(limit: limit, offset: offset)
+    }
+
+    func updateCapture(id: String, request: CaptureUpdateRequest) async throws -> Capture {
+        throw RecallAPIError.http(
+            statusCode: 501,
+            code: "capture_update_unavailable",
+            message: "Capture editing is not available in this client."
+        )
+    }
+
     func createImageCapture(_ request: ImageCaptureUploadRequest) async throws -> Capture {
         throw RecallAPIError.http(
             statusCode: 501,
@@ -87,11 +109,20 @@ struct LiveRecallAPIClient: RecallAPIClient, Sendable {
     }
 
     func listCaptures(limit: Int, offset: Int) async throws -> CaptureListEnvelope {
+        try await listCaptures(limit: limit, offset: offset, sort: .createdNewest)
+    }
+
+    func listCaptures(
+        limit: Int,
+        offset: Int,
+        sort: CaptureSortOrder
+    ) async throws -> CaptureListEnvelope {
         try await send(
             path: ["v1", "captures"],
             queryItems: [
                 URLQueryItem(name: "limit", value: String(limit)),
                 URLQueryItem(name: "offset", value: String(offset)),
+                URLQueryItem(name: "sort", value: sort.rawValue),
             ],
             expectedStatusCodes: [200]
         )
@@ -100,6 +131,15 @@ struct LiveRecallAPIClient: RecallAPIClient, Sendable {
     func getCapture(id: String) async throws -> Capture {
         try await send(
             path: ["v1", "captures", id],
+            expectedStatusCodes: [200]
+        )
+    }
+
+    func updateCapture(id: String, request: CaptureUpdateRequest) async throws -> Capture {
+        try await send(
+            path: ["v1", "captures", id],
+            method: "PATCH",
+            body: request,
             expectedStatusCodes: [200]
         )
     }

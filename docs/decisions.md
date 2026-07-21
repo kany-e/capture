@@ -51,6 +51,9 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-035 | Opt-in transactional clipboard fallback for native selection | Compatibility/privacy safeguard | Implemented; 149/149 host tests and user WeChat acceptance pass |
 | D-036 | Conservative structured-text line restoration | Capture-correctness addition | Merged in PR #14; live Gemini clipboard payload verified |
 | D-037 | Persisted image notes with opt-in background visual indexing | Addition | Implemented; automated verification and real-app AI-disabled/AI-enabled acceptance pass |
+| D-038 | Editable memories with explicit user overrides and state-driven UI | Addition | Implemented and user-accepted on `codex/note-editing-ui-polish`; 243 backend, 44/44 stress, 68/68 Chrome, and 189/189 macOS checks pass |
+| D-039 | Branded Chrome settings and movable capture surfaces | Addition | Implemented and real-Chrome verified on `codex/note-editing-ui-polish`; 70/70 extension tests pass |
+| D-040 | Canonical browser icon and adaptive native brand mark | UI/UX addition | Implemented and user-accepted on `codex/note-editing-ui-polish`; 70/70 extension and 189/189 host macOS tests pass |
 
 ## D-001 — Localhost monorepo architecture
 
@@ -1062,6 +1065,56 @@ D-036 remains a separate capture-correctness decision and was merged through PR
 #14 before D-037 integration. The image-note model does not change its bounded
 structured-clipboard resolver.
 
+## D-038 — Editable memories with explicit user overrides and state-driven UI
+
+- Classification: Addition approved by user direction
+- Status: Implemented, automated-verified, and user-accepted on
+  `codex/note-editing-ui-polish`
+- Product impact: Users can correct and organize saved memories without making
+  user-authored changes indistinguishable from captured or AI-generated data
+- Schedule impact: Crosses migration, API, FTS, embedding invalidation, macOS
+  editing, sorting, notification lifecycle, Settings, and detail/list UI
+
+Migration 005 adds a user-edit layer rather than repurposing captured or AI
+columns. Corrected selected text and source metadata are stored as explicit
+overrides; the captured database values remain intact. A user title, problem,
+key insight, why-it-mattered value, caveats, and tags similarly take display and
+FTS precedence without replacing `ai_*`, `problem`, `tags_json`, or other model
+output. Empty user strings/arrays deliberately hide an inapplicable generated
+field, while `NULL` continues to mean “use the AI value.” The ordinary user note
+is user-owned and may be updated directly.
+
+`user_edited_at` records explicit edits only. Existing `updated_at` remains a
+broader system revision timestamp because AI state transitions also update it.
+Library ordering can use creation or user-edit time in either direction;
+unedited memories fall back to their creation time. Search results retain
+relevance order. Static minute-level list timestamps replace continuously
+updating relative seconds.
+
+Changing effective selected content, source metadata, or the user note marks
+the current AI interpretation stale and hides it. Recall does not silently call
+the provider after an edit: that would spend quota, transmit changed content,
+and replace context without a new explicit user action. The detail view instead
+offers **Refresh AI**, which uses the effective corrected source and current note,
+replaces only the AI layer, and preserves user organization overrides. Any edit
+invalidates the old embedding while trigger-synchronized FTS immediately indexes
+the effective user-visible values.
+
+Application notices now declare either a bounded lifetime or the state that
+resolves them. Clipboard warnings expire and clear on a later successful
+capture; connection errors clear after a successful health/list/search probe;
+processing notices become a short ready/error result when polling observes the
+terminal state. Settings separates shortcut registration from automatically
+saved privacy/features, and the screenshot image-note composer reserves fixed
+preview, description, and switch geometry so the AI toggle cannot resize or
+shift nearby content.
+
+The completed automated gate passes 243 backend tests, all 44 deterministic
+stress scenarios, all 68 Chrome-extension tests, and 189/189 host macOS tests,
+including production Apple Vision OCR. User acceptance on 2026-07-21 covered
+editing, sort ordering, notice resolution, Settings tabs, and stable image-
+composer geometry.
+
 ## D-036 — Conservative structured-text line restoration
 
 - Classification: Capture-correctness addition approved by user direction
@@ -1114,6 +1167,75 @@ D-036 changes no API, schema, migration, enrichment, FTS, or embedding
 projection. Persisting original HTML/RTF/Markdown, declaring a source-format
 field, or rendering Markdown/LaTeX requires a later reviewed contract and
 privacy decision. Image attachments remain a separate storage design.
+
+## D-039 — Branded Chrome settings and movable capture surfaces
+
+- Classification: UI/UX addition approved by user direction
+- Status: Implemented and real-Chrome verified on
+  `codex/note-editing-ui-polish`; 70/70 extension tests pass
+- Product impact: Makes browser capture visually consistent with Recall, moves
+  browser preferences out of the transient popup, and keeps long content usable
+- Schedule impact: Bounded Chrome-extension slice; no backend or data migration
+
+The toolbar popup, inline selection pill, and inline composer reuse Recall's
+checked-in pink icon and palette. The toolbar popup retains D-033's deterministic
+root-sizing rule at a roomier 380 × 560 pixels: its selected-text preview is
+vertically scrollable and resizable, while the Save button has a fixed 40-pixel
+height and cannot stretch with the note field.
+
+A dedicated Manifest V3 options page owns browser preferences. It shows the
+currently assigned `_execute_action` shortcut and links to Chrome's extension
+shortcut manager because the browser does not permit an extension to rewrite
+its command binding programmatically. The existing **Show Add to Recall when I
+select text** control moves from the popup to this page without changing its
+optional-permission, revocation, or off-by-default behavior.
+
+The inline composer's source title now wraps within two visible lines rather
+than widening the surface. Its branded header is a mouse/pointer drag handle;
+movement is clamped to the current viewport and a resize re-clamps an open
+composer. Dragging does not alter the host document layout or change submission,
+retry, BFCache, focus, or privacy state. The only new page-readable extension
+resource is the existing 32-pixel icon, scoped to HTTP/HTTPS origins; no new
+required permission is introduced.
+
+Real Chrome verified the popup, options page, current shortcut display, branded
+selection pill, wrapped long source title, and a composer dragged to the viewport
+edge. The user's inline-access preference remained off throughout this visual
+check; the isolated production-script harness exercised the inline UI without
+changing that permission.
+
+## D-040 — Canonical browser icon and adaptive native brand mark
+
+- Classification: UI/UX addition approved by user direction
+- Status: Implemented and user-accepted on `codex/note-editing-ui-polish`;
+  70/70 extension and 189/189 host macOS tests pass
+- Product impact: Keeps browser and native capture surfaces recognizable while
+  preserving platform-appropriate rendering and long Page metadata
+- Schedule impact: Bounded asset and presentation change; no API, storage, or
+  migration work
+
+The checked-in 128-pixel Chrome image is the canonical browser logo. Chrome's
+16-, 32-, and 48-pixel files remain because the manifest benefits from real
+native-size raster assets, but they are derived from that master rather than
+maintained as separate artwork. The action popup's Page title and URL no longer
+use ellipsis: they wrap within a bounded, keyboard-focusable region that scrolls
+independently when either value is unusually long.
+
+The macOS asset catalog adds one transparent vector `RecallMarkTemplate` that
+uses the Recall logo's ring, satellite circle, and center dot as monochrome
+geometry. `MenuBarExtra` renders it as a template so macOS supplies the correct
+light/dark and selected-state color. The shared Quick Capture header uses the
+same vector with Recall's accent color, including the screenshot-note save
+window. The colored square AppIcon remains the application and Dock icon.
+
+Xcode compiled the vector asset and the host suite passed all 189 tests,
+including production Apple Vision OCR. The dependency-free extension suite
+passed all 70 tests, including new regressions for Page wrapping, independent
+scrolling, and removal of title ellipsis. Live screen inspection was unavailable
+in the verification environment because macOS ScreenCaptureKit could not start;
+asset rendering, compilation, and automated layout evidence remain complete.
+The user subsequently accepted the popup Page metadata, menu-bar logo, and
+Quick Capture logo in the running products on 2026-07-21.
 
 ## Pending decisions
 

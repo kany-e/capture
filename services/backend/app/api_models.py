@@ -26,9 +26,13 @@ from app.limits import (
     SOURCE_TITLE_MAX_LENGTH,
     SOURCE_URL_MAX_LENGTH,
     USER_NOTE_MAX_LENGTH,
+    USER_DETAIL_MAX_LENGTH,
+    USER_LIST_ITEM_MAX_LENGTH,
+    USER_LIST_MAX_ITEMS,
+    USER_TITLE_MAX_LENGTH,
 )
 from app.ocr import decode_screenshot
-from app.models import AttachmentRecord, CaptureRecord, NewCapture
+from app.models import AttachmentRecord, CaptureRecord, CaptureUserUpdate, NewCapture
 
 
 URL_ADAPTER = TypeAdapter(AnyUrl)
@@ -179,6 +183,19 @@ class CaptureResponse(ApiModel):
     search_aliases: list[str]
     error_message: str | None
     enrichment_version: int
+    user_edited_at: str | None = None
+    user_selected_text: str | None = None
+    user_source_app: str | None = None
+    user_source_title: str | None = None
+    user_source_url: str | None = None
+    user_title: str | None = None
+    user_problem: str | None = None
+    user_key_insight: str | None = None
+    user_why_saved: str | None = None
+    user_caveats: list[str] | None = None
+    user_tags: list[str] | None = None
+    ai_interpretation_hidden: bool = False
+    ai_content_stale: bool = False
     attachments: list[AttachmentResponse] = Field(default_factory=list)
 
     @classmethod
@@ -199,6 +216,65 @@ class CaptureListResponse(ApiModel):
     items: list[CaptureResponse]
     limit: int
     offset: int
+
+
+class CaptureUpdateRequest(ApiModel):
+    selected_text: str | None = Field(default=None, max_length=SELECTED_TEXT_MAX_LENGTH)
+    user_note: str | None = Field(default=None, max_length=USER_NOTE_MAX_LENGTH)
+    source_app: str | None = Field(default=None, max_length=SOURCE_APP_MAX_LENGTH)
+    source_title: str | None = Field(default=None, max_length=SOURCE_TITLE_MAX_LENGTH)
+    source_url: str | None = Field(default=None, max_length=SOURCE_URL_MAX_LENGTH)
+    user_title: str | None = Field(default=None, max_length=USER_TITLE_MAX_LENGTH)
+    user_problem: str | None = Field(default=None, max_length=USER_DETAIL_MAX_LENGTH)
+    user_key_insight: str | None = Field(default=None, max_length=USER_DETAIL_MAX_LENGTH)
+    user_why_saved: str | None = Field(default=None, max_length=USER_DETAIL_MAX_LENGTH)
+    user_caveats: list[str] | None = Field(default=None, max_length=USER_LIST_MAX_ITEMS)
+    user_tags: list[str] | None = Field(default=None, max_length=USER_LIST_MAX_ITEMS)
+    show_ai_interpretation: StrictBool = True
+
+    @field_validator("source_url")
+    @classmethod
+    def validate_update_source_url(cls, value: str | None) -> str | None:
+        if value:
+            URL_ADAPTER.validate_python(value)
+        return value
+
+    @field_validator("user_caveats", "user_tags")
+    @classmethod
+    def validate_user_lists(cls, values: list[str] | None) -> list[str] | None:
+        if values is None:
+            return None
+        for value in values:
+            if len(value) > USER_LIST_ITEM_MAX_LENGTH:
+                raise ValueError(
+                    f"list items can use up to {USER_LIST_ITEM_MAX_LENGTH} characters"
+                )
+        return values
+
+    def to_storage_model(
+        self,
+        existing: CaptureRecord | None = None,
+    ) -> CaptureUserUpdate:
+        values = self.model_dump()
+        if existing is not None:
+            existing_values: dict[str, object] = {
+                "selected_text": existing.user_selected_text,
+                "user_note": existing.user_note,
+                "source_app": existing.user_source_app,
+                "source_title": existing.user_source_title,
+                "source_url": existing.user_source_url,
+                "user_title": existing.user_title,
+                "user_problem": existing.user_problem,
+                "user_key_insight": existing.user_key_insight,
+                "user_why_saved": existing.user_why_saved,
+                "user_caveats": existing.user_caveats,
+                "user_tags": existing.user_tags,
+                "show_ai_interpretation": not existing.ai_interpretation_hidden,
+            }
+            for field, value in existing_values.items():
+                if field not in self.model_fields_set:
+                    values[field] = value
+        return CaptureUserUpdate.model_validate(values)
 
 
 class SearchResult(ApiModel):

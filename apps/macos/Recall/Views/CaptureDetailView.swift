@@ -8,6 +8,7 @@ struct CaptureDetailView: View {
     @State private var isSurroundingContextExpanded = false
     @State private var showsDeleteConfirmation = false
     @State private var isDeleting = false
+    @State private var showsEditSheet = false
 
     init(capture: Capture) {
         self.capture = capture
@@ -27,7 +28,15 @@ struct CaptureDetailView: View {
                     }
                 }
 
-                if let summary = capture.aiSummary?.nonEmptyTrimmed {
+                if capture.status != .processing, capture.aiContentStale {
+                    staleAISection
+                } else if capture.aiInterpretationHidden,
+                          capture.aiSummary?.nonEmptyTrimmed != nil {
+                    hiddenAISection
+                }
+
+                if !capture.aiInterpretationHidden,
+                   let summary = capture.aiSummary?.nonEmptyTrimmed {
                     RecallSection("AI interpretation", icon: "sparkles") {
                         Text(summary)
                             .font(.title3)
@@ -73,11 +82,11 @@ struct CaptureDetailView: View {
 
                 interpretationDetails
 
-                if !capture.tags.isEmpty {
+                if !capture.displayTags.isEmpty {
                     RecallSection("Tags", icon: "tag") {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 7) {
-                                ForEach(capture.tags, id: \.self) { tag in
+                                ForEach(capture.displayTags, id: \.self) { tag in
                                     TagPill(text: tag)
                                 }
                             }
@@ -98,12 +107,23 @@ struct CaptureDetailView: View {
         .background(Color(nsColor: .windowBackgroundColor).opacity(0.65))
         .navigationTitle(capture.displayTitle)
         .toolbar {
+            Button {
+                showsEditSheet = true
+            } label: {
+                Label("Edit memory", systemImage: "pencil")
+            }
+            .disabled(isDeleting || capture.status == .processing)
+
             Button(role: .destructive) {
                 showsDeleteConfirmation = true
             } label: {
                 Label("Delete memory", systemImage: "trash")
             }
             .disabled(isDeleting)
+        }
+        .sheet(isPresented: $showsEditSheet) {
+            CaptureEditView(capture: capture)
+                .environmentObject(store)
         }
         .confirmationDialog(
             "Delete this memory?",
@@ -189,7 +209,12 @@ struct CaptureDetailView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
                 if let createdDate = capture.createdDate {
-                    Text(createdDate.formatted(date: .abbreviated, time: .shortened))
+                    Text("Created \(createdDate.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                if let editedDate = capture.userEditedDate {
+                    Text("Edited \(editedDate.formatted(date: .abbreviated, time: .shortened))")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -232,14 +257,19 @@ struct CaptureDetailView: View {
     @ViewBuilder
     private var interpretationDetails: some View {
         let details: [(String, String, String)] = [
-            ("Problem", "questionmark.circle", capture.problem ?? ""),
-            ("Key insight", "lightbulb", capture.keyInsight ?? ""),
-            ("Why it mattered", "bookmark", capture.whySaved ?? ""),
+            ("Problem", "questionmark.circle", capture.displayProblem ?? ""),
+            ("Key insight", "lightbulb", capture.displayKeyInsight ?? ""),
+            ("Why it mattered", "bookmark", capture.displayWhySaved ?? ""),
         ].filter { $0.2.nonEmptyTrimmed != nil }
 
-        if !details.isEmpty || !capture.caveats.isEmpty {
+        if !details.isEmpty || !capture.displayCaveats.isEmpty {
             RecallSection("Memory details", icon: "square.grid.2x2") {
                 VStack(alignment: .leading, spacing: 16) {
+                    if capture.hasUserOrganizationOverrides {
+                        Label("Organized by you", systemImage: "person.crop.circle.badge.checkmark")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
                     ForEach(details, id: \.0) { detail in
                         Label {
                             VStack(alignment: .leading, spacing: 3) {
@@ -254,14 +284,14 @@ struct CaptureDetailView: View {
                                 .foregroundStyle(Color.accentColor)
                         }
                     }
-                    if !capture.caveats.isEmpty {
+                    if !capture.displayCaveats.isEmpty {
                         Divider()
                         Label {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("Caveats")
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.secondary)
-                                ForEach(capture.caveats, id: \.self) { caveat in
+                                ForEach(capture.displayCaveats, id: \.self) { caveat in
                                     Text("• \(caveat)")
                                         .textSelection(.enabled)
                                 }
@@ -300,6 +330,43 @@ struct CaptureDetailView: View {
         }
     }
 
+    private var staleAISection: some View {
+        RecallSection("AI interpretation", icon: "sparkles") {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(
+                    capture.aiInterpretationHidden
+                        ? "Hidden because the source or your note changed"
+                        : "Based on an earlier version of this memory",
+                    systemImage: "clock.badge.exclamationmark"
+                )
+                .font(.headline)
+                Text(
+                    "Recall keeps the previous AI layer separate instead of silently rewriting it. Refresh AI when you want a new interpretation based on the edited memory."
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                Button("Refresh AI", systemImage: "arrow.clockwise") {
+                    Task { await store.retryEnrichment(id: capture.id) }
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    private var hiddenAISection: some View {
+        RecallSection("AI interpretation", icon: "sparkles") {
+            HStack(spacing: 12) {
+                Label("Hidden for this memory", systemImage: "eye.slash")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Edit visibility") {
+                    showsEditSheet = true
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+    }
+
     private var errorSection: some View {
         RecallSection("Processing error", icon: "exclamationmark.triangle") {
             VStack(alignment: .leading, spacing: 12) {
@@ -319,5 +386,381 @@ struct CaptureDetailView: View {
                 .buttonStyle(.borderedProminent)
             }
         }
+    }
+}
+
+private struct CaptureEditView: View {
+    @EnvironmentObject private var store: RecallStore
+    @Environment(\.dismiss) private var dismiss
+    let capture: Capture
+    @State private var draft: CaptureEditDraft
+
+    init(capture: Capture) {
+        self.capture = capture
+        _draft = State(initialValue: CaptureEditDraft(capture: capture))
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Edit Memory")
+                        .font(.title2.weight(.bold))
+                    Text("Captured source, your edits, and AI output remain separate.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(22)
+
+            Divider()
+
+            Form {
+                Section("Title and note") {
+                    TextField("Memory title", text: $draft.title)
+                    Text("Leave blank to use the current AI or source title.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField(
+                        "Your note",
+                        text: $draft.userNote,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...6)
+                }
+
+                Section(
+                    capture.primaryImageAttachment == nil
+                        ? "Selected content"
+                        : "Text found in image"
+                ) {
+                    TextEditor(text: $draft.selectedText)
+                        .font(.body)
+                        .frame(minHeight: 120)
+                    Text(
+                        "\(draft.selectedText.unicodeScalars.count.formatted()) / \(RecallStore.maximumSelectedTextLength.formatted())"
+                    )
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(
+                        draft.selectedText.unicodeScalars.count
+                            > RecallStore.maximumSelectedTextLength ? .red : .secondary
+                    )
+                }
+
+                Section("Source") {
+                    TextField("Application", text: $draft.sourceApp)
+                    TextField("Source title", text: $draft.sourceTitle)
+                    TextField("URL", text: $draft.sourceURL)
+                }
+
+                Section("AI interpretation") {
+                    Toggle("Show AI interpretation", isOn: $draft.showAIInterpretation)
+                    Text(
+                        capture.aiContentStale
+                            ? "This interpretation is already based on an earlier version. Use Refresh AI from the detail view to rebuild it."
+                            : "Changing selected content, your note, or source marks the existing AI interpretation as out of date and hides it. Recall never regenerates automatically."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Section("Memory details · organized by you") {
+                    TextField("Problem", text: $draft.problem, axis: .vertical)
+                        .lineLimit(1...4)
+                    TextField("Key insight", text: $draft.keyInsight, axis: .vertical)
+                        .lineLimit(1...4)
+                    TextField("Why it mattered", text: $draft.whySaved, axis: .vertical)
+                        .lineLimit(1...4)
+                    EditableLineList(
+                        title: "Caveats",
+                        placeholder: "Add a caveat",
+                        values: $draft.caveats
+                    )
+                }
+
+                Section("Tags") {
+                    EditableTagList(tags: $draft.tags)
+                }
+
+                if let message = validationMessage ?? store.captureUpdateError {
+                    Section {
+                        Label(message, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .formStyle(.grouped)
+
+            Divider()
+
+            HStack {
+                Text("Saving updates the user-edited time; creation time never changes.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(store.isUpdatingCapture)
+                Button {
+                    save()
+                } label: {
+                    if store.isUpdatingCapture {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(minWidth: 64)
+                    } else {
+                        Text("Save Changes")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(validationMessage != nil || store.isUpdatingCapture)
+            }
+            .padding(18)
+        }
+        .frame(width: 660, height: 720)
+    }
+
+    private var validationMessage: String? {
+        if draft.selectedText.unicodeScalars.count > RecallStore.maximumSelectedTextLength {
+            return "Selected content is too long."
+        }
+        if draft.userNote.unicodeScalars.count > RecallStore.maximumUserNoteLength {
+            return "Your note is too long."
+        }
+        if draft.title.count > 200 {
+            return "The memory title can use up to 200 characters."
+        }
+        if [draft.problem, draft.keyInsight, draft.whySaved].contains(
+            where: { $0.count > 2_000 }
+        ) {
+            return "Each memory detail can use up to 2,000 characters."
+        }
+        if draft.tags.count > 20 || draft.caveats.count > 20 {
+            return "Tags and caveats can each contain up to 20 items."
+        }
+        if (draft.tags + draft.caveats).contains(where: { $0.count > 300 }) {
+            return "Each tag or caveat can use up to 300 characters."
+        }
+        if let url = draft.sourceURL.nonEmptyTrimmed {
+            guard let parsed = URL(string: url),
+                  let scheme = parsed.scheme?.lowercased(),
+                  scheme == "http" || scheme == "https" else {
+                return "Source URL must begin with http:// or https://."
+            }
+        }
+        if capture.primaryImageAttachment == nil,
+           draft.selectedText.nonEmptyTrimmed == nil,
+           draft.sourceTitle.nonEmptyTrimmed == nil,
+           draft.title.nonEmptyTrimmed == nil {
+            return "Keep at least a title, source title, or selected content."
+        }
+        return nil
+    }
+
+    private func save() {
+        guard validationMessage == nil else { return }
+        let request = CaptureUpdateRequest(
+            selectedText: sourceOverride(
+                currentOverride: capture.userSelectedText,
+                effectiveValue: capture.selectedText,
+                editedValue: draft.selectedText
+            ),
+            userNote: draft.userNote.nonEmptyTrimmed,
+            sourceApp: sourceOverride(
+                currentOverride: capture.userSourceApp,
+                effectiveValue: capture.sourceApp ?? "",
+                editedValue: draft.sourceApp
+            ),
+            sourceTitle: sourceOverride(
+                currentOverride: capture.userSourceTitle,
+                effectiveValue: capture.sourceTitle ?? "",
+                editedValue: draft.sourceTitle
+            ),
+            sourceURL: sourceOverride(
+                currentOverride: capture.userSourceURL,
+                effectiveValue: capture.sourceURL ?? "",
+                editedValue: draft.sourceURL
+            ),
+            userTitle: draft.title.nonEmptyTrimmed,
+            userProblem: manualText(draft.problem, aiValue: capture.problem),
+            userKeyInsight: manualText(
+                draft.keyInsight,
+                aiValue: capture.keyInsight
+            ),
+            userWhySaved: manualText(draft.whySaved, aiValue: capture.whySaved),
+            userCaveats: manualList(draft.caveats, aiValues: capture.caveats),
+            userTags: manualList(draft.tags, aiValues: capture.tags),
+            showAIInterpretation: draft.showAIInterpretation
+        )
+        Task {
+            if await store.updateCapture(id: capture.id, request: request) {
+                dismiss()
+            }
+        }
+    }
+
+    private func normalized(_ values: [String]) -> [String] {
+        var seen: Set<String> = []
+        return values.compactMap { value in
+            guard let trimmed = value.nonEmptyTrimmed else { return nil }
+            let key = trimmed.folding(
+                options: [.caseInsensitive, .diacriticInsensitive],
+                locale: .current
+            )
+            return seen.insert(key).inserted ? trimmed : nil
+        }
+    }
+
+    private func manualText(_ value: String, aiValue: String?) -> String? {
+        let edited = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let generated = aiValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return edited == generated ? nil : edited
+    }
+
+    private func sourceOverride(
+        currentOverride: String?,
+        effectiveValue: String,
+        editedValue: String
+    ) -> String? {
+        if currentOverride == nil, editedValue == effectiveValue {
+            return nil
+        }
+        return editedValue
+    }
+
+    private func manualList(_ values: [String], aiValues: [String]) -> [String]? {
+        let edited = normalized(values)
+        return edited == aiValues ? nil : edited
+    }
+}
+
+private struct CaptureEditDraft {
+    var title: String
+    var userNote: String
+    var selectedText: String
+    var sourceApp: String
+    var sourceTitle: String
+    var sourceURL: String
+    var showAIInterpretation: Bool
+    var problem: String
+    var keyInsight: String
+    var whySaved: String
+    var caveats: [String]
+    var tags: [String]
+
+    init(capture: Capture) {
+        title = capture.userTitle ?? ""
+        userNote = capture.userNote ?? ""
+        selectedText = capture.selectedText
+        sourceApp = capture.sourceApp ?? ""
+        sourceTitle = capture.sourceTitle ?? ""
+        sourceURL = capture.sourceURL ?? ""
+        showAIInterpretation = !capture.aiInterpretationHidden
+        problem = capture.userProblem ?? capture.problem ?? ""
+        keyInsight = capture.userKeyInsight ?? capture.keyInsight ?? ""
+        whySaved = capture.userWhySaved ?? capture.whySaved ?? ""
+        caveats = capture.userCaveats ?? capture.caveats
+        tags = capture.userTags ?? capture.tags
+    }
+}
+
+private struct EditableTagList: View {
+    @Binding var tags: [String]
+    @State private var newTag = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 7) {
+                    ForEach(Array(tags.enumerated()), id: \.offset) { index, tag in
+                        HStack(spacing: 5) {
+                            Text(tag)
+                            Button {
+                                tags.remove(at: index)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Remove tag \(tag)")
+                        }
+                        .font(.caption.weight(.medium))
+                        .padding(.leading, 9)
+                        .padding(.trailing, 6)
+                        .padding(.vertical, 5)
+                        .foregroundStyle(Color.accentColor)
+                        .background(Color.accentColor.opacity(0.10), in: Capsule())
+                    }
+                }
+            }
+
+            HStack {
+                TextField("New tag", text: $newTag)
+                    .onSubmit(addTag)
+                Button("Add", systemImage: "plus", action: addTag)
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color.secondary.opacity(0.6),
+                                style: StrokeStyle(lineWidth: 1, dash: [4, 3])
+                            )
+                    }
+                    .disabled(newTag.nonEmptyTrimmed == nil || tags.count >= 20)
+            }
+        }
+    }
+
+    private func addTag() {
+        guard let value = newTag.nonEmptyTrimmed,
+              !tags.contains(where: { $0.caseInsensitiveCompare(value) == .orderedSame }),
+              tags.count < 20 else { return }
+        tags.append(value)
+        newTag = ""
+    }
+}
+
+private struct EditableLineList: View {
+    let title: String
+    let placeholder: String
+    @Binding var values: [String]
+    @State private var newValue = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            ForEach(Array(values.enumerated()), id: \.offset) { index, _ in
+                HStack {
+                    TextField(placeholder, text: $values[index], axis: .vertical)
+                        .lineLimit(1...3)
+                    Button {
+                        values.remove(at: index)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Remove caveat")
+                }
+            }
+            HStack {
+                TextField(placeholder, text: $newValue)
+                    .onSubmit(addValue)
+                Button("Add", systemImage: "plus", action: addValue)
+                    .disabled(newValue.nonEmptyTrimmed == nil || values.count >= 20)
+            }
+        }
+    }
+
+    private func addValue() {
+        guard let value = newValue.nonEmptyTrimmed, values.count < 20 else { return }
+        values.append(value)
+        newValue = ""
     }
 }

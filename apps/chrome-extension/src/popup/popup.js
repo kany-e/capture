@@ -8,7 +8,6 @@ import {
 } from "../api/messages.js";
 import { extractPageCapture } from "../content/capture.js";
 import { createCaptureAttempt } from "./capture-attempt.js";
-import { createInlinePermissionController } from "./inline-permission.js";
 
 
 const pageTitle = document.querySelector("#page-title");
@@ -23,9 +22,7 @@ const saveButton = document.querySelector("#save-button");
 const statusBox = document.querySelector("#status");
 const statusTitle = document.querySelector("#status-title");
 const statusDetail = document.querySelector("#status-detail");
-const inlineSetting = document.querySelector(".inline-setting");
-const inlineToggle = document.querySelector("#inline-capture-toggle");
-const inlinePermissionStatus = document.querySelector("#inline-permission-status");
+const settingsButton = document.querySelector("#settings-button");
 
 let activeTab = null;
 let extractedCapture = null;
@@ -34,7 +31,6 @@ let isSubmitting = false;
 let retryAllowed = true;
 
 const captureAttempt = createCaptureAttempt(buildCaptureAttempt);
-const inlinePermissionController = createInlinePermissionController();
 const SUCCESS_CLOSE_DELAY_MS = 700;
 
 
@@ -178,60 +174,6 @@ async function initialize() {
 }
 
 
-function showInlinePermissionStatus(message, kind = "information") {
-  inlinePermissionStatus.hidden = !message;
-  inlinePermissionStatus.textContent = message;
-  inlinePermissionStatus.dataset.kind = kind;
-}
-
-
-async function initializeInlinePermission() {
-  if (!chrome.permissions?.contains || !chrome.runtime?.sendMessage) {
-    inlineSetting.hidden = true;
-    return;
-  }
-  inlineToggle.disabled = true;
-  try {
-    inlineToggle.checked = await inlinePermissionController.currentEnabled();
-  } catch (_error) {
-    showInlinePermissionStatus(
-      "Inline capture access could not be checked.",
-      "error",
-    );
-  } finally {
-    inlineToggle.disabled = false;
-  }
-}
-
-
-async function setInlinePermission(enabled) {
-  inlineToggle.disabled = true;
-  showInlinePermissionStatus("");
-  try {
-    const result = await inlinePermissionController.setEnabled(enabled);
-    inlineToggle.checked = result.enabled;
-    if (result.reason === "denied") {
-      showInlinePermissionStatus("Website access was not granted.", "error");
-      return;
-    }
-    showInlinePermissionStatus(
-      result.enabled
-        ? "Enabled on open web pages; no refresh is needed."
-        : "Inline capture is off; toolbar capture still works.",
-    );
-  } catch (_error) {
-    inlineToggle.checked = await inlinePermissionController.currentEnabled()
-      .catch(() => !enabled);
-    showInlinePermissionStatus(
-      "Recall could not update website access.",
-      "error",
-    );
-  } finally {
-    inlineToggle.disabled = false;
-  }
-}
-
-
 noteInput.addEventListener("input", () => {
   updateControls();
   void persistDraft().catch(() => {
@@ -285,8 +227,8 @@ saveButton.addEventListener("click", () => {
 });
 
 
-inlineToggle.addEventListener("change", () => {
-  void setInlinePermission(inlineToggle.checked);
+settingsButton.addEventListener("click", () => {
+  void chrome.runtime.openOptionsPage();
 });
 
 
@@ -302,4 +244,4 @@ document.addEventListener("keydown", (event) => {
 });
 
 
-void Promise.all([initialize(), initializeInlinePermission()]);
+void initialize();
