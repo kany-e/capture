@@ -37,8 +37,8 @@ shortcut, background AX reading, secure/protected-content rejection, transient
 selection bounds, anchored Quick Capture, and backward-compatible shortcut
 migration. The host macOS suite passes 108/108, and the user accepted the
 primary AX path. WeChat then exposed an expected unsupported-control gap;
-D-035 is implemented with a 149/149 host suite; B-016 now gates its real-device
-clipboard compatibility acceptance before merge.
+D-035 is implemented with a 149/149 host suite, and B-016 closed after final
+real-device acceptance on 2026-07-21.
 
 Last baseline cross-check: 2026-07-18 against all sections of
 `docs/product-plan.md`
@@ -91,7 +91,7 @@ Update protocol:
 | Safeguard | Stable Screen Recording identity | Complete and live-verified | D-032 passes 70/70 macOS tests; app-specific reset, authorization, rebuild persistence, selector launch, and cancellation pass |
 | Safeguard | Chrome action popup sizing | Complete and real-Chrome verified | D-033 uses a 344 × 510 root without viewport-height feedback; 68/68 tests and selected/metadata layouts pass |
 | Addition | Native Accessibility selection | Implemented; primary path accepted | D-034 adds explicit `Option+Shift+Command+S`, fail-closed AX reading, anchored review, safe v1 shortcut migration, and 108/108 macOS tests; user acceptance passed on 2026-07-21 |
-| Addition | Clipboard selection compatibility | Implemented; manual acceptance pending | D-035 adds an off-by-default transactional synthetic-Copy fallback with exact-control and application-scoped tickets; 149/149 host tests pass and B-016 is open |
+| Addition | Clipboard selection compatibility | Complete and real-device accepted | D-035 adds an off-by-default transactional synthetic-Copy fallback with exact-control and application-scoped tickets; 149/149 host tests and B-016 user acceptance pass |
 
 The D-023 integration closes B-010, the macOS slice closes B-006, and real
 provider plus unpacked-Chrome evidence closes B-007, B-008, and B-009. B-011 is
@@ -318,9 +318,9 @@ complete
 
 ## Active addition — native Accessibility selection
 
-Status: `[x]` D-034 implementation, 108/108 host tests, draft PR #13, and
+Status: `[x]` D-034 implementation, 108/108 host tests, PR #13, and
 primary-path user acceptance complete on `codex/native-accessibility-selection`;
-D-035/B-016 now cover the WeChat compatibility follow-up
+D-035/B-016 compatibility acceptance is also complete
 
 - [x] Add a third configurable **Selection capture** action with default
   `Option+Shift+Command+S`, generic three-way duplicate validation, and the
@@ -354,10 +354,10 @@ D-035/B-016 now cover the WeChat compatibility follow-up
 - [x] Open non-auto-merged draft PR #13 and obtain user confirmation that the
   primary Accessibility path works on the stably signed app.
 
-## Active privacy/compatibility safeguard — transactional clipboard fallback
+## Completed privacy/compatibility safeguard — transactional clipboard fallback
 
-Status: `[~]` D-035 implementation and its 149/149 host suite are complete on
-draft PR #13; B-016 manual acceptance must pass before merge
+Status: `[x]` D-035 implementation, its 149/149 host suite, and B-016 user
+acceptance are complete; the user authorized merge on 2026-07-21
 
 - [x] Keep the primary D-034 Accessibility path unchanged and add a separately
   persisted **Clipboard Compatibility Mode** that is off by default.
@@ -381,7 +381,7 @@ draft PR #13; B-016 manual acceptance must pass before merge
   macOS's missing writer identity/atomic restore and delayed-Copy residual risk.
 - [x] Complete automated service/store/privacy tests and pass the expanded
   149/149 host suite.
-- [ ] Pass B-016 in WeChat before any merge.
+- [x] Pass B-016 in WeChat and obtain explicit merge authorization.
 
 ## Active reliability correction — stable Screen Recording identity
 
@@ -1632,8 +1632,8 @@ release candidates should repeat the interaction check.
 
 - Opened: 2026-07-21
 - Severity: Manual UI/privacy/compatibility gate
-- Status: Primary AX path accepted by the user on 2026-07-21; PR remains open
-  for the D-035/B-016 compatibility follow-up
+- Status: Closed; primary AX and D-035 compatibility paths were accepted by the
+  user on 2026-07-21
 - Automated evidence: The host macOS suite passes 108/108. It covers permission
   fail-closed ordering, self/secure/protected-content rejection, exact text,
   optional bounds, no-context contract mapping, 12,000-character protection,
@@ -1642,15 +1642,14 @@ release candidates should repeat the interaction check.
   observed regression. WeChat does not expose the selected text through the AX
   path, which correctly produced failure rather than stale clipboard content
   and motivated the separately opt-in D-035 fallback.
-- Merge rule: D-034 no longer blocks by itself. Draft PR #13 must remain
-  unmerged until B-016 verifies the new compatibility transaction and any
-  discovered regression is resolved.
+- Merge rule: Satisfied by B-016 acceptance and explicit user authorization.
 
 ## B-016 — Clipboard Compatibility Mode acceptance
 
 - Opened: 2026-07-21
 - Severity: Manual privacy/data-preservation/compatibility gate
-- Status: Open; required before merging D-035 / PR #13
+- Status: Closed on 2026-07-21; the user reported no issue in final WeChat
+  testing and explicitly authorized merging PR #13
 - Automated evidence: 149/149 host tests pass, including eligibility isolation,
   exact Unicode, default-off and persisted opt-in, exact-control and
   application-scoped AX tickets,
@@ -1661,17 +1660,13 @@ release candidates should repeat the interaction check.
   Save. The deterministic service tests use a fake pasteboard and do not touch
   the user's general clipboard; real AppKit multi-item/type, image, Finder-file,
   lazy-provider, and round-trip behavior remains part of this manual gate.
-- Manual evidence still needed: Enable the mode in Selection access, put known
-  text/rich text, an image, and Finder files on the clipboard in turn, then
-  select known Chinese/emoji/multiline text in WeChat and physically press
-  `Option+Shift+Command+S`. Verify the selection draft, fallback disclosure, and
-  exact prior clipboard paste. Repeat with no selection, a password field,
-  rapid triggers, immediate app switching, and a manual clipboard write during
-  capture. With a clipboard-history app or Universal Clipboard available,
-  confirm the documented transient entry may appear rather than claiming it is
-  invisible.
-- Merge rule: Keep PR #13 as a draft and unmerged until the user reports the
-  WeChat and clipboard-preservation matrix and all automated/CI checks pass.
+- Manual evidence: After the application-scoped fallback correction, the user
+  confirmed the WeChat flow works, reported no current issue, and authorized
+  merge. The broader rich-text/image/Finder/lazy-provider and deliberate-race
+  matrix was not separately enumerated in that report; retain it as release
+  regression coverage rather than claiming every format was manually proven.
+- Merge rule: Satisfied. Keep the documented best-effort clipboard limitations
+  and repeat the broader matrix before a release candidate.
 
 # Errors encountered
 

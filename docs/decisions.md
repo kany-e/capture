@@ -48,7 +48,7 @@ addition made beyond [`product-plan.md`](product-plan.md).
 | D-032 | Stable development code identity for TCC-protected screenshot capture | Reliability/privacy safeguard | Implemented; 70/70 tests and live TCC rebuild-persistence proof pass |
 | D-033 | Deterministic Chrome action-popup dimensions | Reliability safeguard | Implemented; 68/68 tests and real-Chrome selected/metadata layouts pass |
 | D-034 | User-triggered native Accessibility selection capture | Addition | Implemented; 108/108 host tests and primary-path user acceptance pass |
-| D-035 | Opt-in transactional clipboard fallback for native selection | Compatibility/privacy safeguard | Implemented on draft PR #13; 149/149 host tests pass and WeChat acceptance is pending |
+| D-035 | Opt-in transactional clipboard fallback for native selection | Compatibility/privacy safeguard | Implemented; 149/149 host tests and user WeChat acceptance pass |
 
 ## D-001 — Localhost monorepo architecture
 
@@ -926,8 +926,7 @@ visible and reachable; verification did not submit a Capture.
   tests and primary-path user acceptance pass
 - Product impact: Reduces native selected-text capture to one explicit shortcut
   and opens the existing review UI near the selection
-- Schedule impact: Primary-path gate closed; PR #13 remains gated on the
-  separate D-035/B-016 clipboard-compatibility acceptance
+- Schedule impact: Primary-path and D-035/B-016 compatibility gates closed
 
 Recall will add a third configurable global action, **Capture Selection**, with
 `Option+Shift+Command+S` as its default. Only after the user invokes that action
@@ -962,12 +961,11 @@ testable while retaining the explicit shortcut as the reliable fallback.
 ## D-035 — Opt-in transactional clipboard fallback for native selection
 
 - Classification: Compatibility and privacy safeguard approved by user direction
-- Status: Implemented on `codex/native-accessibility-selection` / draft PR #13;
-  149/149 host tests pass and B-016 manual acceptance remains open
+- Status: Implemented on `codex/native-accessibility-selection`; 149/149 host
+  tests pass and B-016 user acceptance closed on 2026-07-21
 - Product impact: Lets the explicit Capture Selection shortcut work in apps
   such as WeChat that can copy a selection but do not expose its text through AX
-- Schedule impact: Extends the current draft PR and adds B-016 real-device
-  clipboard-preservation acceptance before merge
+- Schedule impact: B-016 real-device acceptance passed; user authorized merge
 
 D-034 remains the primary path and continues to read selected text directly
 without touching the clipboard. D-035 adds a separately persisted **Clipboard

@@ -234,8 +234,8 @@ contract; selection bounds are used only to position Quick Capture and are never
 persisted. The host suite passes 108/108 tests, including permission and secure-
 field fail-closed behavior, exact Unicode preservation, old shortcut migration,
 cancellation, oversized-source rejection, and multi-screen placement geometry.
-The user accepted the primary native path on the stably signed app; PR #13 now
-remains open for D-035 WeChat and clipboard-preservation acceptance.
+The user accepted the primary native path and the D-035 WeChat compatibility
+path on the stably signed app on 2026-07-21.
 
 D-035 adds the opt-in transactional clipboard fallback requested after initial
 real-device selection testing. It never runs for missing permission, Recall
@@ -248,8 +248,9 @@ two consecutive, matching clipboard results and attempts restoration only while
 the observed change count remains unchanged. This substantially narrows races
 but cannot make restoration atomic or identify the writer. The in-memory backup
 is never logged, persisted, or sent to the backend. The current host suite passes
-149/149 tests. WeChat behavior and real AppKit preservation of rich text, images,
-and Finder-file clipboards remain manual acceptance gates.
+149/149 tests. The user reported no issue in final WeChat testing and authorized
+merge; rich text, image, Finder-file, and race cases remain release-regression
+coverage rather than an open merge gate.
 
 Final regression also passes 215 backend tests, 44/44 stress scenarios, and
 68/68 Chrome-extension tests.

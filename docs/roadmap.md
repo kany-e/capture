@@ -40,8 +40,8 @@ split; they are no longer assignment gates.
   motivated the separately gated D-035 compatibility fallback.
 - D-035 extends the same draft PR with an off-by-default transactional clipboard
   compatibility mode for apps such as WeChat. It supports exact-control tickets
-  and application-scoped tickets for custom-drawn apps. Its current host suite passes 149/149; B-016
-  clipboard-preservation acceptance remains open.
+  and application-scoped tickets for custom-drawn apps. Its current host suite
+  passes 149/149; B-016 user acceptance passed on 2026-07-21.
 - The macOS app and Chrome extension are separate clients of the loopback
   FastAPI service. The app does not yet package or start that service.
 
@@ -111,9 +111,10 @@ not approval from a particular historical developer role.
    attempts, accepts only matching consecutive results, and then performs a
    best-effort restore. macOS has no writer identity or atomic restore, so the
    UI and documentation disclose residual writer and delayed-Copy races. The
-   expanded host suite passes 149/149. Do not merge until B-016 covers WeChat,
-   real rich clipboard formats, password fields, races, screen edges, and
-   physical shortcuts.
+   expanded host suite passes 149/149. B-016 closed after the user reported no
+   issue in final WeChat testing and authorized merge. Rich clipboard formats,
+   password fields, races, and screen-edge cases remain release regression
+   coverage.
 5. **App-managed local service lifecycle.** Define how a packaged Recall app
    starts, monitors, and stops the backend without assuming a repository checkout
    or terminal command. Keep this separate from browser native messaging.
